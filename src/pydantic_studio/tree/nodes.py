@@ -186,6 +186,37 @@ class DecimalNode(FormNode):
         return self.value
 
 
+class EnumNode(FormNode):
+    """Holds a single value drawn from a closed set of Enum members."""
+
+    kind: Literal["enum"] = "enum"
+    value: Any = None  # an Enum member or None
+    default: Any = None
+    # Enum members serialized as (name, member) pairs. Member objects are
+    # not Pydantic-friendly across snapshots, so we also store the FQ name
+    # of the Enum class for round-trip via sys.modules lookup.
+    enum_class_name: str
+    choices: list[tuple[str, Any]] = []
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    def to_python(self) -> Any:
+        return self.value
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from enum import Enum
+
+        short_name = self.enum_class_name.rsplit(".", 1)[-1]
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, Enum):
+            return (f"{value!r} is not a {short_name} member",)
+        # Compare by name to avoid identity drift across imports.
+        if value.name not in [name for name, _ in self.choices]:
+            return (f"{value!r} is not a {short_name} member",)
+        return ()
+
+
 class GroupNode(FormNode):
     """Represents a nested Pydantic BaseModel with a list of child nodes."""
 
@@ -265,7 +296,7 @@ class GroupNode(FormNode):
 
 # Discriminated union — every concrete node type uses ``kind`` as discriminator.
 AnyNode = Annotated[
-    StringNode | IntNode | FloatNode | BoolNode | DecimalNode | GroupNode,
+    StringNode | IntNode | FloatNode | BoolNode | DecimalNode | EnumNode | GroupNode,
     Discriminator("kind"),
 ]
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -25,3 +26,13 @@ class Address(BaseModel):
 class Person(BaseModel):
     name: str
     address: Address  # nested BaseModel
+
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+
+class WithColor(BaseModel):
+    favorite: Color = Color.BLUE
