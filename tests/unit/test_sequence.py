@@ -154,3 +154,28 @@ def test_fixed_tuple_to_instance_round_trip() -> None:
     tree = build_form_tree(WithFixedTuple, existing={"rgb": (1, 2, 3)})
     instance = tree.to_instance()
     assert instance.rgb == (1, 2, 3)
+
+
+def test_fixed_tuple_to_python_returns_none_when_all_slots_none() -> None:
+    """All-None tuple_fixed must return None so the parent group filters
+    the key — letting Pydantic apply the schema default for the field."""
+    seq = SequenceNode(
+        name="rgb",
+        origin="tuple_fixed",
+        items=[
+            IntNode(name="0", value=None),
+            IntNode(name="1", value=None),
+            IntNode(name="2", value=None),
+        ],
+        slot_type_names=["builtins.int", "builtins.int", "builtins.int"],
+    )
+    assert seq.to_python() is None
+
+
+def test_fixed_tuple_no_existing_uses_schema_default() -> None:
+    """When existing data is omitted, the default tuple from the schema
+    flows through to the materialized instance."""
+    tree = build_form_tree(WithFixedTuple)
+    instance = tree.to_instance()
+    assert instance.rgb == (0, 0, 0)
+    assert instance.pair == ("k", 0)

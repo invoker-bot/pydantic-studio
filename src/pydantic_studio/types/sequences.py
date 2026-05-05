@@ -104,7 +104,8 @@ class TupleBuilder:
         self._registry = registry
 
     def matches(self, type_: type) -> bool:
-        return get_origin(strip_annotated(type_)) is tuple
+        unwrapped = strip_annotated(type_)
+        return unwrapped is tuple or get_origin(unwrapped) is tuple
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> SequenceNode:
         from pydantic.fields import FieldInfo as _FI
