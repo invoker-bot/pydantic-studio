@@ -317,7 +317,8 @@ class LiteralNode(FormNode):
         return self.value
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
-        if value is None:
+        # If None is a declared choice, treat it like any other member.
+        if value is None and None not in self.choices:
             return () if not self.required else ("value is required",)
         if value not in self.choices:
             return (f"{value!r} not in choices {self.choices!r}",)
