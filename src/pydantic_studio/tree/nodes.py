@@ -7,6 +7,7 @@ the abstract base ``FormNode``.
 
 from __future__ import annotations
 
+import sys
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -132,20 +133,36 @@ class GroupNode(FormNode):
 
     @field_validator("schema_class", mode="before")
     @classmethod
-    def deserialize_schema_class(cls, v: Any) -> Any:
-        """Deserialize schema_class from a fully qualified name string."""
-        if isinstance(v, str):
-            parts = v.rsplit(".", 1)
-            if len(parts) == 2:
-                module_name, class_name = parts
-                import sys
-
-                if module_name in sys.modules:
-                    module = sys.modules[module_name]
-                    if hasattr(module, class_name):
-                        return getattr(module, class_name)
-            return v
-        return v
+    def _deserialize_schema_class(cls, v: Any) -> Any:
+        """If ``v`` is a serialized string (`module.ClassName`), look up the
+        class from ``sys.modules``. Raise ValueError with diagnostic info on
+        failure so debugging draft-load problems is easier."""
+        if not isinstance(v, str):
+            return v  # already a class object — no change needed
+        parts = v.rsplit(".", 1)
+        if len(parts) != 2:
+            msg = (
+                f"Cannot deserialize schema_class from {v!r}: expected the "
+                f"'module.ClassName' format produced by the field_serializer."
+            )
+            raise ValueError(msg)
+        module_name, class_name = parts
+        module = sys.modules.get(module_name)
+        if module is None:
+            msg = (
+                f"Cannot deserialize schema_class {v!r}: module {module_name!r} "
+                f"is not in sys.modules. Ensure the module is imported before "
+                f"loading the snapshot/draft."
+            )
+            raise ValueError(msg)
+        if not hasattr(module, class_name):
+            msg = (
+                f"Cannot deserialize schema_class {v!r}: module {module_name!r} "
+                f"has no attribute {class_name!r}. The class may have been "
+                f"renamed or moved since the snapshot/draft was created."
+            )
+            raise ValueError(msg)
+        return getattr(module, class_name)
 
     def find(self, name: str) -> AnyNode | None:
         """Find a child node by name, or None if not found."""

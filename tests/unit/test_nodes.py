@@ -212,6 +212,7 @@ def test_group_node_round_trip_via_json():
     )
     raw = g.model_dump_json()
     restored = GroupNode.model_validate_json(raw)
+    assert restored.schema_class is _PersonSchema
     assert isinstance(restored.fields[0], StringNode)
     assert isinstance(restored.fields[1], IntNode)
     assert restored.to_python() == {"name": "bob", "age": 42}
