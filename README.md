@@ -1,44 +1,57 @@
 # pydantic-studio
 
-Interactive editor for Pydantic models — generates `config.yaml` / `.toml` / `.json` files via terminal UI, ephemeral local web UI, or CLI.
+Interactive editor for Pydantic models. Generate and edit `config.yaml` /
+`config.toml` / `config.json` against a schema.
 
-**Status:** Phase 1 complete (Form Tree core). No CLI / TUI / Web yet — see roadmap below.
+## Status
 
-## What works today (Phase 1 — programmatic API)
+Phase 2 (Type Coverage) — alpha. Programmatic API only; CLI / TUI / Web
+coming in later phases.
+
+## Quick example (programmatic)
 
 ```python
-from pydantic import BaseModel
-import pydantic_studio as ps
+from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from pydantic_studio import build_form_tree
+
+
+class Tier(Enum):
+    BASIC = "basic"
+    PRO = "pro"
+
 
 class Settings(BaseModel):
-    name: str
-    port: int = 8080
+    name: str = Field(min_length=1)
+    tier: Tier = Tier.BASIC
+    log_level: Literal["debug", "info", "warn"] = "info"
+    tags: list[str] = []
+    settings: dict[str, int] = {}
+    primary: int | str = 0
+    nickname: str | None = None
 
-# Build a form tree
-tree = ps.build_form_tree(Settings, existing={"port": 9000})
 
-# Edit programmatically (renderers come in Phase 4–5)
-tree.set_value("name", "my-service")
-tree.set_value("port", 9001)
-tree.undo()  # back to 9000
-tree.redo()  # forward to 9001
+tree = build_form_tree(Settings, existing={"name": "alice"})
+result = tree.set_value("name", "bob")
+assert result.ok
 
-# Materialize into the user's pydantic model
-settings = tree.to_instance()
-assert settings.port == 9001
+tree.add_item("tags", "first-tag")
+tree.add_entry("settings", "timeout", 30)
+tree.select_variant("primary", 1, seed="hello")
+
+instance = tree.to_instance()  # Settings(name='bob', tags=['first-tag'], ...)
 ```
 
-## Roadmap
+## Supported types
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Form Tree core (primitives + groups + undo/redo + drafts) | ✅ done |
-| 2 | Type coverage (Sequence/Mapping/Union/Enum/Literal/datetime/network/special) | ⏳ planned |
-| 3 | YAML I/O + CLI MVP | ⏳ planned |
-| 4 | Textual renderer (TUI) | ⏳ planned |
-| 5 | HTML renderer (HTMX + Tailwind) | ⏳ planned |
-| 6 | TOML / JSON I/O + polish + docs | ⏳ planned |
+Phase 2 adds: `Enum`, `Literal[...]`, `list[T]` / `set[T]` / `tuple[T, ...]`,
+fixed-length `tuple[T1, T2, ...]`, `dict[K, V]`, true unions (`int | str`),
+and Optional (`T | None`). Pydantic v2 constrained types (`constr`,
+`conint`, ...) are supported via the metadata extractor.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT
