@@ -7,7 +7,7 @@ the abstract base ``FormNode``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -34,3 +34,20 @@ class FormNode(BaseModel):
         """Return this node's value in a form suitable for `model_validate`."""
         msg = f"{type(self).__name__}.to_python is not implemented"
         raise NotImplementedError(msg)
+
+
+class StringNode(FormNode):
+    """Holds a string value, with optional length / regex / multiline / secret hints."""
+
+    kind: Literal["string"] = "string"
+    value: str | None = None
+    default: str | None = None
+
+    min_length: int | None = None
+    max_length: int | None = None
+    pattern: str | None = None  # regex source; rendered as a label, not enforced here
+    multiline: bool = False
+    secret: bool = False
+
+    def to_python(self) -> str | None:
+        return self.value
