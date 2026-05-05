@@ -10,6 +10,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from pydantic_studio.exceptions import NoBuilderError
@@ -17,6 +18,7 @@ from pydantic_studio.tree.nodes import (
     BoolNode,
     DecimalNode,
     FloatNode,
+    GroupNode,
     IntNode,
     StringNode,
 )
@@ -64,6 +66,45 @@ class Registry:
 _DEFAULT_REGISTRY: Registry | None = None
 
 
+class GroupBuilder:
+    """Recursive builder for any ``BaseModel`` subclass.
+
+    This builder is special: it owns a reference to the registry so it can
+    dispatch each field to whichever builder matches the field's annotation.
+    """
+
+    def __init__(self, registry: Registry) -> None:
+        self._registry = registry
+
+    def matches(self, type_: type) -> bool:
+        return isinstance(type_, type) and issubclass(type_, BaseModel)
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> GroupNode:
+        assert issubclass(type_, BaseModel)
+        existing_dict: dict[str, Any] = existing if isinstance(existing, dict) else {}
+
+        children: list[Any] = []
+        for fname, finfo in type_.model_fields.items():
+            child_type = finfo.annotation
+            if child_type is None:
+                child_type = str  # fallback — shouldn't happen in practice
+            child_builder = self._registry.find(child_type)
+            child = child_builder.build(child_type, finfo, existing_dict.get(fname))
+            # The child builder didn't know the field name (it sees only the
+            # type); we set it here from the parent's perspective. This avoids
+            # the `FieldInfo.alias` hack and respects users' real aliases.
+            child.name = fname
+            children.append(child)
+
+        return GroupNode(
+            name=field_info.alias or type_.__name__,
+            description=field_info.description,
+            required=field_info.is_required(),
+            schema_class=type_,
+            fields=children,
+        )
+
+
 def default_registry() -> Registry:
     """Return the global default registry (lazily constructed).
 
@@ -81,6 +122,10 @@ def default_registry() -> Registry:
         reg.register(FloatBuilder())
         reg.register(BoolBuilder())
         reg.register(DecimalBuilder())
+        # GroupBuilder is registered last so it matches *any* BaseModel
+        # only when no more-specific builder did. It also needs a back-
+        # reference to the registry for recursive dispatch.
+        reg.register(GroupBuilder(reg))
         _DEFAULT_REGISTRY = reg
     return _DEFAULT_REGISTRY
 

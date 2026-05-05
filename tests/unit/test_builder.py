@@ -10,6 +10,7 @@ from pydantic_studio.tree.builder import (
     BoolBuilder,
     DecimalBuilder,
     FloatBuilder,
+    GroupBuilder,
     IntBuilder,
     NodeBuilder,
     Registry,
@@ -20,9 +21,11 @@ from pydantic_studio.tree.nodes import (
     BoolNode,
     DecimalNode,
     FloatNode,
+    GroupNode,
     IntNode,
     StringNode,
 )
+from tests.fixtures.schemas import Address, Person, Simple
 
 
 def test_default_registry_is_non_empty():
@@ -132,3 +135,60 @@ def test_string_builder_required_field_has_no_default():
     assert n.default is None
     assert n.default is not PydanticUndefined  # ensure the sentinel was filtered
     assert n.required is True
+
+
+def test_group_builder_matches_basemodel_subclasses():
+    b = GroupBuilder(default_registry())
+    assert b.matches(Address) is True
+    assert b.matches(int) is False
+    assert b.matches(str) is False
+
+
+def test_group_builder_builds_simple_schema():
+    b = GroupBuilder(default_registry())
+    fi = FieldInfo(annotation=Simple)
+    n = b.build(Simple, fi, existing=None)
+    assert isinstance(n, GroupNode)
+    assert n.schema_class is Simple
+    field_names = [f.name for f in n.fields]
+    assert field_names == ["name", "age", "height", "enabled", "balance"]
+
+
+def test_group_builder_carries_field_info_into_children():
+    b = GroupBuilder(default_registry())
+    n = b.build(Simple, FieldInfo(annotation=Simple), existing=None)
+    name_node = n.find("name")
+    assert name_node is not None
+    assert name_node.description == "The thing's name"
+
+
+def test_group_builder_recursive_nested_model():
+    b = GroupBuilder(default_registry())
+    n = b.build(Person, FieldInfo(annotation=Person), existing=None)
+    assert isinstance(n, GroupNode)
+    addr_node = n.find("address")
+    assert isinstance(addr_node, GroupNode)
+    assert addr_node.schema_class is Address
+    street = addr_node.find("street")
+    assert street is not None
+    assert street.kind == "string"
+
+
+def test_group_builder_populates_existing_values():
+    b = GroupBuilder(default_registry())
+    existing = {"name": "alice", "age": 30}
+    n = b.build(Simple, FieldInfo(annotation=Simple), existing=existing)
+    assert n.find("name").value == "alice"
+    assert n.find("age").value == 30
+    # unspecified fields fall back to schema defaults
+    assert n.find("enabled").value is None  # nothing passed
+    assert n.find("enabled").default is True
+
+
+def test_group_builder_recursive_existing_values():
+    b = GroupBuilder(default_registry())
+    existing = {"name": "alice", "address": {"street": "1 Main", "city": "Townsville"}}
+    n = b.build(Person, FieldInfo(annotation=Person), existing=existing)
+    addr = n.find("address")
+    assert addr.find("street").value == "1 Main"
+    assert addr.find("city").value == "Townsville"
