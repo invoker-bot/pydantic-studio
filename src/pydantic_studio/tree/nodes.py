@@ -8,9 +8,9 @@ the abstract base ``FormNode``.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Discriminator, field_serializer, field_validator
 
 
 class FormNode(BaseModel):
@@ -114,3 +114,57 @@ class DecimalNode(FormNode):
 
     def to_python(self) -> Decimal | None:
         return self.value
+
+
+class GroupNode(FormNode):
+    """Represents a nested Pydantic BaseModel with a list of child nodes."""
+
+    kind: Literal["group"] = "group"
+    schema_class: type[BaseModel]
+    fields: "list[AnyNode]"  # forward ref; rebuilt at module bottom
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    @field_serializer("schema_class", when_used="json")
+    def serialize_schema_class(self, value: type[BaseModel]) -> str:
+        """Serialize schema_class to a fully qualified name for JSON."""
+        return f"{value.__module__}.{value.__name__}"
+
+    @field_validator("schema_class", mode="before")
+    @classmethod
+    def deserialize_schema_class(cls, v: Any) -> Any:
+        """Deserialize schema_class from a fully qualified name string."""
+        if isinstance(v, str):
+            parts = v.rsplit(".", 1)
+            if len(parts) == 2:
+                module_name, class_name = parts
+                import sys
+
+                if module_name in sys.modules:
+                    module = sys.modules[module_name]
+                    if hasattr(module, class_name):
+                        return getattr(module, class_name)
+            return v
+        return v
+
+    def find(self, name: str) -> AnyNode | None:
+        """Find a child node by name, or None if not found."""
+        for f in self.fields:
+            if f.name == name:
+                return f
+        return None
+
+    def to_python(self) -> dict[str, Any]:
+        """Collect child values into a dict keyed by child names."""
+        return {f.name: f.to_python() for f in self.fields}
+
+
+# Discriminated union — every concrete node type uses ``kind`` as discriminator.
+AnyNode = Annotated[
+    StringNode | IntNode | FloatNode | BoolNode | DecimalNode | GroupNode,
+    Discriminator("kind"),
+]
+
+
+# Resolve the forward reference inside GroupNode.fields.
+GroupNode.model_rebuild()

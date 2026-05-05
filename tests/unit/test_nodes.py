@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from pydantic import BaseModel
+
 from pydantic_studio.tree.nodes import (
+    AnyNode,
     BoolNode,
     DecimalNode,
     FloatNode,
     FormNode,
+    GroupNode,
     IntNode,
     StringNode,
 )
@@ -156,3 +160,68 @@ def test_decimal_node_constraints():
     n = DecimalNode(name="x", max_digits=5, decimal_places=2)
     assert n.max_digits == 5
     assert n.decimal_places == 2
+
+
+class _PersonSchema(BaseModel):
+    name: str
+    age: int
+
+
+def test_group_node_holds_named_fields():
+    name_node = StringNode(name="name", value="alice")
+    age_node = IntNode(name="age", value=30)
+    g = GroupNode(name="root", schema_class=_PersonSchema, fields=[name_node, age_node])
+    assert g.kind == "group"
+    assert len(g.fields) == 2
+    assert g.fields[0].name == "name"
+
+
+def test_group_node_find_by_name():
+    name_node = StringNode(name="name", value="alice")
+    age_node = IntNode(name="age", value=30)
+    g = GroupNode(name="root", schema_class=_PersonSchema, fields=[name_node, age_node])
+    assert g.find("name") is name_node
+    assert g.find("missing") is None
+
+
+def test_group_node_to_python():
+    name_node = StringNode(name="name", value="alice")
+    age_node = IntNode(name="age", value=30)
+    g = GroupNode(name="root", schema_class=_PersonSchema, fields=[name_node, age_node])
+    assert g.to_python() == {"name": "alice", "age": 30}
+
+
+def test_group_node_serializes_with_polymorphic_children():
+    """Children are stored under the AnyNode discriminated union."""
+    g = GroupNode(
+        name="root",
+        schema_class=_PersonSchema,
+        fields=[StringNode(name="name", value="bob"), IntNode(name="age", value=42)],
+    )
+    dumped = g.model_dump()
+    assert dumped["kind"] == "group"
+    assert dumped["fields"][0]["kind"] == "string"
+    assert dumped["fields"][1]["kind"] == "int"
+
+
+def test_group_node_round_trip_via_json():
+    g = GroupNode(
+        name="root",
+        schema_class=_PersonSchema,
+        fields=[StringNode(name="name", value="bob"), IntNode(name="age", value=42)],
+    )
+    raw = g.model_dump_json()
+    restored = GroupNode.model_validate_json(raw)
+    assert isinstance(restored.fields[0], StringNode)
+    assert isinstance(restored.fields[1], IntNode)
+    assert restored.to_python() == {"name": "bob", "age": 42}
+
+
+def test_any_node_alias_covers_all_types():
+    """AnyNode discriminates among all concrete node types added so far."""
+    # Sanity: we can declare a list[AnyNode] and append various types.
+    nodes: list[AnyNode] = []
+    nodes.append(StringNode(name="a"))
+    nodes.append(IntNode(name="b"))
+    nodes.append(BoolNode(name="c"))
+    assert {n.kind for n in nodes} == {"string", "int", "bool"}
