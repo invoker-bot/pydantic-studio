@@ -402,6 +402,29 @@ class SequenceNode(FormNode):
         return ()
 
 
+class MappingNode(FormNode):
+    """Container for ``dict[K, V]`` values.
+
+    ``entries`` preserves insertion order; each entry is a (key_node,
+    value_node) pair built from the corresponding annotations.
+    """
+
+    kind: Literal["mapping"] = "mapping"
+    entries: "list[tuple[AnyNode, AnyNode]]" = []
+    key_type_name: str
+    value_type_name: str
+    min_length: int | None = None
+    max_length: int | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    def to_python(self) -> dict[Any, Any]:
+        return {k.to_python(): v.to_python() for k, v in self.entries}
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        return ()  # whole-mapping replacement deferred to v0.2
+
+
 class GroupNode(FormNode):
     """Represents a nested Pydantic BaseModel with a list of child nodes."""
 
@@ -489,14 +512,17 @@ AnyNode = Annotated[
     | EnumNode
     | LiteralNode
     | SequenceNode
+    | MappingNode
     | GroupNode,
     Discriminator("kind"),
 ]
 
 
-# Resolve the forward references inside GroupNode.fields and SequenceNode.items.
+# Resolve the forward references inside GroupNode.fields, SequenceNode.items,
+# and MappingNode.entries.
 GroupNode.model_rebuild()
 SequenceNode.model_rebuild()
+MappingNode.model_rebuild()
 
 
 class FormTree(BaseModel):
@@ -721,6 +747,88 @@ class FormTree(BaseModel):
         for i, it in enumerate(items):
             it.name = str(i)
         seq.items = items
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def _walk_to_mapping(self, path: str) -> MappingNode:
+        """Resolve ``path`` and return the MappingNode at that location."""
+        from pydantic_studio.tree.paths import Path as _Path
+
+        path_obj = _Path.parse(path)
+        if not path_obj.segments:
+            msg = "empty path"
+            raise ValueError(msg)
+        node: Any = self.root
+        for seg in path_obj.segments:
+            if isinstance(node, GroupNode) and isinstance(seg, str):
+                child = node.find(seg)
+                if child is None:
+                    msg = f"no field named {seg!r}"
+                    raise KeyError(msg)
+                node = child
+            else:
+                msg = f"cannot navigate {seg!r}"
+                raise KeyError(msg)
+        if not isinstance(node, MappingNode):
+            msg = f"{path!r} is not a MappingNode"
+            raise TypeError(msg)
+        return node
+
+    def add_entry(
+        self, path: str, key: Any, value: Any = None
+    ) -> ValidationResult:
+        """Append a (key, value) entry to the MappingNode at ``path``."""
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.builder import default_registry
+
+        mp = self._walk_to_mapping(path)
+        self._push_snapshot(_snap.take(self.root))
+        key_type = _resolve_type_name(mp.key_type_name)
+        value_type = _resolve_type_name(mp.value_type_name)
+        reg = default_registry()
+        k_builder = reg.find(key_type)
+        v_builder = reg.find(value_type)
+        k_node = k_builder.build(key_type, FieldInfo(annotation=key_type), key)
+        v_node = v_builder.build(value_type, FieldInfo(annotation=value_type), value)
+        k_node.name = "key"
+        v_node.name = "value"
+        mp.entries = [*mp.entries, (k_node, v_node)]
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def remove_entry(self, path: str, index: int) -> ValidationResult:
+        """Remove the entry at ``index`` from the MappingNode at ``path``."""
+        from pydantic_studio.tree import snapshots as _snap
+
+        mp = self._walk_to_mapping(path)
+        if not (0 <= index < len(mp.entries)):
+            return ValidationResult.fail([f"index {index} out of range"])
+        self._push_snapshot(_snap.take(self.root))
+        mp.entries = [e for i, e in enumerate(mp.entries) if i != index]
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def rename_key(
+        self, path: str, index: int, new_key: Any
+    ) -> ValidationResult:
+        """Rename the key at ``index`` in the MappingNode at ``path``."""
+        from pydantic_studio.tree import snapshots as _snap
+
+        mp = self._walk_to_mapping(path)
+        if not (0 <= index < len(mp.entries)):
+            return ValidationResult.fail([f"index {index} out of range"])
+        k_node, _v_node = mp.entries[index]
+        errors = k_node.validate_value(new_key)
+        if errors:
+            return ValidationResult.fail(list(errors))
+        # Validation passed — push snapshot and mutate.
+        self._push_snapshot(_snap.take(self.root))
+        k_node.value = new_key
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()

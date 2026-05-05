@@ -65,3 +65,8 @@ class WithTuple(BaseModel):
 class WithFixedTuple(BaseModel):
     rgb: tuple[int, int, int] = (0, 0, 0)
     pair: tuple[str, int] = ("k", 0)
+
+
+class WithDict(BaseModel):
+    settings: dict[str, int] = {}
+    labels: dict[str, str] = {}

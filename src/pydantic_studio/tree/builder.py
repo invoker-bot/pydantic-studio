@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic_studio.types.choices import EnumBuilder, LiteralBuilder
+from pydantic_studio.types.mapping import DictBuilder
 from pydantic_studio.types.models import GroupBuilder
 from pydantic_studio.types.primitives import (
     BoolBuilder,
@@ -57,7 +58,8 @@ def default_registry() -> Registry:
         reg.register(LiteralBuilder())
         reg.register(ListBuilder(reg))
         reg.register(SetBuilder(reg))
-        reg.register(TupleBuilder(reg))      # NEW
+        reg.register(TupleBuilder(reg))
+        reg.register(DictBuilder(reg))
         # GroupBuilder is registered last so it matches *any* BaseModel
         # only when no more-specific builder did. It also needs a back-
         # reference to the registry for recursive dispatch.
