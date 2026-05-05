@@ -36,5 +36,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# uv lock file (library project — regenerated per-environment)
+uv.lock
+
 # pydantic-studio
 .pydantic-studio.draft.json
