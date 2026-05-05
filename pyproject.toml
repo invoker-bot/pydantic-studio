@@ -58,6 +58,12 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "PT", "RUF", "TC", "SIM"]
 
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic models need annotations evaluated at runtime to build their schema,
+# so types referenced in BaseModel-subclass annotations must remain in the
+# runtime import section (not moved to TYPE_CHECKING).
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
 

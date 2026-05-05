@@ -7,7 +7,7 @@ the abstract base ``FormNode``.
 
 from __future__ import annotations
 
-from decimal import Decimal  # noqa: TC003 - needed by Pydantic field validation at runtime
+from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
