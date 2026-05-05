@@ -39,5 +39,8 @@ Thumbs.db
 # uv lock file (library project — regenerated per-environment)
 uv.lock
 
+# Local verification / debug scripts
+verify_spec.py
+
 # pydantic-studio
 .pydantic-studio.draft.json
