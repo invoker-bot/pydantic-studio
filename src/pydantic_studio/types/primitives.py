@@ -1,4 +1,4 @@
-"""Builders for str / int / float / bool / Decimal."""
+"""Builders for str / int / float / bool / Decimal — constraint-aware."""
 
 from __future__ import annotations
 
@@ -14,9 +14,15 @@ from pydantic_studio.tree.nodes import (
     IntNode,
     StringNode,
 )
+from pydantic_studio.types.metadata import extract_constraints
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
+
+
+def _default(field_info: FieldInfo) -> Any:
+    d = field_info.get_default(call_default_factory=True)
+    return None if d is PydanticUndefined else d
 
 
 class StringBuilder:
@@ -26,15 +32,16 @@ class StringBuilder:
         return type_ is str
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> StringNode:
-        default = field_info.get_default(call_default_factory=True)
-        if default is PydanticUndefined:
-            default = None
+        c = extract_constraints(field_info)
         return StringNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default,
+            default=_default(field_info),
+            min_length=c.get("min_length"),
+            max_length=c.get("max_length"),
+            pattern=c.get("pattern"),
         )
 
 
@@ -46,15 +53,18 @@ class IntBuilder:
         return type_ is int
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> IntNode:
-        default = field_info.get_default(call_default_factory=True)
-        if default is PydanticUndefined:
-            default = None
+        c = extract_constraints(field_info)
         return IntNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default,
+            default=_default(field_info),
+            ge=c.get("ge"),
+            le=c.get("le"),
+            gt=c.get("gt"),
+            lt=c.get("lt"),
+            multiple_of=c.get("multiple_of"),
         )
 
 
@@ -65,15 +75,18 @@ class FloatBuilder:
         return type_ is float
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> FloatNode:
-        default = field_info.get_default(call_default_factory=True)
-        if default is PydanticUndefined:
-            default = None
+        c = extract_constraints(field_info)
         return FloatNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default,
+            default=_default(field_info),
+            ge=c.get("ge"),
+            le=c.get("le"),
+            gt=c.get("gt"),
+            lt=c.get("lt"),
+            multiple_of=c.get("multiple_of"),
         )
 
 
@@ -84,15 +97,12 @@ class BoolBuilder:
         return type_ is bool
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> BoolNode:
-        default = field_info.get_default(call_default_factory=True)
-        if default is PydanticUndefined:
-            default = None
         return BoolNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default,
+            default=_default(field_info),
         )
 
 
@@ -103,13 +113,15 @@ class DecimalBuilder:
         return type_ is Decimal
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> DecimalNode:
-        default = field_info.get_default(call_default_factory=True)
-        if default is PydanticUndefined:
-            default = None
+        c = extract_constraints(field_info)
         return DecimalNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default,
+            default=_default(field_info),
+            max_digits=c.get("max_digits"),
+            decimal_places=c.get("decimal_places"),
+            ge=c.get("ge"),
+            le=c.get("le"),
         )
