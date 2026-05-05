@@ -25,16 +25,33 @@ def test_set_invalid_value_returns_errors() -> None:
     tree = build_form_tree(Schema)
     result = tree.set_value("age", "not-a-number")
     assert result.ok is False
-    assert len(result.errors) >= 1
+    assert result.errors == ("expected int, got str",)
 
 
-def test_set_value_still_pushes_snapshot_on_invalid() -> None:
-    """Even when validation fails, the mutation is applied and a snapshot
-    is pushed — undo() should be able to revert the bad value."""
+def test_set_value_does_not_mutate_on_invalid() -> None:
+    """Validation failure must not corrupt the typed value field, so the
+    tree stays serializable and undo cannot crash."""
     tree = build_form_tree(Schema)
-    tree.set_value("name", "Alice")  # valid baseline
-    tree.set_value("age", "not-a-number")  # invalid
-    assert tree.undo() is True
+    tree.set_value("name", "Alice")
     age_node = tree.root.find("age")
     assert age_node is not None
-    assert age_node.value != "not-a-number"
+    initial_value = age_node.value
+    result = tree.set_value("age", "not-a-number")
+    assert result.ok is False
+    # value untouched
+    assert age_node.value == initial_value
+    # error message recorded for renderer display
+    assert age_node.error == "expected int, got str"
+
+
+def test_undo_after_invalid_then_valid_does_not_crash() -> None:
+    """Sequence: valid → invalid (no-op) → valid → undo. Must not raise."""
+    tree = build_form_tree(Schema)
+    tree.set_value("name", "Alice")          # snapshot pushed
+    tree.set_value("age", "not-a-number")    # invalid → no snapshot
+    tree.set_value("name", "Bob")            # snapshot pushed
+    # Undo back to "Alice" — must not raise on snapshot replay.
+    assert tree.undo() is True
+    name_node = tree.root.find("name")
+    assert name_node is not None
+    assert name_node.value == "Alice"

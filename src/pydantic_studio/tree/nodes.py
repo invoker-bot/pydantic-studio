@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
 
@@ -164,15 +164,19 @@ class DecimalNode(FormNode):
     le: Decimal | None = None
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
-        from decimal import InvalidOperation
-
         if value is None:
             return () if not self.required else ("value is required",)
+        # Reject bool first — Pydantic's Decimal validation rejects it.
+        if isinstance(value, bool):
+            return (f"expected Decimal, got {type(value).__name__}",)
         if isinstance(value, Decimal):
             return ()
-        if isinstance(value, (int, str)):
+        # Pydantic coerces int / float / str via Decimal(str(...)). Mirror
+        # that behavior so validate_value does not flag values the schema
+        # would happily accept.
+        if isinstance(value, (int, float, str)):
             try:
-                Decimal(value)
+                Decimal(str(value)) if isinstance(value, float) else Decimal(value)
             except (InvalidOperation, ValueError):
                 return (f"cannot convert {value!r} to Decimal",)
             return ()
@@ -325,17 +329,20 @@ class FormTree(BaseModel):
     def set_value(self, path: str, value: Any) -> ValidationResult:
         """Set ``value`` at the given path; runs node-local validation.
 
-        The mutation is applied and a snapshot is pushed regardless of
-        whether validation passes — this lets the user undo a bad entry.
-        Returns a ``ValidationResult`` whose ``errors`` are empty iff the
-        value passes the target node's ``validate_value``.
+        On success: push a snapshot, write the value to the target node,
+        clear ``target.error``, and return ``ValidationResult.ok()``.
+
+        On failure: leave ``target.value`` untouched (so the FormTree's
+        typed fields stay type-correct and snapshots remain serializable),
+        record the first error message on ``target.error`` for renderer
+        display, and return ``ValidationResult.fail(...)``. Note that
+        ``target.error`` carries only the primary message; the full list
+        of errors lives in the returned ``ValidationResult``.
 
         Cross-field validation runs at submit time (``to_instance``).
         """
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.paths import Path as _Path
-
-        self._push_snapshot(_snap.take(self.root))
 
         path_obj = _Path.parse(path)
         if not path_obj.segments:
@@ -354,22 +361,26 @@ class FormTree(BaseModel):
                 raise KeyError(msg)
 
         last = path_obj.segments[-1]
-        if isinstance(parent, GroupNode) and isinstance(last, str):
-            target = parent.find(last)
-            if target is None:
-                msg = f"no field named {last!r}"
-                raise KeyError(msg)
-            errors = target.validate_value(value)
-            target.value = value
-            target.error = errors[0] if errors else None
-        else:
+        if not (isinstance(parent, GroupNode) and isinstance(last, str)):
             msg = f"cannot set on non-group parent at segment {last!r}"
             raise KeyError(msg)
+        target = parent.find(last)
+        if target is None:
+            msg = f"no field named {last!r}"
+            raise KeyError(msg)
 
+        errors = target.validate_value(value)
+        if errors:
+            target.error = errors[0]
+            return ValidationResult.fail(list(errors))
+
+        # Validation passed: snapshot before mutating so undo can revert.
+        self._push_snapshot(_snap.take(self.root))
+        target.value = value
+        target.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
-
-        return ValidationResult.fail(list(errors)) if errors else ValidationResult.ok()
+        return ValidationResult.ok()
 
     # ----- snapshot internals -----
 
