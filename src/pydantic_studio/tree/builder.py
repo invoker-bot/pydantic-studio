@@ -131,6 +131,18 @@ def default_registry() -> Registry:
     return _DEFAULT_REGISTRY
 
 
+def reset_default_registry() -> None:
+    """Drop the cached default registry so the next ``default_registry()``
+    call rebuilds it from scratch.
+
+    Tests that mutate the registry (e.g., via ``register_builder``) must
+    call this in teardown — otherwise registrations leak between tests.
+    The autouse fixture in ``tests/conftest.py`` calls it for every test.
+    """
+    global _DEFAULT_REGISTRY
+    _DEFAULT_REGISTRY = None
+
+
 class StringBuilder:
     def matches(self, type_: type) -> bool:
         return type_ is str
