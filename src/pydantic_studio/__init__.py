@@ -12,6 +12,7 @@ from pydantic_studio.exceptions import (
 )
 from pydantic_studio.tree.builder import (
     NodeBuilder,
+    Registry,
     build_form_tree,
     default_registry,
     reset_default_registry,
@@ -49,6 +50,7 @@ __all__ = [
     "NoBuilderError",
     "NodeBuilder",
     "PydanticStudioError",
+    "Registry",
     "StringNode",
     "ValidationFailedError",
     "__version__",

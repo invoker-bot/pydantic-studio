@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 
 class StringBuilder:
+    """Builds a StringNode for bare ``str`` fields."""
+
     def matches(self, type_: type) -> bool:
         return type_ is str
 
@@ -37,6 +39,8 @@ class StringBuilder:
 
 
 class IntBuilder:
+    """Builds an IntNode for bare ``int`` fields (excluding ``bool``)."""
+
     def matches(self, type_: type) -> bool:
         # Exclude bool, which is a subclass of int in Python.
         return type_ is int
@@ -55,6 +59,8 @@ class IntBuilder:
 
 
 class FloatBuilder:
+    """Builds a FloatNode for bare ``float`` fields."""
+
     def matches(self, type_: type) -> bool:
         return type_ is float
 
@@ -72,6 +78,8 @@ class FloatBuilder:
 
 
 class BoolBuilder:
+    """Builds a BoolNode for bare ``bool`` fields."""
+
     def matches(self, type_: type) -> bool:
         return type_ is bool
 
@@ -89,6 +97,8 @@ class BoolBuilder:
 
 
 class DecimalBuilder:
+    """Builds a DecimalNode for bare ``Decimal`` fields."""
+
     def matches(self, type_: type) -> bool:
         return type_ is Decimal
 

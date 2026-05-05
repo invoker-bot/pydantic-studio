@@ -87,11 +87,12 @@ def build_form_tree(
     """
     from pydantic.fields import FieldInfo
 
-    from pydantic_studio.tree.nodes import FormTree  # avoid circular at import time
+    from pydantic_studio.tree.nodes import FormTree, GroupNode  # avoid circular at import time
 
     reg = registry if registry is not None else default_registry()
-    group_builder = GroupBuilder(reg)
-    root = group_builder.build(schema, FieldInfo(annotation=schema), existing or {})
+    builder = reg.find(schema)
+    root = builder.build(schema, FieldInfo(annotation=schema), existing or {})
+    assert isinstance(root, GroupNode), f"expected GroupNode for BaseModel, got {type(root)}"
     schema_name = f"{schema.__module__}:{schema.__qualname__}"
     return FormTree(
         schema_class=schema,

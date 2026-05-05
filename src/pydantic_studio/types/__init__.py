@@ -7,3 +7,7 @@ modules (``primitives``, ``models``, ``choices``, ``sequences``,
 """
 
 from __future__ import annotations
+
+# Each module exports its own classes; ``types/__init__.py`` is intentionally
+# a namespace package — import directly from the per-family submodule.
+__all__: list[str] = []

@@ -38,9 +38,9 @@ class GroupBuilder:
                 child_type = str  # fallback — shouldn't happen in practice
             child_builder = self._registry.find(child_type)
             child = child_builder.build(child_type, finfo, existing_dict.get(fname))
-            # The child builder didn't know the field name (it sees only the
-            # type); we set it here from the parent's perspective. This avoids
-            # the FieldInfo.alias hack and respects users' real aliases.
+            # The child builder uses ``field_info.alias`` (or "<unnamed>") as a
+            # placeholder; overwrite with the real field-attribute name from
+            # the parent's ``model_fields`` so users' aliases stay untouched.
             child.name = fname
             children.append(child)
 
