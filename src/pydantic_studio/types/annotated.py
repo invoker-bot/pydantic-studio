@@ -65,6 +65,14 @@ def get_optional_inner(typ: Any) -> Any:
         ``int | None``         -> ``int``
         ``int | str | None``   -> ``int | str``
         ``int``                -> ``int`` (passthrough)
+
+    Note: when the input has 2+ non-None variants, the multi-variant
+    return value is always reconstructed as a PEP 604 ``types.UnionType``
+    (``A | B``), regardless of whether the input was ``typing.Union[A, B, None]``
+    or ``A | B | None``. This means ``get_origin(result) is types.UnionType``
+    on a multi-variant return; ``is_union_type`` (this module) covers both
+    origins so internal callers are unaffected. External callers that
+    branch on ``get_origin`` directly should be aware.
     """
     if not is_optional_type(typ):
         return typ

@@ -1,4 +1,4 @@
-"""Type-detection predicates for the dispatch layer."""
+"""Type-detection predicates and Annotated unwrapping for the dispatch layer."""
 
 from __future__ import annotations
 
@@ -54,9 +54,10 @@ def test_is_optional_type_detects_t_or_none() -> None:
 
 def test_get_optional_inner_strips_none() -> None:
     assert get_optional_inner(int | None) is int
+    # Multi-variant Optional: returns the union of remaining members,
+    # preserving original order.
     inner = get_optional_inner(int | str | None)
-    args = get_union_args(inner)
-    assert set(args) == {int, str}
+    assert get_union_args(inner) == (int, str)
 
 
 def test_get_optional_inner_returns_input_when_not_optional() -> None:
