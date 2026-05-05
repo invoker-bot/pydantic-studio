@@ -19,9 +19,15 @@ class Outer(BaseModel):
 
 def test_nested_none_dropped_for_default_to_apply() -> None:
     tree = build_form_tree(Outer)
+    # Nothing was filled in: every leaf is None.
     out = tree.root.to_python()
+    # Top-level None dropped (was already true in Phase 1).
     assert "name" not in out
-    assert "inner" not in out or out["inner"] == {}
+    # The nested group's all-None children produce an empty dict, which is
+    # itself NOT None and therefore not filtered. Pydantic treats {} as
+    # "use all of Inner's defaults", so this is the correct serialization.
+    assert "inner" in out
+    assert out["inner"] == {}
 
 
 def test_nested_to_instance_applies_defaults() -> None:

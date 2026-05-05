@@ -184,8 +184,14 @@ class GroupNode(FormNode):
     def to_python(self) -> dict[str, Any]:
         """Collect child values into a dict keyed by child names.
 
-        ``None`` values are filtered: a field whose value is ``None`` is
-        treated as "not set", letting Pydantic apply the schema default.
+        Filters by *omitting the key from the returned dict* whenever a
+        child's ``to_python()`` returns ``None`` — which causes Pydantic to
+        apply the field's schema default. An all-None nested ``GroupNode``
+        returns ``{}`` (empty dict), which is NOT itself filtered: Pydantic
+        treats ``{}`` as "use all of the nested model's defaults", and
+        keeping the empty dict in the parent yields more precise validation
+        error messages when a required leaf is missing.
+
         Known v0.1 limitation: users cannot save an Optional[T] field as
         explicit None — that requires v0.2's explicit-null toggle.
         """
