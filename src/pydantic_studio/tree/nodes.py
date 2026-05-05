@@ -182,8 +182,20 @@ class GroupNode(FormNode):
         return None
 
     def to_python(self) -> dict[str, Any]:
-        """Collect child values into a dict keyed by child names."""
-        return {f.name: f.to_python() for f in self.fields}
+        """Collect child values into a dict keyed by child names.
+
+        ``None`` values are filtered: a field whose value is ``None`` is
+        treated as "not set", letting Pydantic apply the schema default.
+        Known v0.1 limitation: users cannot save an Optional[T] field as
+        explicit None — that requires v0.2's explicit-null toggle.
+        """
+        out: dict[str, Any] = {}
+        for f in self.fields:
+            v = f.to_python()
+            if v is None:
+                continue
+            out[f.name] = v
+        return out
 
 
 # Discriminated union — every concrete node type uses ``kind`` as discriminator.
@@ -227,9 +239,9 @@ class FormTree(BaseModel):
         if self.schema_class is None:
             msg = "FormTree.schema_class is not set"
             raise RuntimeError(msg)
+        # GroupNode.to_python now filters None at every depth, so no
+        # additional top-level filtering is needed here.
         data = self.to_python()
-        # Remove None values so Pydantic applies defaults for unset fields.
-        data = {k: v for k, v in data.items() if v is not None}
         try:
             return self.schema_class.model_validate(data)
         except ValidationError as e:
