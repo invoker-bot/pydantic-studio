@@ -26,6 +26,43 @@ from pydantic import (
 from pydantic_studio.tree.validation import ValidationResult
 
 
+def _resolve_type_name(name: str) -> Any:
+    """Look up a fully-qualified type name (``module.Qualname``).
+
+    Handles ``builtins.str`` etc. specially so unit tests don't need to
+    import builtins. Raises ValueError on miss with a diagnostic message.
+    """
+    parts = name.rsplit(".", 1)
+    if len(parts) != 2:
+        msg = f"malformed type name {name!r} (expected 'module.Qualname')"
+        raise ValueError(msg)
+    module_name, qualname = parts
+    if module_name == "builtins":
+        builtin = (
+            __builtins__.get(qualname)
+            if isinstance(__builtins__, dict)
+            else getattr(__builtins__, qualname, None)
+        )
+        if builtin is None:
+            msg = f"unknown builtin {qualname!r}"
+            raise ValueError(msg)
+        return builtin
+    module = sys.modules.get(module_name)
+    if module is None:
+        msg = (
+            f"module {module_name!r} not in sys.modules — "
+            f"import it before resolving {name!r}"
+        )
+        raise ValueError(msg)
+    obj: Any = module
+    for part in qualname.split("."):
+        obj = getattr(obj, part, None)
+        if obj is None:
+            msg = f"{module_name!r} has no {part!r} (resolving {name!r})"
+            raise ValueError(msg)
+    return obj
+
+
 class FormNode(BaseModel):
     """Abstract base. Concrete subclasses set their own ``kind`` literal.
 
@@ -566,6 +603,124 @@ class FormTree(BaseModel):
         self._push_snapshot(_snap.take(self.root))
         target.value = value
         target.error = None
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def _walk_to_sequence(self, path: str) -> SequenceNode:
+        """Resolve ``path`` and return the SequenceNode at that location."""
+        from pydantic_studio.tree.paths import Path as _Path
+
+        path_obj = _Path.parse(path)
+        if not path_obj.segments:
+            msg = "empty path"
+            raise ValueError(msg)
+        node: Any = self.root
+        for seg in path_obj.segments:
+            if isinstance(node, GroupNode) and isinstance(seg, str):
+                child = node.find(seg)
+                if child is None:
+                    msg = f"no field named {seg!r}"
+                    raise KeyError(msg)
+                node = child
+            else:
+                msg = f"cannot navigate {seg!r}"
+                raise KeyError(msg)
+        if not isinstance(node, SequenceNode):
+            msg = f"{path!r} is not a SequenceNode"
+            raise TypeError(msg)
+        return node
+
+    def add_item(self, path: str, value: Any = None) -> ValidationResult:
+        """Append a default child to the SequenceNode at ``path``."""
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.builder import default_registry
+
+        seq = self._walk_to_sequence(path)
+        if seq.origin == "tuple_fixed":
+            return ValidationResult.fail(["cannot add to a fixed-length tuple"])
+        if seq.item_type_name is None:
+            return ValidationResult.fail(["sequence has no item_type_name"])
+        self._push_snapshot(_snap.take(self.root))
+        item_type = _resolve_type_name(seq.item_type_name)
+        builder = default_registry().find(item_type)
+        child = builder.build(item_type, FieldInfo(annotation=item_type), value)
+        child.name = str(len(seq.items))
+        seq.items = [*seq.items, child]
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def remove_item(self, path: str, index: int) -> ValidationResult:
+        """Remove the child at ``index`` from the SequenceNode at ``path``."""
+        from pydantic_studio.tree import snapshots as _snap
+
+        seq = self._walk_to_sequence(path)
+        if not (0 <= index < len(seq.items)):
+            return ValidationResult.fail([f"index {index} out of range"])
+        self._push_snapshot(_snap.take(self.root))
+        new_items = [it for i, it in enumerate(seq.items) if i != index]
+        for i, it in enumerate(new_items):
+            it.name = str(i)
+        seq.items = new_items
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def insert_item(
+        self, path: str, index: int, value: Any = None
+    ) -> ValidationResult:
+        """Insert a new child at ``index`` in the SequenceNode at ``path``."""
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.builder import default_registry
+
+        seq = self._walk_to_sequence(path)
+        if seq.origin == "tuple_fixed":
+            return ValidationResult.fail(
+                ["cannot insert into a fixed-length tuple"]
+            )
+        if not (0 <= index <= len(seq.items)):
+            return ValidationResult.fail([f"index {index} out of range"])
+        if seq.item_type_name is None:
+            return ValidationResult.fail(["sequence has no item_type_name"])
+        self._push_snapshot(_snap.take(self.root))
+        item_type = _resolve_type_name(seq.item_type_name)
+        builder = default_registry().find(item_type)
+        child = builder.build(item_type, FieldInfo(annotation=item_type), value)
+        new_items = [*seq.items[:index], child, *seq.items[index:]]
+        for i, it in enumerate(new_items):
+            it.name = str(i)
+        seq.items = new_items
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
+
+    def move_item(
+        self, path: str, from_index: int, to_index: int
+    ) -> ValidationResult:
+        """Move the child at ``from_index`` to ``to_index`` in the SequenceNode at ``path``."""
+        from pydantic_studio.tree import snapshots as _snap
+
+        seq = self._walk_to_sequence(path)
+        if not (0 <= from_index < len(seq.items)):
+            return ValidationResult.fail(
+                [f"from_index {from_index} out of range"]
+            )
+        if not (0 <= to_index < len(seq.items)):
+            return ValidationResult.fail(
+                [f"to_index {to_index} out of range"]
+            )
+        self._push_snapshot(_snap.take(self.root))
+        items = list(seq.items)
+        item = items.pop(from_index)
+        items.insert(to_index, item)
+        for i, it in enumerate(items):
+            it.name = str(i)
+        seq.items = items
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()

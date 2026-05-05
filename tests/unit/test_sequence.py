@@ -179,3 +179,66 @@ def test_fixed_tuple_no_existing_uses_schema_default() -> None:
     instance = tree.to_instance()
     assert instance.rgb == (0, 0, 0)
     assert instance.pair == ("k", 0)
+
+
+def test_add_item_appends_default_child() -> None:
+    tree = build_form_tree(WithList)
+    result = tree.add_item("tags")
+    assert result.ok is True
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    assert len(tags.items) == 1
+    assert isinstance(tags.items[0], StringNode)
+    assert tags.items[0].name == "0"
+
+
+def test_add_item_with_explicit_value() -> None:
+    tree = build_form_tree(WithList)
+    tree.add_item("tags", "hello")
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    assert cast("StringNode", tags.items[0]).value == "hello"
+
+
+def test_remove_item_renumbers() -> None:
+    tree = build_form_tree(WithList, existing={"tags": ["a", "b", "c"]})
+    tree.remove_item("tags", 1)
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    str_items = [cast("StringNode", it) for it in tags.items]
+    assert [it.value for it in str_items] == ["a", "c"]
+    assert [it.name for it in tags.items] == ["0", "1"]
+
+
+def test_insert_item_at_index() -> None:
+    tree = build_form_tree(WithList, existing={"tags": ["a", "c"]})
+    tree.insert_item("tags", 1, "b")
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    str_items = [cast("StringNode", it) for it in tags.items]
+    assert [it.value for it in str_items] == ["a", "b", "c"]
+
+
+def test_move_item_reorders() -> None:
+    tree = build_form_tree(WithList, existing={"tags": ["a", "b", "c"]})
+    tree.move_item("tags", 0, 2)
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    str_items = [cast("StringNode", it) for it in tags.items]
+    assert [it.value for it in str_items] == ["b", "c", "a"]
+
+
+def test_add_item_pushes_snapshot_so_undo_works() -> None:
+    tree = build_form_tree(WithList)
+    tree.add_item("tags", "x")
+    assert tree.undo() is True
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    assert tags.items == []
+
+
+def test_add_item_fails_on_fixed_tuple() -> None:
+    tree = build_form_tree(WithFixedTuple)
+    result = tree.add_item("rgb")
+    assert result.ok is False
+    assert any("fixed-length" in e for e in result.errors)
