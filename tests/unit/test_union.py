@@ -54,3 +54,42 @@ def test_union_to_instance_round_trip() -> None:
     tree = build_form_tree(WithUnion, existing={"value": "hello"})
     instance = tree.to_instance()
     assert instance.value == "hello"
+
+
+def test_select_variant_switches_to_str() -> None:
+    tree = build_form_tree(WithUnion, existing={"value": 42})
+    result = tree.select_variant("value", 1)  # switch to str
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value is None  # fresh; previous int 42 is discarded
+
+
+def test_select_variant_undo_restores() -> None:
+    tree = build_form_tree(WithUnion, existing={"value": 42})
+    tree.select_variant("value", 1)
+    assert tree.undo() is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 42
+
+
+def test_select_variant_out_of_range_returns_error() -> None:
+    tree = build_form_tree(WithUnion)
+    result = tree.select_variant("value", 99)
+    assert result.ok is False
+    assert any("out of range" in e for e in result.errors)
+
+
+def test_select_variant_with_seed_value() -> None:
+    """Optional second arg lets caller seed the new variant's value."""
+    tree = build_form_tree(WithUnion)
+    result = tree.select_variant("value", 1, seed="seeded")
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected.value == "seeded"

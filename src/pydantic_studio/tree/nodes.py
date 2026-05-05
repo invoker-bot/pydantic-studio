@@ -898,3 +898,57 @@ class FormTree(BaseModel):
         self.cursor += 1
         self.root = _snap.restore(self.snapshots[self.cursor])
         return True
+
+    def _walk_to_union(self, path: str) -> UnionNode:
+        from pydantic_studio.tree.paths import Path as _Path
+
+        path_obj = _Path.parse(path)
+        if not path_obj.segments:
+            msg = "empty path"
+            raise ValueError(msg)
+        node: Any = self.root
+        for seg in path_obj.segments:
+            if isinstance(node, GroupNode) and isinstance(seg, str):
+                child = node.find(seg)
+                if child is None:
+                    msg = f"no field named {seg!r}"
+                    raise KeyError(msg)
+                node = child
+            else:
+                msg = f"cannot navigate {seg!r}"
+                raise KeyError(msg)
+        if not isinstance(node, UnionNode):
+            msg = f"{path!r} is not a UnionNode"
+            raise TypeError(msg)
+        return node
+
+    def select_variant(
+        self, path: str, variant_index: int, seed: Any = None
+    ) -> ValidationResult:
+        """Switch the UnionNode at ``path`` to its ``variant_index``-th variant.
+
+        If ``seed`` is provided, the freshly-built variant is initialized
+        with that value (otherwise its value is None / default).
+        """
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.builder import default_registry
+
+        union = self._walk_to_union(path)
+        if not (0 <= variant_index < len(union.variant_type_names)):
+            return ValidationResult.fail(
+                [
+                    f"variant index {variant_index} out of range "
+                    f"(0..{len(union.variant_type_names) - 1})"
+                ]
+            )
+        self._push_snapshot(_snap.take(self.root))
+        v_type = _resolve_type_name(union.variant_type_names[variant_index])
+        builder = default_registry().find(v_type)
+        new_selected = builder.build(v_type, FieldInfo(annotation=v_type), seed)
+        union.selected_index = variant_index
+        union.selected = new_selected
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
