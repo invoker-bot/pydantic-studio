@@ -189,18 +189,96 @@ class DecimalNode(FormNode):
 
 
 class EnumNode(FormNode):
-    """Holds a single value drawn from a closed set of Enum members."""
+    """Holds a single value drawn from a closed set of Enum members.
+
+    Snapshot round-trip: ``value``, ``default``, and the member side of
+    each ``choices`` tuple are serialized as the member's ``.name`` (a
+    string) and rehydrated back into Enum members on validation, using
+    ``enum_class_name`` for sys.modules lookup. This matches the pattern
+    GroupNode uses for ``schema_class``.
+
+    Invariant: ``choices[i][1]`` is always an Enum member when the node is
+    in a fresh-from-builder OR fresh-from-snapshot-load state. After JSON
+    serialization but before re-validation it is transiently a string.
+    """
 
     kind: Literal["enum"] = "enum"
-    value: Any = None  # an Enum member or None
+    value: Any = None
     default: Any = None
-    # Enum members serialized as (name, member) pairs. Member objects are
-    # not Pydantic-friendly across snapshots, so we also store the FQ name
-    # of the Enum class for round-trip via sys.modules lookup.
     enum_class_name: str
     choices: list[tuple[str, Any]] = []
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    @field_serializer("value", "default", when_used="json")
+    def _serialize_member(self, value: Any) -> Any:
+        from enum import Enum
+
+        if isinstance(value, Enum):
+            return value.name
+        return value
+
+    @field_serializer("choices", when_used="json")
+    def _serialize_choices(
+        self, choices: list[tuple[str, Any]]
+    ) -> list[tuple[str, Any]]:
+        from enum import Enum
+
+        return [
+            (name, member.name if isinstance(member, Enum) else member)
+            for name, member in choices
+        ]
+
+    @model_validator(mode="after")
+    def _rehydrate_members(self) -> EnumNode:
+        """After JSON load, ``value`` / ``default`` / ``choices[i][1]`` may
+        be strings (member names). Look up the Enum class and convert back.
+
+        This runs on every validation including initial construction, but
+        only mutates when the field is a string — Enum members short-circuit.
+        """
+        from enum import Enum
+
+        enum_cls = self._lookup_enum_class()
+        if enum_cls is None:
+            # If the class can't be resolved (e.g., the module isn't
+            # imported), skip rehydration and let downstream code see
+            # raw strings. validate_value will catch this.
+            return self
+
+        def to_member(v: Any) -> Any:
+            if isinstance(v, str) and not isinstance(v, Enum):
+                try:
+                    return enum_cls[v]
+                except KeyError:
+                    return v
+            return v
+
+        self.value = to_member(self.value)
+        self.default = to_member(self.default)
+        new_choices: list[tuple[str, Any]] = []
+        for name, member in self.choices:
+            new_choices.append((name, to_member(member)))
+        self.choices = new_choices
+        return self
+
+    def _lookup_enum_class(self) -> Any:
+        """Resolve ``enum_class_name`` (e.g. ``mymodule.Color``) via
+        sys.modules. Returns the class, or None if not importable."""
+        import sys
+        from enum import Enum
+
+        parts = self.enum_class_name.rsplit(".", 1)
+        if len(parts) != 2:
+            return None
+        module_name, class_name = parts
+        module = sys.modules.get(module_name)
+        if module is None:
+            return None
+        cls = getattr(module, class_name, None)
+        if cls is None or not (isinstance(cls, type) and issubclass(cls, Enum)):
+            return None
+        return cls
 
     def to_python(self) -> Any:
         return self.value
@@ -208,13 +286,14 @@ class EnumNode(FormNode):
     def validate_value(self, value: Any) -> tuple[str, ...]:
         from enum import Enum
 
-        short_name = self.enum_class_name.rsplit(".", 1)[-1]
         if value is None:
             return () if not self.required else ("value is required",)
         if not isinstance(value, Enum):
+            short_name = self.enum_class_name.rsplit(".", 1)[-1]
             return (f"{value!r} is not a {short_name} member",)
         # Compare by name to avoid identity drift across imports.
         if value.name not in [name for name, _ in self.choices]:
+            short_name = self.enum_class_name.rsplit(".", 1)[-1]
             return (f"{value!r} is not a {short_name} member",)
         return ()
 

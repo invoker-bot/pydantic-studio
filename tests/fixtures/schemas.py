@@ -35,4 +35,6 @@ class Color(Enum):
 
 
 class WithColor(BaseModel):
+    # NOTE(T14): an ``accent: Color | None = None`` field will be added
+    # in T14 once UnionBuilder handles Optional. Don't add it earlier.
     favorite: Color = Color.BLUE
