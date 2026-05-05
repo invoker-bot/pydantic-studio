@@ -87,3 +87,24 @@ def test_set_after_undo_drops_redo_tail():
     tree.set_value("name", "c")  # should drop the "b" snapshot from redo tail
     assert tree.redo() is False  # no redo available
     assert tree.root.find("name").value == "c"
+
+
+def test_snapshot_buffer_evicts_oldest():
+    tree = build_form_tree(Simple)
+    tree.snapshot_limit = 3
+    for i in range(5):
+        tree.set_value("name", f"v{i}")
+    # 5 mutations but limit=3 → only 3 most recent snapshots kept.
+    assert len(tree.snapshots) == 3
+    # The earliest accessible state should be the one captured before "v2".
+    while tree.undo():
+        pass
+    # We've undone everything we can. The earliest reachable name is "v1"
+    # (the value before "v2" was assigned), since the snapshot taken before
+    # "v0" was evicted.
+    assert tree.root.find("name").value == "v1"
+
+
+def test_snapshot_limit_default_is_50():
+    tree = build_form_tree(Simple)
+    assert tree.snapshot_limit == 50
