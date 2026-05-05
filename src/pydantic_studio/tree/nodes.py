@@ -13,7 +13,15 @@ from decimal import Decimal
 from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Discriminator, field_serializer, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    ValidationInfo,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 
 class FormNode(BaseModel):
@@ -206,6 +214,14 @@ class FormTree(BaseModel):
     def to_python(self) -> dict[str, Any]:
         return self.root.to_python()
 
+    @model_validator(mode="after")
+    def _inject_schema_from_context(self, info: ValidationInfo) -> FormTree:
+        """If schema_class is missing (e.g., loaded from JSON), pull it
+        from the validation context (which ``draft_load`` supplies)."""
+        if self.schema_class is None and info.context and "schema_class" in info.context:
+            self.schema_class = info.context["schema_class"]
+        return self
+
     # ----- mutations -----
 
     def set_value(self, path: str, value: Any) -> None:
@@ -243,6 +259,12 @@ class FormTree(BaseModel):
         else:
             msg = f"cannot set on non-group parent at segment {last!r}"
             raise KeyError(msg)
+
+        # Auto-save draft if a path is configured.
+        if self.draft_path is not None:
+            from pydantic_studio.tree import snapshots as _snap
+
+            _snap.draft_save(self, self.draft_path)
 
     # ----- snapshot internals -----
 
