@@ -23,6 +23,8 @@ from pydantic import (
     model_validator,
 )
 
+from pydantic_studio.tree.validation import ValidationResult
+
 
 class FormNode(BaseModel):
     """Abstract base. Concrete subclasses set their own ``kind`` literal.
@@ -40,6 +42,14 @@ class FormNode(BaseModel):
     description: str | None = None
     required: bool = True
     error: str | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        """Return tuple of error messages for ``value`` against this node's
+        type. Empty tuple = valid. Default: accept any value.
+
+        Subclasses override to enforce per-type rules.
+        """
+        return ()
 
     # Convenience hook used in subsequent tasks; subclasses may override.
     def to_python(self) -> Any:
@@ -61,6 +71,13 @@ class StringNode(FormNode):
     multiline: bool = False
     secret: bool = False
 
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected str, got {type(value).__name__}",)
+        return ()
+
     def to_python(self) -> str | None:
         return self.value
 
@@ -77,6 +94,14 @@ class IntNode(FormNode):
     gt: int | None = None
     lt: int | None = None
     multiple_of: int | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        # Reject bool explicitly even though it is an int subclass.
+        if isinstance(value, bool) or not isinstance(value, int):
+            return (f"expected int, got {type(value).__name__}",)
+        return ()
 
     def to_python(self) -> int | None:
         return self.value
@@ -96,6 +121,14 @@ class FloatNode(FormNode):
     multiple_of: float | None = None
     allow_inf_nan: bool = True
 
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        # Accept int (Pydantic coerces). Reject bool.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return (f"expected float, got {type(value).__name__}",)
+        return ()
+
     def to_python(self) -> float | None:
         return self.value
 
@@ -106,6 +139,13 @@ class BoolNode(FormNode):
     kind: Literal["bool"] = "bool"
     value: bool | None = None
     default: bool | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, bool):
+            return (f"expected bool, got {type(value).__name__}",)
+        return ()
 
     def to_python(self) -> bool | None:
         return self.value
@@ -122,6 +162,21 @@ class DecimalNode(FormNode):
     decimal_places: int | None = None
     ge: Decimal | None = None
     le: Decimal | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from decimal import InvalidOperation
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if isinstance(value, Decimal):
+            return ()
+        if isinstance(value, (int, str)):
+            try:
+                Decimal(value)
+            except (InvalidOperation, ValueError):
+                return (f"cannot convert {value!r} to Decimal",)
+            return ()
+        return (f"expected Decimal, got {type(value).__name__}",)
 
     def to_python(self) -> Decimal | None:
         return self.value
@@ -267,15 +322,21 @@ class FormTree(BaseModel):
 
     # ----- mutations -----
 
-    def set_value(self, path: str, value: Any) -> None:
-        """Set ``value`` at the given path. Pushes a snapshot before mutating."""
+    def set_value(self, path: str, value: Any) -> ValidationResult:
+        """Set ``value`` at the given path; runs node-local validation.
+
+        The mutation is applied and a snapshot is pushed regardless of
+        whether validation passes — this lets the user undo a bad entry.
+        Returns a ``ValidationResult`` whose ``errors`` are empty iff the
+        value passes the target node's ``validate_value``.
+
+        Cross-field validation runs at submit time (``to_instance``).
+        """
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.paths import Path as _Path
 
-        # 1. Snapshot before mutation.
         self._push_snapshot(_snap.take(self.root))
 
-        # 2. Walk to the parent node.
         path_obj = _Path.parse(path)
         if not path_obj.segments:
             msg = "cannot set value on the root group itself"
@@ -298,16 +359,17 @@ class FormTree(BaseModel):
             if target is None:
                 msg = f"no field named {last!r}"
                 raise KeyError(msg)
+            errors = target.validate_value(value)
             target.value = value
+            target.error = errors[0] if errors else None
         else:
             msg = f"cannot set on non-group parent at segment {last!r}"
             raise KeyError(msg)
 
-        # Auto-save draft if a path is configured.
         if self.draft_path is not None:
-            from pydantic_studio.tree import snapshots as _snap
-
             _snap.draft_save(self, self.draft_path)
+
+        return ValidationResult.fail(list(errors)) if errors else ValidationResult.ok()
 
     # ----- snapshot internals -----
 
