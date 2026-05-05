@@ -214,6 +214,31 @@ class FormTree(BaseModel):
     def to_python(self) -> dict[str, Any]:
         return self.root.to_python()
 
+    def to_instance(self) -> BaseModel:
+        """Materialize the tree into the user's schema_class.
+
+        Raises:
+            ValidationFailedError: if the schema rejects the produced dict.
+        """
+        from pydantic import ValidationError
+
+        from pydantic_studio.exceptions import ValidationFailedError
+
+        if self.schema_class is None:
+            msg = "FormTree.schema_class is not set"
+            raise RuntimeError(msg)
+        data = self.to_python()
+        # Remove None values so Pydantic applies defaults for unset fields.
+        data = {k: v for k, v in data.items() if v is not None}
+        try:
+            return self.schema_class.model_validate(data)
+        except ValidationError as e:
+            errors = [
+                f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
+                for err in e.errors()
+            ]
+            raise ValidationFailedError(errors) from e
+
     @model_validator(mode="after")
     def _inject_schema_from_context(self, info: ValidationInfo) -> FormTree:
         """If schema_class is missing (e.g., loaded from JSON), pull it
