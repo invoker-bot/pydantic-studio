@@ -22,6 +22,9 @@ from typing import TypeAlias
 PathSegment: TypeAlias = str | int
 
 _FIELD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# Reserved for callers that need to locate bracket spans (e.g., for
+# highlighting in error messages); ``parse`` scans manually rather than
+# using this regex.
 _INDEX_RE = re.compile(r"\[([^\]]*)\]")
 
 
@@ -60,6 +63,14 @@ class Path:
                     raise ValueError(msg)
                 segments.append(idx)
                 i = end + 1
+                # After ']', the next character (if any) must be '.' or '[' —
+                # otherwise the input is malformed (e.g., "foo[2]bar").
+                if i < n and raw[i] not in (".", "["):
+                    msg = (
+                        f"unexpected character {raw[i]!r} after ']' "
+                        f"at position {i} in path {raw!r}"
+                    )
+                    raise ValueError(msg)
             elif raw[i] == ".":
                 i += 1  # separator between two field-name segments
             else:

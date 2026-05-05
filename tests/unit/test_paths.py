@@ -45,6 +45,18 @@ def test_parse_rejects_non_integer_index():
         Path.parse("foo[abc]")
 
 
+def test_parse_rejects_index_followed_by_field_without_dot():
+    """`foo[2]bar` is malformed — must be `foo[2].bar`."""
+    with pytest.raises(ValueError, match="unexpected character"):
+        Path.parse("foo[2]bar")
+
+
+def test_parse_rejects_index_followed_by_letter_at_start():
+    """`[2]foo` is malformed — must be `[2].foo` (or just `[2]`)."""
+    with pytest.raises(ValueError, match="unexpected character"):
+        Path.parse("[2]foo")
+
+
 def test_render_round_trip():
     raw = "database.replicas[2].host"
     assert Path.parse(raw).render() == raw
