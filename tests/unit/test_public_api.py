@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+import pydantic_studio as ps
+
+
+def test_version_string_present():
+    assert isinstance(ps.__version__, str)
+    assert ps.__version__.count(".") >= 1
+
+
+def test_top_level_imports():
+    """Most-used names are re-exported at top level."""
+    assert hasattr(ps, "build_form_tree")
+    assert hasattr(ps, "FormTree")
+    assert hasattr(ps, "GroupNode")
+    assert hasattr(ps, "register_builder")
+    assert hasattr(ps, "PydanticStudioError")
+    assert hasattr(ps, "NoBuilderError")
+    assert hasattr(ps, "CancelledByUser")
+    assert hasattr(ps, "ValidationFailedError")
+
+
+def test_register_builder_is_callable_and_affects_default_registry():
+    from pydantic_studio.tree.builder import default_registry
+
+    class _Dummy:
+        def matches(self, type_):
+            return False
+
+        def build(self, type_, field_info, existing):
+            raise NotImplementedError
+
+    before = len(default_registry())
+    ps.register_builder(_Dummy())
+    assert len(default_registry()) == before + 1
