@@ -325,6 +325,41 @@ class LiteralNode(FormNode):
         return ()
 
 
+class SequenceNode(FormNode):
+    """Container for list / set / tuple values.
+
+    ``origin`` selects the Python container used by ``to_python``.
+    ``item_type_name`` is the FQ name of the (homogeneous) item annotation,
+    used by ``FormTree.add_item`` to build a fresh child via the registry.
+    For fixed-length heterogeneous tuples (``origin="tuple_fixed"``),
+    ``slot_type_names`` carries one FQ name per slot.
+    """
+
+    kind: Literal["sequence"] = "sequence"
+    origin: Literal["list", "set", "tuple", "tuple_fixed"]
+    items: "list[AnyNode]" = []
+    item_type_name: str | None = None
+    slot_type_names: list[str] | None = None
+    min_length: int | None = None
+    max_length: int | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    def to_python(self) -> Any:
+        values = [it.to_python() for it in self.items]
+        if self.origin == "list":
+            return values
+        if self.origin == "set":
+            return set(values)
+        return tuple(values)  # both "tuple" and "tuple_fixed"
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        # Whole-sequence replacement isn't a typical mutation; renderers
+        # use add_item / remove_item / move_item instead. Accept anything
+        # iterable for now and let the schema do the work at submit time.
+        return ()
+
+
 class GroupNode(FormNode):
     """Represents a nested Pydantic BaseModel with a list of child nodes."""
 
@@ -411,13 +446,15 @@ AnyNode = Annotated[
     | DecimalNode
     | EnumNode
     | LiteralNode
+    | SequenceNode
     | GroupNode,
     Discriminator("kind"),
 ]
 
 
-# Resolve the forward reference inside GroupNode.fields.
+# Resolve the forward references inside GroupNode.fields and SequenceNode.items.
 GroupNode.model_rebuild()
+SequenceNode.model_rebuild()
 
 
 class FormTree(BaseModel):
