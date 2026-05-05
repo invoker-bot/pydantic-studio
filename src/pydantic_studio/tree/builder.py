@@ -10,6 +10,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+from pydantic_core import PydanticUndefined
+
 from pydantic_studio.exceptions import NoBuilderError
 from pydantic_studio.tree.nodes import (
     BoolNode,
@@ -89,12 +91,14 @@ class StringBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> StringNode:
         default = field_info.get_default(call_default_factory=True)
+        if default is PydanticUndefined:
+            default = None
         return StringNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default if default is not None else None,
+            default=default,
         )
 
 
@@ -105,12 +109,14 @@ class IntBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> IntNode:
         default = field_info.get_default(call_default_factory=True)
+        if default is PydanticUndefined:
+            default = None
         return IntNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default if default is not None else None,
+            default=default,
         )
 
 
@@ -120,12 +126,14 @@ class FloatBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> FloatNode:
         default = field_info.get_default(call_default_factory=True)
+        if default is PydanticUndefined:
+            default = None
         return FloatNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default if default is not None else None,
+            default=default,
         )
 
 
@@ -135,12 +143,14 @@ class BoolBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> BoolNode:
         default = field_info.get_default(call_default_factory=True)
+        if default is PydanticUndefined:
+            default = None
         return BoolNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default if default is not None else None,
+            default=default,
         )
 
 
@@ -150,10 +160,12 @@ class DecimalBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> DecimalNode:
         default = field_info.get_default(call_default_factory=True)
+        if default is PydanticUndefined:
+            default = None
         return DecimalNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=default if default is not None else None,
+            default=default,
         )

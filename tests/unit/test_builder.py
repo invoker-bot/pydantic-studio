@@ -119,3 +119,16 @@ def test_decimal_builder_builds():
     n = b.build(Decimal, _fi(default=Decimal("0.00")), existing=None)
     assert isinstance(n, DecimalNode)
     assert n.default == Decimal("0.00")
+
+
+def test_string_builder_required_field_has_no_default():
+    """A required field (no default) should produce a node with default=None,
+    not PydanticUndefined sentinel leakage."""
+    from pydantic_core import PydanticUndefined
+
+    b = StringBuilder()
+    fi = FieldInfo()  # no default → required
+    n = b.build(str, fi, existing=None)
+    assert n.default is None
+    assert n.default is not PydanticUndefined  # ensure the sentinel was filtered
+    assert n.required is True
