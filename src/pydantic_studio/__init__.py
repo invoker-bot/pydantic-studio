@@ -14,6 +14,7 @@ from pydantic_studio.tree.builder import (
     NodeBuilder,
     build_form_tree,
     default_registry,
+    reset_default_registry,
 )
 from pydantic_studio.tree.nodes import (
     BoolNode,
@@ -53,4 +54,5 @@ __all__ = [
     "__version__",
     "build_form_tree",
     "register_builder",
+    "reset_default_registry",
 ]
