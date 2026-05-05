@@ -56,3 +56,12 @@ class WithList(BaseModel):
 
 class WithSet(BaseModel):
     flags: set[str] = set()
+
+
+class WithTuple(BaseModel):
+    coords: tuple[int, ...] = ()
+
+
+class WithFixedTuple(BaseModel):
+    rgb: tuple[int, int, int] = (0, 0, 0)
+    pair: tuple[str, int] = ("k", 0)

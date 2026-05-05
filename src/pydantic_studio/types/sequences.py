@@ -94,3 +94,72 @@ class SetBuilder:
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
         )
+
+
+class TupleBuilder:
+    """Builds a SequenceNode for ``tuple[T, ...]`` (variadic) and
+    ``tuple[T1, T2, ...]`` (fixed-length heterogeneous)."""
+
+    def __init__(self, registry: Registry) -> None:
+        self._registry = registry
+
+    def matches(self, type_: type) -> bool:
+        return get_origin(strip_annotated(type_)) is tuple
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> SequenceNode:
+        from pydantic.fields import FieldInfo as _FI
+
+        unwrapped = strip_annotated(type_)
+        args = get_args(unwrapped)
+        c = extract_constraints(field_info)
+
+        if not args:
+            # Plain ``tuple`` with no parameters — treat as ``tuple[Any, ...]``.
+            return SequenceNode(
+                name=field_info.alias or "<unnamed>",
+                description=field_info.description,
+                required=field_info.is_required(),
+                origin="tuple",
+                items=[],
+                item_type_name=_fq(object),
+                min_length=c.get("min_length"),
+                max_length=c.get("max_length"),
+            )
+
+        is_variadic = len(args) == 2 and args[1] is Ellipsis
+        if is_variadic:
+            item_type = args[0]
+            return SequenceNode(
+                name=field_info.alias or "<unnamed>",
+                description=field_info.description,
+                required=field_info.is_required(),
+                origin="tuple",
+                items=_build_items(self._registry, item_type, existing, field_info),
+                item_type_name=_fq(item_type),
+                min_length=c.get("min_length"),
+                max_length=c.get("max_length"),
+            )
+
+        # Fixed-length heterogeneous tuple: one slot per arg.
+        items: list[Any] = []
+        existing_seq = list(existing) if existing is not None else [None] * len(args)
+        # Pad existing_seq to len(args) so missing slots become None children.
+        while len(existing_seq) < len(args):
+            existing_seq.append(None)
+        for i, slot_type in enumerate(args):
+            slot_finfo = _FI(annotation=slot_type)
+            slot_builder = self._registry.find(slot_type)
+            child = slot_builder.build(slot_type, slot_finfo, existing_seq[i])
+            child.name = str(i)
+            items.append(child)
+        return SequenceNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            origin="tuple_fixed",
+            items=items,
+            item_type_name=None,
+            slot_type_names=[_fq(a) for a in args],
+            min_length=len(args),
+            max_length=len(args),
+        )

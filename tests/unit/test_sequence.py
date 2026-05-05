@@ -6,7 +6,7 @@ from typing import cast
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import GroupNode, IntNode, SequenceNode, StringNode
-from tests.fixtures.schemas import WithList, WithSet
+from tests.fixtures.schemas import WithFixedTuple, WithList, WithSet, WithTuple
 
 
 def test_sequence_node_construct() -> None:
@@ -121,3 +121,36 @@ def test_set_to_instance_round_trip() -> None:
     tree = build_form_tree(WithSet, existing={"flags": {"x", "y"}})
     instance = tree.to_instance()
     assert instance.flags == {"x", "y"}
+
+
+def test_variadic_tuple_uses_origin_tuple() -> None:
+    tree = build_form_tree(WithTuple, existing={"coords": (1, 2, 3)})
+    coords = tree.root.find("coords")
+    assert isinstance(coords, SequenceNode)
+    assert coords.origin == "tuple"
+    assert [cast("IntNode", it).value for it in coords.items] == [1, 2, 3]
+
+
+def test_fixed_tuple_uses_origin_tuple_fixed() -> None:
+    tree = build_form_tree(WithFixedTuple, existing={"rgb": (10, 20, 30)})
+    rgb = tree.root.find("rgb")
+    assert isinstance(rgb, SequenceNode)
+    assert rgb.origin == "tuple_fixed"
+    assert rgb.slot_type_names == ["builtins.int", "builtins.int", "builtins.int"]
+    assert [cast("IntNode", it).value for it in rgb.items] == [10, 20, 30]
+
+
+def test_fixed_tuple_heterogeneous_slot_types() -> None:
+    tree = build_form_tree(WithFixedTuple, existing={"pair": ("hello", 7)})
+    pair = tree.root.find("pair")
+    assert isinstance(pair, SequenceNode)
+    assert pair.origin == "tuple_fixed"
+    assert pair.slot_type_names == ["builtins.str", "builtins.int"]
+    assert cast("StringNode", pair.items[0]).value == "hello"
+    assert cast("IntNode", pair.items[1]).value == 7
+
+
+def test_fixed_tuple_to_instance_round_trip() -> None:
+    tree = build_form_tree(WithFixedTuple, existing={"rgb": (1, 2, 3)})
+    instance = tree.to_instance()
+    assert instance.rgb == (1, 2, 3)

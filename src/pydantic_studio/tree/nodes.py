@@ -351,6 +351,11 @@ class SequenceNode(FormNode):
             return values
         if self.origin == "set":
             return set(values)
+        # For fixed-length heterogeneous tuples: if every slot is None
+        # (i.e. no existing data was provided), return None so GroupNode
+        # can omit the key and let Pydantic apply the field's default.
+        if self.origin == "tuple_fixed" and all(v is None for v in values):
+            return None
         return tuple(values)  # both "tuple" and "tuple_fixed"
 
     def validate_value(self, value: Any) -> tuple[str, ...]:

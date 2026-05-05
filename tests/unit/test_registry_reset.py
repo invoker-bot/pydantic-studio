@@ -42,6 +42,6 @@ def test_reset_is_idempotent() -> None:
     reset_default_registry()
     reset_default_registry()  # second call must not error
     reg = default_registry()
-    # Default registry registers 10 builders: String, Int, Float, Bool, Decimal,
-    # Enum, Literal, List, Set, Group. Double-reset must produce the same baseline.
-    assert len(reg) == 10
+    # Default registry registers 11 builders: String, Int, Float, Bool, Decimal,
+    # Enum, Literal, List, Set, Tuple, Group. Double-reset must produce the same baseline.
+    assert len(reg) == 11
