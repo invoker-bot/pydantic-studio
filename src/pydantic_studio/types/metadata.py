@@ -25,8 +25,13 @@ def extract_constraints(field_info: FieldInfo) -> dict[str, Any]:
         ge, le, gt, lt, multiple_of   — numeric (annotated_types.Interval/Ge/Le/Gt/Lt/MultipleOf)
         min_length, max_length        — sequence/string
                                       (annotated_types.MinLen/MaxLen, StringConstraints)
-        pattern                       — string (StringConstraints.pattern)
+        pattern                       — string (StringConstraints.pattern, only ``str`` instances —
+                                        compiled ``re.Pattern`` objects are skipped)
         max_digits, decimal_places    — Decimal (pydantic Decimal helper)
+
+    If multiple metadata items set the same key the last item wins
+    (dict assignment). In practice Pydantic rejects most double-constraint
+    annotations at schema build time, so this rarely matters.
 
     Unknown metadata items are silently ignored.
     """

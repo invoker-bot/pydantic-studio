@@ -111,3 +111,47 @@ def test_annotated_constraints_via_annotated_types() -> None:
     assert n is not None
     assert n.ge == 5
     assert n.le == 10
+
+
+def test_zero_boundary_values_extract_correctly() -> None:
+    """The is-not-None guard must not collapse zero (a falsy but valid bound)."""
+    from annotated_types import Ge, Le, MinLen
+
+    class IntZero(BaseModel):
+        n: Annotated[int, Ge(0), Le(0)]
+
+    class StrZero(BaseModel):
+        s: Annotated[str, MinLen(0)]
+
+    c = extract_constraints(IntZero.model_fields["n"])
+    assert c["ge"] == 0
+    assert c["le"] == 0
+
+    c2 = extract_constraints(StrZero.model_fields["s"])
+    assert c2["min_length"] == 0
+
+
+def test_duplicate_keys_last_one_wins() -> None:
+    """Documented behavior: when two metadata items set the same key,
+    the later item's value wins (dict assignment order)."""
+    from annotated_types import Ge
+
+    class S(BaseModel):
+        n: Annotated[int, Ge(5), Ge(10)]
+
+    c = extract_constraints(S.model_fields["n"])
+    assert c["ge"] == 10  # second Ge wins
+
+
+def test_decimal_gt_lt_constraints_carry_into_node() -> None:
+    """DecimalNode now has gt/lt fields — verify the wiring."""
+    from decimal import Decimal
+
+    class S(BaseModel):
+        price: Decimal = Field(gt=Decimal("0"), lt=Decimal("1000"))
+
+    tree = build_form_tree(S)
+    price = tree.root.find("price")
+    assert price is not None
+    assert price.gt == Decimal("0")
+    assert price.lt == Decimal("1000")

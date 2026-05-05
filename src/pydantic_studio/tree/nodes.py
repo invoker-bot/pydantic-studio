@@ -162,6 +162,8 @@ class DecimalNode(FormNode):
     decimal_places: int | None = None
     ge: Decimal | None = None
     le: Decimal | None = None
+    gt: Decimal | None = None
+    lt: Decimal | None = None
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
         if value is None:

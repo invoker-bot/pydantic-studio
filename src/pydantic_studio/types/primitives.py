@@ -124,4 +124,6 @@ class DecimalBuilder:
             decimal_places=c.get("decimal_places"),
             ge=c.get("ge"),
             le=c.get("le"),
+            gt=c.get("gt"),
+            lt=c.get("lt"),
         )
