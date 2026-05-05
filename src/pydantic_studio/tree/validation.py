@@ -22,7 +22,7 @@ class ValidationResult:
 
     # convenience aliases
     @classmethod
-    def ok(cls) -> ValidationResult:
+    def ok(cls) -> ValidationResult:  # noqa: A003, RUF100 - intentional shadowing of builtin
         return cls.success()
 
     @classmethod
