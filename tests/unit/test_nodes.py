@@ -7,19 +7,35 @@ from pydantic_studio.tree.validation import ValidationResult
 def test_validation_result_ok_factory():
     res = ValidationResult.ok()
     assert res.ok is True
-    assert res.errors == []
+    assert res.errors == ()
 
 
 def test_validation_result_failure_factory():
     res = ValidationResult.fail(["name: required"])
     assert res.ok is False
-    assert res.errors == ["name: required"]
+    assert res.errors == ("name: required",)
 
 
 def test_validation_result_is_truthy_when_ok():
     """Convenient: `if result: ...` works."""
     assert bool(ValidationResult.ok()) is True
     assert bool(ValidationResult.fail(["x"])) is False
+
+
+def test_validation_result_success_alias_matches_ok():
+    """``ok()`` is an alias for ``success()``."""
+    assert ValidationResult.success() == ValidationResult.ok()
+
+
+def test_form_node_to_python_raises_not_implemented():
+    """Subclasses must override ``to_python``; the base raises NotImplementedError."""
+    import pytest
+
+    class _Bare(FormNode):
+        kind: str = "_bare"
+
+    with pytest.raises(NotImplementedError, match=r"_Bare\.to_python is not implemented"):
+        _Bare(name="x").to_python()
 
 
 def test_form_node_has_required_attrs():

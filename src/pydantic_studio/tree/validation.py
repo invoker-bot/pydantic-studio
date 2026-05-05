@@ -10,15 +10,16 @@ class ValidationResult:
     """Outcome of a node-local or tree-wide validation pass.
 
     ``ok`` is True iff ``errors`` is empty. The dataclass is frozen so
-    callers can store results without worrying about mutation.
+    callers can store results without worrying about mutation. ``errors``
+    is a tuple to prevent in-place mutation through the frozen wrapper.
     """
 
     ok: bool
-    errors: list[str] = field(default_factory=list)
+    errors: tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod
     def success(cls) -> ValidationResult:
-        return cls(ok=True, errors=[])
+        return cls(ok=True, errors=())
 
     # convenience aliases
     @classmethod
@@ -27,7 +28,7 @@ class ValidationResult:
 
     @classmethod
     def fail(cls, errors: list[str]) -> ValidationResult:
-        return cls(ok=False, errors=list(errors))
+        return cls(ok=False, errors=tuple(errors))
 
     def __bool__(self) -> bool:
         return self.ok
