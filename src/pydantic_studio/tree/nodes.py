@@ -425,6 +425,32 @@ class MappingNode(FormNode):
         return ()  # whole-mapping replacement deferred to v0.2
 
 
+class UnionNode(FormNode):
+    """Holds a value that could be one of several types.
+
+    The user picks a variant; the node's ``selected`` carries the chosen
+    variant's child node. ``variant_type_names`` records all candidate
+    types for ``select_variant`` to rebuild on switch.
+    """
+
+    kind: Literal["union"] = "union"
+    variant_type_names: list[str]
+    selected_index: int | None = None
+    selected: "AnyNode | None" = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    def to_python(self) -> Any:
+        if self.selected is None:
+            return None
+        return self.selected.to_python()
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        # Per-leaf validation happens on the inner node; the union itself
+        # accepts any value the user is staging.
+        return ()
+
+
 class GroupNode(FormNode):
     """Represents a nested Pydantic BaseModel with a list of child nodes."""
 
@@ -513,16 +539,18 @@ AnyNode = Annotated[
     | LiteralNode
     | SequenceNode
     | MappingNode
+    | UnionNode
     | GroupNode,
     Discriminator("kind"),
 ]
 
 
 # Resolve the forward references inside GroupNode.fields, SequenceNode.items,
-# and MappingNode.entries.
+# MappingNode.entries, and UnionNode.selected.
 GroupNode.model_rebuild()
 SequenceNode.model_rebuild()
 MappingNode.model_rebuild()
+UnionNode.model_rebuild()
 
 
 class FormTree(BaseModel):

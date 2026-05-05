@@ -36,9 +36,8 @@ class Color(Enum):
 
 
 class WithColor(BaseModel):
-    # NOTE(T14): an ``accent: Color | None = None`` field will be added
-    # in T14 once UnionBuilder handles Optional. Don't add it earlier.
     favorite: Color = Color.BLUE
+    accent: Color | None = None
 
 
 LogLevel = Literal["debug", "info", "warn", "error"]
@@ -70,3 +69,12 @@ class WithFixedTuple(BaseModel):
 class WithDict(BaseModel):
     settings: dict[str, int] = {}
     labels: dict[str, str] = {}
+
+
+class WithUnion(BaseModel):
+    value: int | str = 0
+
+
+class WithOptional(BaseModel):
+    nickname: str | None = None
+    age: int | None = None

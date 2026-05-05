@@ -22,6 +22,7 @@ from pydantic_studio.types.primitives import (
 )
 from pydantic_studio.types.registry import NodeBuilder, Registry
 from pydantic_studio.types.sequences import ListBuilder, SetBuilder, TupleBuilder
+from pydantic_studio.types.unions import UnionBuilder
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -60,6 +61,7 @@ def default_registry() -> Registry:
         reg.register(SetBuilder(reg))
         reg.register(TupleBuilder(reg))
         reg.register(DictBuilder(reg))
+        reg.register(UnionBuilder(reg))      # before GroupBuilder
         # GroupBuilder is registered last so it matches *any* BaseModel
         # only when no more-specific builder did. It also needs a back-
         # reference to the registry for recursive dispatch.
