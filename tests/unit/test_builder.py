@@ -1,9 +1,28 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
+from pydantic.fields import FieldInfo
 
 from pydantic_studio.exceptions import NoBuilderError
-from pydantic_studio.tree.builder import NodeBuilder, Registry, default_registry
+from pydantic_studio.tree.builder import (
+    BoolBuilder,
+    DecimalBuilder,
+    FloatBuilder,
+    IntBuilder,
+    NodeBuilder,
+    Registry,
+    StringBuilder,
+    default_registry,
+)
+from pydantic_studio.tree.nodes import (
+    BoolNode,
+    DecimalNode,
+    FloatNode,
+    IntNode,
+    StringNode,
+)
 
 
 def test_default_registry_is_non_empty():
@@ -35,3 +54,68 @@ def test_registry_register_prepends_builder():
     reg.register(a)
     reg.register(b)  # b prepended
     assert reg.find(int) is b
+
+
+def _fi(default=None, **kw):
+    """Helper: fabricate a FieldInfo with the given metadata."""
+    return FieldInfo(default=default, **kw)
+
+
+def test_string_builder_matches_str():
+    b = StringBuilder()
+    assert b.matches(str) is True
+    assert b.matches(int) is False
+
+
+def test_string_builder_builds_with_default():
+    b = StringBuilder()
+    fi = _fi(default="hi", description="a greeting")
+    n = b.build(str, fi, existing=None)
+    assert isinstance(n, StringNode)
+    assert n.default == "hi"
+    assert n.description == "a greeting"
+    assert n.value is None  # nothing passed in `existing`
+
+
+def test_string_builder_picks_existing_value_over_default():
+    b = StringBuilder()
+    fi = _fi(default="hi")
+    n = b.build(str, fi, existing="bonjour")
+    assert n.value == "bonjour"
+
+
+def test_int_builder_matches_int_only():
+    b = IntBuilder()
+    assert b.matches(int) is True
+    assert b.matches(bool) is False  # bool is a subclass of int but we don't want it
+
+
+def test_int_builder_builds():
+    b = IntBuilder()
+    n = b.build(int, _fi(default=10), existing=None)
+    assert isinstance(n, IntNode)
+    assert n.default == 10
+
+
+def test_float_builder_builds():
+    b = FloatBuilder()
+    assert b.matches(float)
+    n = b.build(float, _fi(default=1.5), existing=None)
+    assert isinstance(n, FloatNode)
+    assert n.default == 1.5
+
+
+def test_bool_builder_builds():
+    b = BoolBuilder()
+    assert b.matches(bool)
+    n = b.build(bool, _fi(default=True), existing=None)
+    assert isinstance(n, BoolNode)
+    assert n.default is True
+
+
+def test_decimal_builder_builds():
+    b = DecimalBuilder()
+    assert b.matches(Decimal)
+    n = b.build(Decimal, _fi(default=Decimal("0.00")), existing=None)
+    assert isinstance(n, DecimalNode)
+    assert n.default == Decimal("0.00")
