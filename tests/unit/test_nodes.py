@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from pydantic_studio.tree.nodes import FormNode, StringNode
+from decimal import Decimal
+
+from pydantic_studio.tree.nodes import (
+    BoolNode,
+    DecimalNode,
+    FloatNode,
+    FormNode,
+    IntNode,
+    StringNode,
+)
 from pydantic_studio.tree.validation import ValidationResult
 
 
@@ -100,3 +109,50 @@ def test_string_node_serializes_with_kind_discriminator():
     assert dumped["kind"] == "string"
     restored = StringNode.model_validate(dumped)
     assert restored.value == "y"
+
+
+def test_int_node_minimal():
+    n = IntNode(name="age")
+    assert n.kind == "int"
+    assert n.value is None
+
+
+def test_int_node_with_value_and_constraints():
+    n = IntNode(name="age", value=42, ge=0, le=150)
+    assert n.value == 42
+    assert n.ge == 0
+    assert n.le == 150
+    assert n.to_python() == 42
+
+
+def test_int_node_supports_strict_bounds():
+    n = IntNode(name="x", gt=0, lt=100, multiple_of=5)
+    assert n.gt == 0
+    assert n.lt == 100
+    assert n.multiple_of == 5
+
+
+def test_float_node_minimal():
+    n = FloatNode(name="ratio", value=0.75)
+    assert n.kind == "float"
+    assert n.value == 0.75
+
+
+def test_bool_node_minimal():
+    n = BoolNode(name="enabled", value=True)
+    assert n.kind == "bool"
+    assert n.value is True
+    assert n.to_python() is True
+
+
+def test_decimal_node_minimal():
+    n = DecimalNode(name="amount", value=Decimal("3.14"))
+    assert n.kind == "decimal"
+    assert n.value == Decimal("3.14")
+    assert n.to_python() == Decimal("3.14")
+
+
+def test_decimal_node_constraints():
+    n = DecimalNode(name="x", max_digits=5, decimal_places=2)
+    assert n.max_digits == 5
+    assert n.decimal_places == 2

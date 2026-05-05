@@ -7,6 +7,7 @@ the abstract base ``FormNode``.
 
 from __future__ import annotations
 
+from decimal import Decimal  # noqa: TC003 - needed by Pydantic field validation at runtime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -50,4 +51,66 @@ class StringNode(FormNode):
     secret: bool = False
 
     def to_python(self) -> str | None:
+        return self.value
+
+
+class IntNode(FormNode):
+    """Holds an integer value, with optional comparison and multiple-of constraints."""
+
+    kind: Literal["int"] = "int"
+    value: int | None = None
+    default: int | None = None
+
+    ge: int | None = None
+    le: int | None = None
+    gt: int | None = None
+    lt: int | None = None
+    multiple_of: int | None = None
+
+    def to_python(self) -> int | None:
+        return self.value
+
+
+class FloatNode(FormNode):
+    """Holds a float value, with optional comparison and infinity/NaN constraints."""
+
+    kind: Literal["float"] = "float"
+    value: float | None = None
+    default: float | None = None
+
+    ge: float | None = None
+    le: float | None = None
+    gt: float | None = None
+    lt: float | None = None
+    multiple_of: float | None = None
+    allow_inf_nan: bool = True
+
+    def to_python(self) -> float | None:
+        return self.value
+
+
+class BoolNode(FormNode):
+    """Holds a boolean value."""
+
+    kind: Literal["bool"] = "bool"
+    value: bool | None = None
+    default: bool | None = None
+
+    def to_python(self) -> bool | None:
+        return self.value
+
+
+class DecimalNode(FormNode):
+    """Holds a Decimal value, with optional digit and comparison constraints."""
+
+    kind: Literal["decimal"] = "decimal"
+    value: Decimal | None = None
+    default: Decimal | None = None
+
+    max_digits: int | None = None
+    decimal_places: int | None = None
+    ge: Decimal | None = None
+    le: Decimal | None = None
+
+    def to_python(self) -> Decimal | None:
         return self.value
