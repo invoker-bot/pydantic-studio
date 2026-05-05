@@ -7,6 +7,7 @@ prepended so user registrations override defaults.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -214,3 +215,34 @@ class DecimalBuilder:
             value=existing,
             default=default,
         )
+
+
+def build_form_tree(
+    schema: type[BaseModel],
+    existing: dict[str, Any] | None = None,
+    registry: Registry | None = None,
+) -> Any:
+    """Build a FormTree from a Pydantic BaseModel subclass.
+
+    Args:
+        schema: The user's Pydantic model class.
+        existing: Optional dict to pre-populate field values.
+        registry: Optional custom registry (defaults to the global default).
+
+    Returns:
+        FormTree: Root container with schema reference, root group, and history fields.
+    """
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.nodes import FormTree  # avoid circular at import time
+
+    reg = registry if registry is not None else default_registry()
+    group_builder = GroupBuilder(reg)
+    root = group_builder.build(schema, FieldInfo(annotation=schema), existing or {})
+    schema_name = f"{schema.__module__}:{schema.__qualname__}"
+    return FormTree(
+        schema_class=schema,
+        schema_name=schema_name,
+        root=root,
+        created_at=datetime.now(tz=UTC),
+    )

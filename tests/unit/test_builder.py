@@ -15,12 +15,14 @@ from pydantic_studio.tree.builder import (
     NodeBuilder,
     Registry,
     StringBuilder,
+    build_form_tree,
     default_registry,
 )
 from pydantic_studio.tree.nodes import (
     BoolNode,
     DecimalNode,
     FloatNode,
+    FormTree,
     GroupNode,
     IntNode,
     StringNode,
@@ -192,3 +194,23 @@ def test_group_builder_recursive_existing_values():
     addr = n.find("address")
     assert addr.find("street").value == "1 Main"
     assert addr.find("city").value == "Townsville"
+
+
+def test_build_form_tree_returns_form_tree_with_root_group():
+    tree = build_form_tree(Simple)
+    assert isinstance(tree, FormTree)
+    assert tree.schema_class is Simple
+    assert isinstance(tree.root, GroupNode)
+    assert tree.root.schema_class is Simple
+
+
+def test_build_form_tree_records_schema_name():
+    tree = build_form_tree(Simple)
+    # 'tests.fixtures.schemas:Simple' or similar — exact format documented
+    assert tree.schema_name.endswith(":Simple")
+
+
+def test_build_form_tree_with_existing_dict():
+    tree = build_form_tree(Simple, existing={"name": "carol", "age": 7})
+    assert tree.root.find("name").value == "carol"
+    assert tree.root.find("age").value == 7

@@ -8,7 +8,9 @@ the abstract base ``FormNode``.
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from decimal import Decimal
+from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Discriminator, field_serializer, field_validator
@@ -185,3 +187,21 @@ AnyNode = Annotated[
 
 # Resolve the forward reference inside GroupNode.fields.
 GroupNode.model_rebuild()
+
+
+class FormTree(BaseModel):
+    """Root container: schema reference, root group, and history (added later)."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    schema_class: type[BaseModel] | None = None  # may be re-attached via context on load
+    schema_name: str
+    root: GroupNode
+    created_at: datetime
+    snapshots: list[bytes] = []
+    cursor: int = 0
+    snapshot_limit: int = 50
+    draft_path: FsPath | None = None
+
+    def to_python(self) -> dict[str, Any]:
+        return self.root.to_python()
