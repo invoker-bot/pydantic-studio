@@ -24,4 +24,8 @@ class ValidationFailedError(PydanticStudioError):
 
     def __init__(self, errors: list[str]) -> None:
         self.errors = list(errors)
-        super().__init__("Validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
+        if errors:
+            msg = "Validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+        else:
+            msg = "Validation failed"
+        super().__init__(msg)

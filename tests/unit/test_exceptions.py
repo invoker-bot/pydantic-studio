@@ -34,6 +34,13 @@ def test_validation_failed_error_carries_errors():
     assert "name: required" in str(err)
 
 
+def test_validation_failed_error_with_empty_errors_has_clean_message():
+    """Empty error list should not produce a trailing-newline message."""
+    err = ValidationFailedError([])
+    assert err.errors == []
+    assert str(err) == "Validation failed"
+
+
 def test_pydantic_studio_error_can_be_caught_generically():
     """Anyone who catches PydanticStudioError catches all our errors."""
     with pytest.raises(PydanticStudioError):
