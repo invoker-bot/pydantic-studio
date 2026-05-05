@@ -205,3 +205,53 @@ class FormTree(BaseModel):
 
     def to_python(self) -> dict[str, Any]:
         return self.root.to_python()
+
+    # ----- mutations -----
+
+    def set_value(self, path: str, value: Any) -> None:
+        """Set ``value`` at the given path. Pushes a snapshot before mutating."""
+        from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.paths import Path as _Path
+
+        # 1. Snapshot before mutation.
+        self._push_snapshot(_snap.take(self.root))
+
+        # 2. Walk to the parent node.
+        path_obj = _Path.parse(path)
+        if not path_obj.segments:
+            msg = "cannot set value on the root group itself"
+            raise ValueError(msg)
+        parent: Any = self.root
+        for seg in path_obj.segments[:-1]:
+            if isinstance(parent, GroupNode) and isinstance(seg, str):
+                child = parent.find(seg)
+                if child is None:
+                    msg = f"no field named {seg!r} at this level"
+                    raise KeyError(msg)
+                parent = child
+            else:
+                msg = f"cannot navigate segment {seg!r} (not a group)"
+                raise KeyError(msg)
+
+        last = path_obj.segments[-1]
+        if isinstance(parent, GroupNode) and isinstance(last, str):
+            target = parent.find(last)
+            if target is None:
+                msg = f"no field named {last!r}"
+                raise KeyError(msg)
+            target.value = value
+        else:
+            msg = f"cannot set on non-group parent at segment {last!r}"
+            raise KeyError(msg)
+
+    # ----- snapshot internals -----
+
+    def _push_snapshot(self, snap: bytes) -> None:
+        # If the cursor is not at the tail, drop the redo tail before pushing.
+        if self.cursor < len(self.snapshots):
+            self.snapshots = self.snapshots[: self.cursor]
+        self.snapshots.append(snap)
+        # Bound: drop oldest until under the limit.
+        while len(self.snapshots) > self.snapshot_limit:
+            self.snapshots.pop(0)
+        self.cursor = len(self.snapshots)
