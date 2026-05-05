@@ -47,3 +47,12 @@ LogLevel = Literal["debug", "info", "warn", "error"]
 class WithLogLevel(BaseModel):
     level: LogLevel = "info"
     severity: Literal[1, 2, 3] = 2
+
+
+class WithList(BaseModel):
+    tags: list[str] = []
+    counts: list[int] = []
+
+
+class WithSet(BaseModel):
+    flags: set[str] = set()
