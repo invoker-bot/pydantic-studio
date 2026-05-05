@@ -38,3 +38,52 @@ def test_set_value_through_nonexistent_parent_raises():
     tree = build_form_tree(Person)
     with pytest.raises(KeyError, match="ghost"):
         tree.set_value("ghost.city", "x")
+
+
+def test_undo_restores_previous_value():
+    tree = build_form_tree(Simple)
+    tree.set_value("name", "first")
+    tree.set_value("name", "second")
+    assert tree.root.find("name").value == "second"
+    assert tree.undo() is True
+    assert tree.root.find("name").value == "first"
+
+
+def test_undo_to_initial_state():
+    tree = build_form_tree(Simple)
+    tree.set_value("name", "x")
+    assert tree.undo() is True
+    # Initial state had value=None for name.
+    assert tree.root.find("name").value is None
+
+
+def test_undo_returns_false_when_nothing_to_undo():
+    tree = build_form_tree(Simple)
+    assert tree.undo() is False
+
+
+def test_redo_returns_false_when_nothing_to_redo():
+    tree = build_form_tree(Simple)
+    assert tree.redo() is False
+
+
+def test_redo_after_undo_restores():
+    tree = build_form_tree(Simple)
+    tree.set_value("name", "alpha")
+    tree.set_value("name", "beta")
+    tree.undo()
+    tree.undo()
+    tree.redo()
+    assert tree.root.find("name").value == "alpha"
+    tree.redo()
+    assert tree.root.find("name").value == "beta"
+
+
+def test_set_after_undo_drops_redo_tail():
+    tree = build_form_tree(Simple)
+    tree.set_value("name", "a")
+    tree.set_value("name", "b")
+    tree.undo()  # back to "a"
+    tree.set_value("name", "c")  # should drop the "b" snapshot from redo tail
+    assert tree.redo() is False  # no redo available
+    assert tree.root.find("name").value == "c"

@@ -255,3 +255,29 @@ class FormTree(BaseModel):
         while len(self.snapshots) > self.snapshot_limit:
             self.snapshots.pop(0)
         self.cursor = len(self.snapshots)
+
+    def undo(self) -> bool:
+        """Restore the previous state. Returns True if anything was undone."""
+        from pydantic_studio.tree import snapshots as _snap
+
+        if self.cursor == 0:
+            return False
+        # The current state isn't yet on the stack; only prior states are.
+        # Step back: cursor points to the snapshot that *was* the state before
+        # the most recent mutation. To allow redo, capture the current state
+        # first if cursor == len(snapshots).
+        if self.cursor == len(self.snapshots):
+            self.snapshots.append(_snap.take(self.root))
+        self.cursor -= 1
+        self.root = _snap.restore(self.snapshots[self.cursor])
+        return True
+
+    def redo(self) -> bool:
+        """Re-apply a previously undone mutation."""
+        from pydantic_studio.tree import snapshots as _snap
+
+        if self.cursor + 1 >= len(self.snapshots):
+            return False
+        self.cursor += 1
+        self.root = _snap.restore(self.snapshots[self.cursor])
+        return True
