@@ -298,6 +298,32 @@ class EnumNode(FormNode):
         return ()
 
 
+class LiteralNode(FormNode):
+    """Holds a value drawn from a closed list defined by ``Literal[...]``.
+
+    Literal values are always JSON-friendly primitives (str / int / bool /
+    None / Enum members), so no special serializer is needed — Pydantic's
+    default JSON encoding round-trips them correctly.
+    """
+
+    kind: Literal["literal"] = "literal"
+    value: Any = None
+    default: Any = None
+    choices: list[Any] = []
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    def to_python(self) -> Any:
+        return self.value
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if value not in self.choices:
+            return (f"{value!r} not in choices {self.choices!r}",)
+        return ()
+
+
 class GroupNode(FormNode):
     """Represents a nested Pydantic BaseModel with a list of child nodes."""
 
@@ -377,7 +403,14 @@ class GroupNode(FormNode):
 
 # Discriminated union — every concrete node type uses ``kind`` as discriminator.
 AnyNode = Annotated[
-    StringNode | IntNode | FloatNode | BoolNode | DecimalNode | EnumNode | GroupNode,
+    StringNode
+    | IntNode
+    | FloatNode
+    | BoolNode
+    | DecimalNode
+    | EnumNode
+    | LiteralNode
+    | GroupNode,
     Discriminator("kind"),
 ]
 

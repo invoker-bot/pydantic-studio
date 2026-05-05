@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -38,3 +39,11 @@ class WithColor(BaseModel):
     # NOTE(T14): an ``accent: Color | None = None`` field will be added
     # in T14 once UnionBuilder handles Optional. Don't add it earlier.
     favorite: Color = Color.BLUE
+
+
+LogLevel = Literal["debug", "info", "warn", "error"]
+
+
+class WithLogLevel(BaseModel):
+    level: LogLevel = "info"
+    severity: Literal[1, 2, 3] = 2

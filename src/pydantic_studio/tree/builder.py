@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic_studio.types.choices import EnumBuilder
+from pydantic_studio.types.choices import EnumBuilder, LiteralBuilder
 from pydantic_studio.types.models import GroupBuilder
 from pydantic_studio.types.primitives import (
     BoolBuilder,
@@ -52,7 +52,8 @@ def default_registry() -> Registry:
         reg.register(FloatBuilder())
         reg.register(BoolBuilder())
         reg.register(DecimalBuilder())
-        reg.register(EnumBuilder())          # NEW
+        reg.register(EnumBuilder())
+        reg.register(LiteralBuilder())       # NEW
         # GroupBuilder is registered last so it matches *any* BaseModel
         # only when no more-specific builder did. It also needs a back-
         # reference to the registry for recursive dispatch.
