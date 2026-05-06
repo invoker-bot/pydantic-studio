@@ -41,7 +41,7 @@ pydantic-studio = "pydantic_studio.cli:app"
 email = ["email-validator>=2"]
 
 [project.urls]
-Source = "https://github.com/pydantic-studio/pydantic-studio"
+Source = "https://github.com/invoker-bot/pydantic-studio"
 
 [dependency-groups]
 dev = [
