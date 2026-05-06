@@ -32,6 +32,7 @@ from pydantic_studio.tree.nodes import (
     MappingNode,
     SequenceNode,
     StringNode,
+    TimedeltaNode,
     TimeNode,
     UnionNode,
 )
@@ -68,6 +69,7 @@ __all__ = [
     "SequenceNode",
     "StringNode",
     "TimeNode",
+    "TimedeltaNode",
     "UnionNode",
     "ValidationFailedError",
     "ValidationResult",

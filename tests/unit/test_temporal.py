@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 
 from pydantic import BaseModel
 
 from pydantic_studio import (
     DateNode,
     DatetimeNode,
+    TimedeltaNode,
     TimeNode,
     build_form_tree,
 )
@@ -141,3 +142,57 @@ class TestEndToEnd:
         assert result.ok
         instance = tree.to_instance()
         assert instance.when == new_when
+
+
+class WithTimedelta(BaseModel):
+    interval: timedelta = timedelta(seconds=30)
+    timeout: timedelta = timedelta(minutes=5)
+
+
+class TestTimedeltaNode:
+    def test_build_uses_timedelta_node(self) -> None:
+        tree = build_form_tree(WithTimedelta)
+        interval = tree.root.find("interval")
+        assert isinstance(interval, TimedeltaNode)
+        assert interval.value == timedelta(seconds=30)
+
+    def test_validate_accepts_timedelta(self) -> None:
+        node = TimedeltaNode(name="x", value=None)
+        assert node.validate_value(timedelta(hours=1)) == ()
+
+    def test_validate_rejects_int(self) -> None:
+        """Pydantic accepts int as seconds during JSON parse, but at the
+        validate_value level (post-renderer-coerce) we expect the actual
+        type. The renderer converts `30` from a number input into
+        timedelta(seconds=30) before calling set_value."""
+        node = TimedeltaNode(name="x", value=None)
+        errors = node.validate_value(30)
+        assert errors
+        assert "expected timedelta" in errors[0]
+
+    def test_validate_rejects_str(self) -> None:
+        node = TimedeltaNode(name="x", value=None)
+        errors = node.validate_value("PT1H")
+        assert errors
+
+    def test_required_none_fails(self) -> None:
+        node = TimedeltaNode(name="x", required=True, value=None)
+        assert node.validate_value(None) == ("value is required",)
+
+    def test_to_python_returns_value(self) -> None:
+        d = timedelta(hours=2, minutes=30)
+        node = TimedeltaNode(name="x", value=d)
+        assert node.to_python() == d
+
+    def test_snapshot_round_trip(self) -> None:
+        node = TimedeltaNode(name="x", value=timedelta(hours=1, minutes=30))
+        raw = node.model_dump_json()
+        restored = TimedeltaNode.model_validate_json(raw)
+        assert restored.value == node.value
+
+    def test_to_instance_round_trip(self) -> None:
+        tree = build_form_tree(WithTimedelta)
+        result = tree.set_value("interval", timedelta(minutes=10))
+        assert result.ok
+        instance = tree.to_instance()
+        assert instance.interval == timedelta(minutes=10)

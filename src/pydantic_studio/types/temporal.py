@@ -1,18 +1,19 @@
-"""Builders for ``datetime``, ``date``, ``time`` annotations.
+"""Builders for all temporal annotations: ``datetime``, ``date``, ``time``,
+and ``timedelta``.
 
-Pydantic round-trips these via ISO 8601 strings, so the builders only need
-to detect the annotation and bind a default. ``TimedeltaBuilder`` is in
-this module too (Task 7) — durations share the temporal-module imports.
+Pydantic round-trips these via ISO 8601 strings (durations use ISO 8601
+duration format, e.g. ``PT1H30M``), so the builders only need to detect
+the annotation and bind a default.
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any
 
 from pydantic_core import PydanticUndefined
 
-from pydantic_studio.tree.nodes import DateNode, DatetimeNode, TimeNode
+from pydantic_studio.tree.nodes import DateNode, DatetimeNode, TimedeltaNode, TimeNode
 from pydantic_studio.types.annotated import strip_annotated
 
 if TYPE_CHECKING:
@@ -74,6 +75,25 @@ class TimeBuilder:
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> TimeNode:
         default = _default(field_info)
         return TimeNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            value=existing if existing is not None else default,
+            default=default,
+        )
+
+
+class TimedeltaBuilder:
+    """Matches ``datetime.timedelta`` annotations."""
+
+    def matches(self, type_: type) -> bool:
+        return strip_annotated(type_) is timedelta
+
+    def build(
+        self, type_: type, field_info: FieldInfo, existing: Any
+    ) -> TimedeltaNode:
+        default = _default(field_info)
+        return TimedeltaNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),

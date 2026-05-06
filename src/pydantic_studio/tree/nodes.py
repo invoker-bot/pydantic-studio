@@ -8,7 +8,7 @@ the abstract base ``FormNode``.
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
@@ -283,6 +283,29 @@ class TimeNode(FormNode):
         return ()
 
     def to_python(self) -> time | None:
+        return self.value
+
+
+class TimedeltaNode(FormNode):
+    """Holds a ``datetime.timedelta`` value (a duration).
+
+    Pydantic emits ISO 8601 duration strings (``PT1H30M``) on JSON dump
+    and parses them back on load — round-trip works without a custom
+    serializer.
+    """
+
+    kind: Literal["timedelta"] = "timedelta"
+    value: timedelta | None = None
+    default: timedelta | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, timedelta):
+            return (f"expected timedelta, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> timedelta | None:
         return self.value
 
 
@@ -599,6 +622,7 @@ AnyNode = Annotated[
     | DatetimeNode
     | DateNode
     | TimeNode
+    | TimedeltaNode
     | EnumNode
     | LiteralNode
     | SequenceNode
