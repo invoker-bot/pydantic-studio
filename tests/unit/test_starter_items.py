@@ -65,3 +65,45 @@ class TestSnapshotOrderingHoist:
         with pytest.raises(ValueError, match=r"not in sys\.modules"):
             t2.select_variant("v", 1)
         assert len(t2.snapshots) == snapshots_before
+
+
+class TestUnionPreSelectViaModelValidate:
+    """When a union has a BaseModel variant and existing is a dict that
+    matches its schema, the variant should be pre-selected — not left blank."""
+
+    def test_dict_matches_basemodel_variant(self) -> None:
+        from pydantic import BaseModel
+
+        from pydantic_studio import build_form_tree
+        from tests.fixtures.schemas import Address
+
+        class HasUnion(BaseModel):
+            target: Address | int = 0
+
+        # Pass a dict that validly populates Address; UnionBuilder should
+        # detect this via model_validate and pre-select the Address variant.
+        tree = build_form_tree(HasUnion, existing={"target": {"street": "X", "city": "Y"}})
+        union = tree.root.find("target")
+        assert union is not None
+        assert union.selected_index == 0, (
+            f"expected Address variant (index 0) pre-selected, got {union.selected_index}"
+        )
+        assert union.selected is not None
+        assert union.selected.kind == "group"
+
+    def test_int_still_picks_int_variant(self) -> None:
+        from pydantic import BaseModel
+
+        from pydantic_studio import build_form_tree
+        from tests.fixtures.schemas import Address
+
+        class HasUnion(BaseModel):
+            target: Address | int = 0
+
+        tree = build_form_tree(HasUnion, existing={"target": 42})
+        union = tree.root.find("target")
+        assert union is not None
+        assert union.selected_index == 1, "expected int variant (index 1)"
+        assert union.selected is not None
+        assert union.selected.kind == "int"
+        assert union.selected.value == 42
