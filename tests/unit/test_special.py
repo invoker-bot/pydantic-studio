@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, SecretBytes, SecretStr
 
-from pydantic_studio import PathNode, SecretNode, UuidNode, build_form_tree
+from pydantic_studio import PathNode, PatternNode, SecretNode, UuidNode, build_form_tree
 
 
 class WithPath(BaseModel):
@@ -197,3 +198,62 @@ class TestSecretNode:
         assert result.ok
         instance = tree.to_instance()
         assert instance.api_key.get_secret_value() == "new-secret"
+
+
+class WithPattern(BaseModel):
+    name_re: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_]*$")
+    flag_re: re.Pattern[str] = re.compile(r"hello", re.IGNORECASE)
+
+
+class TestPatternNode:
+    def test_build_uses_pattern_node(self) -> None:
+        tree = build_form_tree(WithPattern)
+        name_re = tree.root.find("name_re")
+        assert isinstance(name_re, PatternNode)
+        assert name_re.value == r"^[a-z][a-z0-9_]*$"
+        assert name_re.flags == 0
+
+    def test_build_preserves_flags(self) -> None:
+        tree = build_form_tree(WithPattern)
+        flag_re = tree.root.find("flag_re")
+        assert isinstance(flag_re, PatternNode)
+        assert flag_re.flags & re.IGNORECASE
+
+    def test_validate_accepts_string(self) -> None:
+        node = PatternNode(name="x", value=None)
+        assert node.validate_value(r"^abc$") == ()
+
+    def test_validate_rejects_invalid_regex(self) -> None:
+        node = PatternNode(name="x", value=None)
+        errors = node.validate_value(r"[unclosed")
+        assert errors
+        assert "regex" in errors[0].lower()
+
+    def test_validate_rejects_non_string(self) -> None:
+        node = PatternNode(name="x", value=None)
+        errors = node.validate_value(42)
+        assert errors
+
+    def test_to_python_compiles(self) -> None:
+        node = PatternNode(name="x", value=r"^[a-z]+$", flags=0)
+        result = node.to_python()
+        assert isinstance(result, re.Pattern)
+        assert result.match("abc")
+        assert not result.match("ABC")
+
+    def test_to_python_applies_flags(self) -> None:
+        node = PatternNode(name="x", value=r"hello", flags=re.IGNORECASE)
+        result = node.to_python()
+        assert result.match("HELLO")
+
+    def test_snapshot_round_trip(self) -> None:
+        node = PatternNode(name="x", value=r"^foo$", flags=re.IGNORECASE)
+        raw = node.model_dump_json()
+        restored = PatternNode.model_validate_json(raw)
+        assert restored.value == r"^foo$"
+        assert restored.flags == re.IGNORECASE
+
+    def test_to_instance_round_trip(self) -> None:
+        tree = build_form_tree(WithPattern)
+        instance = tree.to_instance()
+        assert instance.name_re.match("hello")

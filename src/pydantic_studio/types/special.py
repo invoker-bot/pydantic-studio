@@ -100,6 +100,61 @@ def _coerce_secret_existing(existing: Any) -> Any:
     return existing
 
 
+def _is_pattern_type(type_: Any) -> bool:
+    """Detect ``re.Pattern[str]`` and bare ``re.Pattern``."""
+    import re
+    from typing import get_origin
+
+    unwrapped = strip_annotated(type_)
+    return get_origin(unwrapped) is re.Pattern or unwrapped is re.Pattern
+
+
+class PatternBuilder:
+    """Matches ``re.Pattern`` and ``re.Pattern[str]``."""
+
+    def matches(self, type_: type) -> bool:
+        return _is_pattern_type(type_)
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
+        import re
+
+        from pydantic_studio.tree.nodes import PatternNode as _PatternNode
+
+        # Strip always-implicit re.UNICODE so only user-explicit flags are
+        # stored.  re.compile(r"x").flags == 32 (UNICODE) even with no args;
+        # we record 0 in that case so PatternNode.flags reflects only the
+        # flags the caller explicitly requested.
+        _implicit = int(re.UNICODE)
+
+        def _explicit_flags(pat: re.Pattern) -> int:  # type: ignore[type-arg]
+            return int(pat.flags) & ~_implicit
+
+        default = _default(field_info)
+        if isinstance(default, re.Pattern):
+            default_src: str | None = default.pattern
+            default_flags = _explicit_flags(default)
+        else:
+            default_src = default if isinstance(default, str) else None
+            default_flags = 0
+        if isinstance(existing, re.Pattern):
+            existing_src: str | None = existing.pattern
+            existing_flags: int = _explicit_flags(existing)
+        elif isinstance(existing, str):
+            existing_src = existing
+            existing_flags = default_flags
+        else:
+            existing_src = None
+            existing_flags = default_flags
+        return _PatternNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            value=existing_src if existing_src is not None else default_src,
+            default=default_src,
+            flags=existing_flags,
+        )
+
+
 class SecretBuilder:
     """Matches ``pydantic.SecretStr`` and ``pydantic.SecretBytes``."""
 

@@ -607,6 +607,38 @@ class SecretNode(FormNode):
         return SecretBytes(self.value)
 
 
+class PatternNode(FormNode):
+    """Holds a regex pattern as its source string + flags.
+
+    ``to_python`` recompiles via ``re.compile(value, flags)``.
+    """
+
+    kind: Literal["pattern"] = "pattern"
+    value: str | None = None
+    default: str | None = None
+    flags: int = 0
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        import re as _re
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected regex source string, got {type(value).__name__}",)
+        try:
+            _re.compile(value, self.flags)
+        except _re.error as e:
+            return (f"invalid regex: {e}",)
+        return ()
+
+    def to_python(self) -> Any:
+        import re as _re
+
+        if self.value is None:
+            return None
+        return _re.compile(self.value, self.flags)
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -928,6 +960,7 @@ AnyNode = Annotated[
     | PathNode
     | UuidNode
     | SecretNode
+    | PatternNode
     | EnumNode
     | LiteralNode
     | SequenceNode
