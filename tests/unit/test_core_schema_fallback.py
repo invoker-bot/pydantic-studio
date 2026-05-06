@@ -3,21 +3,31 @@ declared via ``__get_pydantic_core_schema__`` (issue #1)."""
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import date
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel, GetCoreSchemaHandler
 from pydantic_core import core_schema
 
+if TYPE_CHECKING:
+    from uuid import UUID
+
 from pydantic_studio.exceptions import NoBuilderError
 from pydantic_studio.tree.builder import build_form_tree
 from pydantic_studio.tree.nodes import (
+    DateNode,
+    DecimalNode,
     FloatNode,
     GroupNode,
     IntNode,
+    LiteralNode,
     MappingNode,
     SequenceNode,
     StringNode,
+    UnionNode,
+    UuidNode,
 )
 
 # ---------- helper custom types ----------
@@ -374,3 +384,173 @@ def test_basemodel_subclass_still_uses_group_builder():
     tree = build_form_tree(Outer)
     inner_node = next(c for c in tree.root.fields if c.name == "inner")
     assert isinstance(inner_node, GroupNode)
+
+
+# ---------- extended schema kinds: temporal, uuid, literal, union, decimal ----------
+
+
+class Timestamp:
+    """Wraps ``date``."""
+
+    def __init__(self, value: date) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.date_schema(),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> Timestamp:
+        return value if isinstance(value, cls) else cls(value)
+
+
+class RequestId:
+    """Wraps ``UUID``."""
+
+    def __init__(self, value: UUID) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.uuid_schema(),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> RequestId:
+        return value if isinstance(value, cls) else cls(value)
+
+
+class Status:
+    """Wraps ``Literal['active', 'paused', 'archived']`` — domain enum-like
+    type that carries methods on top of a constrained string."""
+
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.literal_schema(["active", "paused", "archived"]),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> Status:
+        return value if isinstance(value, cls) else cls(value)
+
+
+class MaybeNum:
+    """Wraps ``Union[str, int]`` — value that may be either text or a
+    numeric ID."""
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.union_schema(
+                [core_schema.str_schema(), core_schema.int_schema()]
+            ),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> MaybeNum:
+        return value if isinstance(value, cls) else cls(value)
+
+
+class Money:
+    """Wraps ``Decimal`` with max_digits / decimal_places / ge constraints."""
+
+    def __init__(self, value: Decimal) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.decimal_schema(max_digits=10, decimal_places=2, ge=0),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> Money:
+        return value if isinstance(value, cls) else cls(Decimal(value))
+
+
+def test_timestamp_resolves_to_date_node():
+    class M(BaseModel):
+        when: Timestamp
+
+    tree = build_form_tree(M, existing={"when": date(2026, 5, 7)})
+    when_node = next(c for c in tree.root.fields if c.name == "when")
+    assert isinstance(when_node, DateNode)
+
+
+def test_request_id_resolves_to_uuid_node():
+    class M(BaseModel):
+        rid: RequestId
+
+    tree = build_form_tree(M)
+    rid_node = next(c for c in tree.root.fields if c.name == "rid")
+    assert isinstance(rid_node, UuidNode)
+
+
+def test_status_resolves_to_literal_node_with_choices():
+    class M(BaseModel):
+        s: Status
+
+    tree = build_form_tree(M)
+    s_node = next(c for c in tree.root.fields if c.name == "s")
+    assert isinstance(s_node, LiteralNode)
+    assert s_node.choices == ["active", "paused", "archived"]
+
+
+def test_status_round_trip_reconstructs_custom_class():
+    class M(BaseModel):
+        s: Status
+
+    tree = build_form_tree(M)
+    tree.set_value("s", "active")
+    inst = tree.to_instance()
+    assert isinstance(inst.s, Status)
+    assert inst.s.value == "active"
+
+
+def test_maybe_num_resolves_to_union_node():
+    class M(BaseModel):
+        v: MaybeNum
+
+    tree = build_form_tree(M)
+    v_node = next(c for c in tree.root.fields if c.name == "v")
+    assert isinstance(v_node, UnionNode)
+    # Order in the schema's choices list is preserved.
+    assert any("str" in n for n in v_node.variant_type_names)
+    assert any("int" in n for n in v_node.variant_type_names)
+
+
+def test_money_propagates_decimal_constraints():
+    class M(BaseModel):
+        amount: Money
+
+    tree = build_form_tree(M)
+    amount_node = next(c for c in tree.root.fields if c.name == "amount")
+    assert isinstance(amount_node, DecimalNode)
+    assert amount_node.max_digits == 10
+    assert amount_node.decimal_places == 2
+    assert amount_node.ge == 0

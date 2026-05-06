@@ -21,9 +21,11 @@ See also: ``Registry`` (`src/pydantic_studio/types/registry.py`),
 from __future__ import annotations
 
 import copy
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -54,6 +56,11 @@ _PRIMITIVE_KIND_TO_TYPE: dict[str, type] = {
     "bool": bool,
     "bytes": bytes,
     "decimal": Decimal,
+    "date": date,
+    "datetime": datetime,
+    "time": time,
+    "timedelta": timedelta,
+    "uuid": UUID,
 }
 
 _NUMERIC_KINDS = frozenset({"int", "float", "decimal"})
@@ -148,7 +155,54 @@ def _schema_to_type(schema: Any) -> type | None:
         key = _schema_to_type(schema.get("keys_schema") or {"type": "str"}) or str
         value = _schema_to_type(schema.get("values_schema") or {"type": "str"}) or str
         return dict[key, value]
+    if kind == "literal":
+        expected = schema.get("expected") or []
+        if not expected:
+            return None
+        return Literal[tuple(expected)]  # type: ignore[misc]
+    if kind == "union":
+        return _resolve_union_members(schema.get("choices") or [])
+    if kind == "tagged-union":
+        choices = schema.get("choices") or {}
+        # Tagged-union choices is a dict mapping tag → schema (or
+        # alias-tag → schema). Dropping the discriminator hint is fine —
+        # ``UnionBuilder`` probes variants by isinstance, not by tag.
+        members = list(choices.values()) if isinstance(choices, dict) else list(choices)
+        return _resolve_union_members(members)
     return None
+
+
+def _resolve_union_members(choices: Any) -> type | None:
+    """Resolve a list of core_schema choice entries to a Python ``Union``.
+
+    Each entry is a schema dict — or, in some Pydantic shapes, a
+    ``(schema, label)`` tuple where the first element is the schema.
+    Returns ``None`` if any choice resolves to an unknown shape so the
+    fallback fails open rather than producing a partially-typed union.
+    Single-member unions collapse to that member; duplicates dedupe.
+    """
+    if not isinstance(choices, list) or not choices:
+        return None
+    members: list[Any] = []
+    for choice in choices:
+        if isinstance(choice, tuple):
+            choice = choice[0]
+        resolved = _schema_to_type(choice)
+        if resolved is None:
+            return None
+        if resolved not in members:
+            members.append(resolved)
+    if not members:
+        return None
+    if len(members) == 1:
+        return members[0]
+    # Build a PEP 604 ``T1 | T2 | ...`` chain. ``UnionBuilder`` already
+    # handles both ``typing.Union`` and ``types.UnionType`` origins (see
+    # ``is_union_type`` in ``types.annotated``).
+    result: Any = members[0]
+    for t in members[1:]:
+        result = result | t
+    return result
 
 
 def _augment_field_info(field_info: FieldInfo, schema: Any) -> FieldInfo:
