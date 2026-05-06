@@ -697,11 +697,13 @@ class FormTree(BaseModel):
             return ValidationResult.fail(["cannot add to a fixed-length tuple"])
         if seq.item_type_name is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
-        self._push_snapshot(_snap.take(self.root))
+        # Resolve + build BEFORE snapshotting — failure here must not pollute
+        # the undo history (mirrors the validate-first contract of set_value).
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         child = builder.build(item_type, FieldInfo(annotation=item_type), value)
         child.name = str(len(seq.items))
+        self._push_snapshot(_snap.take(self.root))
         seq.items = [*seq.items, child]
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
@@ -741,10 +743,10 @@ class FormTree(BaseModel):
             return ValidationResult.fail([f"index {index} out of range"])
         if seq.item_type_name is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
-        self._push_snapshot(_snap.take(self.root))
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         child = builder.build(item_type, FieldInfo(annotation=item_type), value)
+        self._push_snapshot(_snap.take(self.root))
         new_items = [*seq.items[:index], child, *seq.items[index:]]
         for i, it in enumerate(new_items):
             it.name = str(i)
@@ -813,7 +815,6 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
 
         mp = self._walk_to_mapping(path)
-        self._push_snapshot(_snap.take(self.root))
         key_type = _resolve_type_name(mp.key_type_name)
         value_type = _resolve_type_name(mp.value_type_name)
         reg = default_registry()
@@ -823,6 +824,7 @@ class FormTree(BaseModel):
         v_node = v_builder.build(value_type, FieldInfo(annotation=value_type), value)
         k_node.name = "key"
         v_node.name = "value"
+        self._push_snapshot(_snap.take(self.root))
         mp.entries = [*mp.entries, (k_node, v_node)]
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
@@ -943,10 +945,10 @@ class FormTree(BaseModel):
                     f"(0..{len(union.variant_type_names) - 1})"
                 ]
             )
-        self._push_snapshot(_snap.take(self.root))
         v_type = _resolve_type_name(union.variant_type_names[variant_index])
         builder = default_registry().find(v_type)
         new_selected = builder.build(v_type, FieldInfo(annotation=v_type), seed)
+        self._push_snapshot(_snap.take(self.root))
         union.selected_index = variant_index
         union.selected = new_selected
         if self.draft_path is not None:
