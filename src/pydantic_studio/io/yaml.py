@@ -33,21 +33,25 @@ def _yaml() -> YAML:
     return y
 
 
-def load_yaml(path: Path, schema: type[BaseModel]) -> FormTree:
+def load_yaml(path: str | Path, schema: type[BaseModel]) -> FormTree:
     """Load a YAML file into a FormTree bound to ``schema``.
 
     Args:
-        path: Path to a YAML file. Must exist; missing files raise
-            FileNotFoundError. Malformed YAML raises ruamel.yaml.YAMLError.
+        path: Path to a YAML file. Accepts either a string or a Path.
         schema: A Pydantic BaseModel subclass — drives field-level
             type construction.
 
     Returns:
         FormTree with values populated from the file. Fields absent from
         the file get their schema defaults. Fields in the file but not in
-        the schema are dropped (silent in v0.0.4; --strict mode comes later).
+        the schema are dropped (silent in v0.0.4; per spec O-1 future
+        versions will warn to stderr or fail under ``--strict``).
         ``tree.yaml_source`` carries the parsed CommentedMap for save_yaml's
         comment-preservation pass.
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist.
+        ruamel.yaml.YAMLError: If the file is not valid YAML.
     """
     path = Path(path)
     yaml = _yaml()
