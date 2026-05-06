@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.0.1"
+__version__ = "0.0.3"
 
 from pydantic_studio.exceptions import (
     CancelledByUser,
@@ -19,18 +19,31 @@ from pydantic_studio.tree.builder import (
 )
 from pydantic_studio.tree.nodes import (
     BoolNode,
+    BytesNode,
+    DateNode,
+    DatetimeNode,
     DecimalNode,
+    EmailNode,
     EnumNode,
     FloatNode,
     FormNode,
     FormTree,
     GroupNode,
     IntNode,
+    IpAddressNode,
+    IpNetworkNode,
     LiteralNode,
     MappingNode,
+    PathNode,
+    PatternNode,
+    SecretNode,
     SequenceNode,
     StringNode,
+    TimedeltaNode,
+    TimeNode,
     UnionNode,
+    UrlNode,
+    UuidNode,
 )
 from pydantic_studio.tree.validation import ValidationResult
 
@@ -46,23 +59,36 @@ def register_builder(builder: NodeBuilder) -> None:
 
 __all__ = [
     "BoolNode",
+    "BytesNode",
     "CancelledByUser",
+    "DateNode",
+    "DatetimeNode",
     "DecimalNode",
+    "EmailNode",
     "EnumNode",
     "FloatNode",
     "FormNode",
     "FormTree",
     "GroupNode",
     "IntNode",
+    "IpAddressNode",
+    "IpNetworkNode",
     "LiteralNode",
     "MappingNode",
     "NoBuilderError",
     "NodeBuilder",
+    "PathNode",
+    "PatternNode",
     "PydanticStudioError",
     "Registry",
+    "SecretNode",
     "SequenceNode",
     "StringNode",
+    "TimeNode",
+    "TimedeltaNode",
     "UnionNode",
+    "UrlNode",
+    "UuidNode",
     "ValidationFailedError",
     "ValidationResult",
     "__version__",

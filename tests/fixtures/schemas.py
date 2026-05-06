@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import re
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
+from ipaddress import IPv4Address, IPv6Network
+from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, SecretBytes, SecretStr
 
 
 class Simple(BaseModel):
@@ -78,3 +83,29 @@ class WithUnion(BaseModel):
 class WithOptional(BaseModel):
     nickname: str | None = None
     age: int | None = None
+
+
+class Phase3Sink(BaseModel):
+    """Kitchen-sink schema covering every Plan 3 type. Defaults exercise
+    the build path; Phase-3 smoke tests mutate one field at a time and
+    confirm round-trip through ``to_instance``."""
+
+    # Temporal
+    when: datetime = datetime(2026, 5, 6, 12, 0)
+    on: date = date(2026, 5, 6)
+    at: time = time(9, 30)
+    interval: timedelta = timedelta(seconds=30)
+
+    # Network
+    bind: IPv4Address = IPv4Address("127.0.0.1")
+    allow: IPv6Network = IPv6Network("fe80::/64")
+    api: HttpUrl = HttpUrl("https://api.example.com")
+    contact: EmailStr = "ops@example.com"
+
+    # Special
+    home: Path = Path("/home/user")
+    request_id: UUID = UUID("00000000-0000-0000-0000-000000000000")
+    api_key: SecretStr = SecretStr("default-key")
+    token: SecretBytes = SecretBytes(b"default-token")
+    name_re: re.Pattern[str] = re.compile(r"^[a-z]+$")
+    blob: bytes = b"\x00\x01\x02"

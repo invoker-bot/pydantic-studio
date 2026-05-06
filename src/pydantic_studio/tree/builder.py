@@ -13,6 +13,12 @@ from typing import TYPE_CHECKING, Any
 from pydantic_studio.types.choices import EnumBuilder, LiteralBuilder
 from pydantic_studio.types.mapping import DictBuilder
 from pydantic_studio.types.models import GroupBuilder
+from pydantic_studio.types.network import (
+    EmailBuilder,
+    IpAddressBuilder,
+    IpNetworkBuilder,
+    UrlBuilder,
+)
 from pydantic_studio.types.primitives import (
     BoolBuilder,
     DecimalBuilder,
@@ -22,6 +28,19 @@ from pydantic_studio.types.primitives import (
 )
 from pydantic_studio.types.registry import NodeBuilder, Registry
 from pydantic_studio.types.sequences import ListBuilder, SetBuilder, TupleBuilder
+from pydantic_studio.types.special import (
+    BytesBuilder,
+    PathBuilder,
+    PatternBuilder,
+    SecretBuilder,
+    UuidBuilder,
+)
+from pydantic_studio.types.temporal import (
+    DateBuilder,
+    DatetimeBuilder,
+    TimeBuilder,
+    TimedeltaBuilder,
+)
 from pydantic_studio.types.unions import UnionBuilder
 
 if TYPE_CHECKING:
@@ -57,6 +76,19 @@ def default_registry() -> Registry:
         reg.register(DecimalBuilder())
         reg.register(EnumBuilder())
         reg.register(LiteralBuilder())
+        reg.register(DatetimeBuilder())
+        reg.register(DateBuilder())
+        reg.register(TimeBuilder())
+        reg.register(TimedeltaBuilder())
+        reg.register(IpAddressBuilder())
+        reg.register(IpNetworkBuilder())
+        reg.register(UrlBuilder())
+        reg.register(EmailBuilder())
+        reg.register(PathBuilder())
+        reg.register(UuidBuilder())
+        reg.register(SecretBuilder())
+        reg.register(PatternBuilder())
+        reg.register(BytesBuilder())
         reg.register(ListBuilder(reg))
         reg.register(SetBuilder(reg))
         reg.register(TupleBuilder(reg))

@@ -8,10 +8,11 @@ the abstract base ``FormNode``.
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -223,6 +224,482 @@ class DecimalNode(FormNode):
 
     def to_python(self) -> Decimal | None:
         return self.value
+
+
+class DatetimeNode(FormNode):
+    """Holds a timezone-aware-or-naive ``datetime.datetime`` value.
+
+    Pydantic emits ISO 8601 strings on ``model_dump_json`` and parses them
+    back on ``model_validate_json``, so no custom serializer is needed.
+    """
+
+    kind: Literal["datetime"] = "datetime"
+    value: datetime | None = None
+    default: datetime | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        # Reject date/time subclasses explicitly — datetime IS-A date in Python,
+        # but a date field cannot take a datetime and vice versa. We need an
+        # exact-type check.
+        if type(value) is not datetime:
+            return (f"expected datetime, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> datetime | None:
+        return self.value
+
+
+class DateNode(FormNode):
+    """Holds a ``datetime.date`` value (no time component)."""
+
+    kind: Literal["date"] = "date"
+    value: date | None = None
+    default: date | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if type(value) is not date:  # exact-type: rejects datetime subclass
+            return (f"expected date, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> date | None:
+        return self.value
+
+
+class TimeNode(FormNode):
+    """Holds a ``datetime.time`` value (no date component)."""
+
+    kind: Literal["time"] = "time"
+    value: time | None = None
+    default: time | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if type(value) is not time:
+            return (f"expected time, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> time | None:
+        return self.value
+
+
+class TimedeltaNode(FormNode):
+    """Holds a ``datetime.timedelta`` value (a duration).
+
+    Pydantic emits ISO 8601 duration strings (``PT1H30M``) on JSON dump
+    and parses them back on load — round-trip works without a custom
+    serializer.
+    """
+
+    kind: Literal["timedelta"] = "timedelta"
+    value: timedelta | None = None
+    default: timedelta | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, timedelta):
+            return (f"expected timedelta, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> timedelta | None:
+        return self.value
+
+
+class IpAddressNode(FormNode):
+    """Holds an IPv4 or IPv6 address as a string.
+
+    The ``version`` field discriminates 4 vs 6 — set by the builder from
+    the field annotation (IPv4Address vs IPv6Address). Stored as a string
+    rather than the ``IPv4Address``/``IPv6Address`` instance because:
+
+    1. Pydantic's union handling for the two address classes is brittle.
+    2. Strings are JSON-friendly without custom serializers.
+    3. ``to_python`` coerces back via ``ipaddress.ip_address`` for the
+       schema's validate step.
+    """
+
+    kind: Literal["ip_address"] = "ip_address"
+    value: str | None = None
+    default: str | None = None
+    version: Literal[4, 6]
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from ipaddress import (
+            AddressValueError,
+            IPv4Address,
+            IPv6Address,
+        )
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        # Accept already-parsed instances of the right version.
+        if self.version == 4 and isinstance(value, IPv4Address):
+            return ()
+        if self.version == 6 and isinstance(value, IPv6Address):
+            return ()
+        if isinstance(value, str):
+            cls = IPv4Address if self.version == 4 else IPv6Address
+            other_cls = IPv6Address if self.version == 4 else IPv4Address
+            other_version = 6 if self.version == 4 else 4
+            try:
+                cls(value)
+            except (AddressValueError, ValueError):
+                # Check if it parses as the other version — if so, give a
+                # clearer "wrong version" message.
+                try:
+                    other_cls(value)
+                    return (
+                        f"expected IPv{self.version} address, "
+                        f"got IPv{other_version}: {value!r}",
+                    )
+                except (AddressValueError, ValueError):
+                    pass
+                return (f"invalid IPv{self.version} address: {value!r}",)
+            return ()
+        return (f"expected IPv{self.version} address, got {type(value).__name__}",)
+
+    def to_python(self) -> Any:
+        from ipaddress import IPv4Address, IPv6Address
+
+        if self.value is None:
+            return None
+        cls = IPv4Address if self.version == 4 else IPv6Address
+        return cls(self.value)
+
+
+class IpNetworkNode(FormNode):
+    """Holds an IPv4 or IPv6 network in CIDR form, as a string."""
+
+    kind: Literal["ip_network"] = "ip_network"
+    value: str | None = None
+    default: str | None = None
+    version: Literal[4, 6]
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from ipaddress import IPv4Network, IPv6Network
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if self.version == 4 and isinstance(value, IPv4Network):
+            return ()
+        if self.version == 6 and isinstance(value, IPv6Network):
+            return ()
+        if isinstance(value, str):
+            cls = IPv4Network if self.version == 4 else IPv6Network
+            try:
+                cls(value, strict=False)
+            except ValueError:
+                return (f"invalid IPv{self.version} network: {value!r}",)
+            return ()
+        return (f"expected IPv{self.version} network, got {type(value).__name__}",)
+
+    def to_python(self) -> Any:
+        from ipaddress import IPv4Network, IPv6Network
+
+        if self.value is None:
+            return None
+        cls = IPv4Network if self.version == 4 else IPv6Network
+        return cls(self.value, strict=False)
+
+
+class UrlNode(FormNode):
+    """Holds a URL as a string, with the original Pydantic URL type
+    recorded in ``target_type_name`` for round-trip coercion.
+
+    Covers ``AnyUrl``, ``AnyHttpUrl``, ``HttpUrl``, ``FileUrl``,
+    ``WebsocketUrl``, and any other ``Annotated[Url, UrlConstraints(...)]``
+    variant exposed by Pydantic. ``validate_value`` and ``to_python``
+    delegate to a ``TypeAdapter`` built from ``target_type_name`` so
+    each URL subtype's specific constraints (scheme set, default port,
+    etc.) are enforced.
+    """
+
+    kind: Literal["url"] = "url"
+    value: str | None = None
+    default: str | None = None
+    target_type_name: str  # e.g., "pydantic.HttpUrl"
+
+    def _adapter(self) -> Any:
+        """Build (and cache) a TypeAdapter for this URL's target type.
+
+        Cached as an instance attribute via ``object.__setattr__`` to bypass
+        Pydantic's own attribute machinery — TypeAdapters aren't Pydantic
+        fields and shouldn't be model_dumped.
+        """
+        cached = getattr(self, "__url_adapter__", None)
+        if cached is not None:
+            return cached
+        from pydantic import TypeAdapter
+
+        target = _resolve_type_name(self.target_type_name)
+        adapter = TypeAdapter(target)
+        object.__setattr__(self, "__url_adapter__", adapter)
+        return adapter
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from pydantic import ValidationError
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected str URL, got {type(value).__name__}",)
+        try:
+            self._adapter().validate_python(value)
+        except ValidationError as e:
+            first = e.errors()[0]
+            return (first.get("msg", "invalid URL"),)
+        return ()
+
+    def to_python(self) -> Any:
+        if self.value is None:
+            return None
+        return self._adapter().validate_python(self.value)
+
+
+class EmailNode(FormNode):
+    """Holds an email address as a string, validated via Pydantic's
+    ``EmailStr`` (which depends on ``email-validator``).
+    """
+
+    kind: Literal["email"] = "email"
+    value: str | None = None
+    default: str | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected str email, got {type(value).__name__}",)
+        # Lazy import: email-validator is an optional dep; if missing, fall
+        # back to a permissive '@'-presence check so EmailNode still works
+        # in environments that haven't installed the extra.
+        try:
+            from email_validator import EmailNotValidError, validate_email
+        except ImportError:
+            if "@" not in value or value.startswith("@") or value.endswith("@"):
+                return (f"invalid email: {value!r}",)
+            return ()
+        try:
+            validate_email(value, check_deliverability=False)
+        except EmailNotValidError as e:
+            return (str(e),)
+        return ()
+
+    def to_python(self) -> str | None:
+        return self.value
+
+
+class PathNode(FormNode):
+    """Holds a filesystem path as a string.
+
+    Stored as a string (not a ``Path`` instance) so JSON round-trip is
+    OS-portable — `Path("/etc/x")` becomes `WindowsPath` on Windows, which
+    breaks equality on round-trip across platforms. ``set_value`` accepts
+    either a string or a ``Path`` instance and normalizes to ``str``.
+    """
+
+    kind: Literal["path"] = "path"
+    value: str | None = None
+    default: str | None = None
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    @field_validator("value", "default", mode="before")
+    @classmethod
+    def _normalize_path(cls, v: Any) -> Any:
+        from pathlib import PurePath
+
+        if isinstance(v, PurePath):
+            return str(v)
+        return v
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from pathlib import PurePath
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, (str, PurePath)):
+            return (f"expected str or Path, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> Any:
+        from pathlib import Path as _Path
+
+        if self.value is None:
+            return None
+        return _Path(self.value)
+
+
+class UuidNode(FormNode):
+    """Holds a ``uuid.UUID`` value.
+
+    Pydantic round-trips UUIDs as strings via JSON, so the proper field
+    type works directly with no custom serializer.
+    """
+
+    kind: Literal["uuid"] = "uuid"
+    value: UUID | None = None
+    default: UUID | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, UUID):
+            return (f"expected UUID, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> UUID | None:
+        return self.value
+
+
+class SecretNode(FormNode):
+    """Holds the plaintext value of a ``pydantic.SecretStr`` or
+    ``pydantic.SecretBytes`` field.
+
+    The ``secret_kind`` field discriminates str vs bytes so renderers can
+    pick the correct widget. ``to_python`` wraps the stored value in the
+    appropriate Pydantic Secret type so model validation passes.
+
+    Security caveat: in v0.0.3, secret values are stored in plaintext in
+    snapshots (in-memory) and in ``draft_save`` JSON (on disk). Don't use
+    drafts on shared storage for sensitive deployments. v0.x will offer
+    encrypted drafts or a "skip secrets in drafts" mode.
+    """
+
+    kind: Literal["secret"] = "secret"
+    value: str | bytes | None = None
+    default: str | bytes | None = None
+    secret_kind: Literal["str", "bytes"]
+
+    @model_validator(mode="after")
+    def _coerce_bytes_fields(self) -> SecretNode:
+        """After JSON load, bytes values come back as ``str`` because Pydantic
+        serializes ``bytes`` as a plain UTF-8 string in the ``str | bytes | None``
+        union. Re-coerce them to ``bytes`` when ``secret_kind == "bytes"``."""
+        if self.secret_kind == "bytes":
+            if isinstance(self.value, str):
+                self.value = self.value.encode()
+            if isinstance(self.default, str):
+                self.default = self.default.encode()
+        return self
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if self.secret_kind == "str" and not isinstance(value, str):
+            return (f"expected str (SecretStr value), got {type(value).__name__}",)
+        if self.secret_kind == "bytes" and not isinstance(value, (bytes, bytearray)):
+            return (f"expected bytes (SecretBytes value), got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> Any:
+        from pydantic import SecretBytes, SecretStr
+
+        if self.value is None:
+            return None
+        if self.secret_kind == "str":
+            return SecretStr(self.value)
+        return SecretBytes(self.value)
+
+
+class PatternNode(FormNode):
+    """Holds a regex pattern as its source string + flags.
+
+    ``to_python`` recompiles via ``re.compile(value, flags)``.
+    """
+
+    kind: Literal["pattern"] = "pattern"
+    value: str | None = None
+    default: str | None = None
+    flags: int = 0
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        import re as _re
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected regex source string, got {type(value).__name__}",)
+        try:
+            _re.compile(value, self.flags)
+        except _re.error as e:
+            return (f"invalid regex: {e}",)
+        return ()
+
+    def to_python(self) -> Any:
+        import re as _re
+
+        if self.value is None:
+            return None
+        return _re.compile(self.value, self.flags)
+
+
+class BytesNode(FormNode):
+    """Holds a ``bytes`` value (JSON-serialized as hex to guarantee lossless
+    round-trips — Pydantic's default JSON bytes handling is UTF-8 encoding,
+    which is not safe for arbitrary binary data).
+
+    The ``_value_hex`` / ``_default_hex`` *string* fields are the on-disk
+    representation; the ``value`` / ``default`` *bytes* properties are the
+    in-memory API.  External code should use ``value`` and ``default``; the
+    hex fields are an implementation detail.
+    """
+
+    kind: Literal["bytes"] = "bytes"
+    # Store as hex strings so JSON serialization is always lossless.
+    _value_hex: str | None = None
+    _default_hex: str | None = None
+
+    # Public fields (bytes); private storage is the hex strings above.
+    value: bytes | None = None
+    default: bytes | None = None
+
+    @field_serializer("value", when_used="json")
+    def _serialize_value(self, v: bytes | None) -> str | None:
+        if v is None:
+            return None
+        return v.hex()
+
+    @field_serializer("default", when_used="json")
+    def _serialize_default(self, v: bytes | None) -> str | None:
+        if v is None:
+            return None
+        return v.hex()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decode_hex_fields(cls, data: Any) -> Any:
+        """On JSON load, ``value``/``default`` arrive as hex strings.
+        Convert them back to ``bytes`` before field assignment so Pydantic
+        receives the correct type.
+        """
+        import contextlib
+
+        if not isinstance(data, dict):
+            return data
+        for key in ("value", "default"):
+            raw = data.get(key)
+            if isinstance(raw, str):
+                with contextlib.suppress(ValueError):
+                    data = {**data, key: bytes.fromhex(raw)}
+        return data
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, (bytes, bytearray)):
+            return (f"expected bytes, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> bytes | None:
+        if self.value is None:
+            return None
+        return bytes(self.value)
 
 
 class EnumNode(FormNode):
@@ -535,6 +1012,19 @@ AnyNode = Annotated[
     | FloatNode
     | BoolNode
     | DecimalNode
+    | DatetimeNode
+    | DateNode
+    | TimeNode
+    | TimedeltaNode
+    | IpAddressNode
+    | IpNetworkNode
+    | UrlNode
+    | EmailNode
+    | PathNode
+    | UuidNode
+    | SecretNode
+    | PatternNode
+    | BytesNode
     | EnumNode
     | LiteralNode
     | SequenceNode
@@ -608,6 +1098,12 @@ class FormTree(BaseModel):
     def set_value(self, path: str, value: Any) -> ValidationResult:
         """Set ``value`` at the given path; runs node-local validation.
 
+        Path segments may be field names (str) — for navigating into
+        GroupNode children — or integer indices — for SequenceNode items
+        and MappingNode entries (where the index targets the *value* side
+        of the (key, value) pair). The terminal segment identifies the
+        node whose ``value`` field is mutated.
+
         On success: push a snapshot, write the value to the target node,
         clear ``target.error``, and return ``ValidationResult.ok()``.
 
@@ -627,26 +1123,15 @@ class FormTree(BaseModel):
         if not path_obj.segments:
             msg = "cannot set value on the root group itself"
             raise ValueError(msg)
-        parent: Any = self.root
-        for seg in path_obj.segments[:-1]:
-            if isinstance(parent, GroupNode) and isinstance(seg, str):
-                child = parent.find(seg)
-                if child is None:
-                    msg = f"no field named {seg!r} at this level"
-                    raise KeyError(msg)
-                parent = child
-            else:
-                msg = f"cannot navigate segment {seg!r} (not a group)"
-                raise KeyError(msg)
 
+        # Walk all but the last segment, pivoting on the current node's type.
+        node: Any = self.root
+        for seg in path_obj.segments[:-1]:
+            node = self._descend(node, seg)
+
+        # Resolve the terminal segment to a target node.
         last = path_obj.segments[-1]
-        if not (isinstance(parent, GroupNode) and isinstance(last, str)):
-            msg = f"cannot set on non-group parent at segment {last!r}"
-            raise KeyError(msg)
-        target = parent.find(last)
-        if target is None:
-            msg = f"no field named {last!r}"
-            raise KeyError(msg)
+        target = self._descend(node, last)
 
         errors = target.validate_value(value)
         if errors:
@@ -660,6 +1145,41 @@ class FormTree(BaseModel):
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
+
+    def _descend(self, node: Any, seg: Any) -> Any:
+        """Navigate one path segment into ``node``.
+
+        Pivots on ``node``'s type:
+        - GroupNode + str → child by name
+        - SequenceNode + int → items[seg]
+        - MappingNode + int → entries[seg][1] (the value node)
+
+        Raises KeyError on any mismatch (out-of-range index, unknown name,
+        or type/segment mismatch).
+        """
+        if isinstance(node, GroupNode) and isinstance(seg, str):
+            child = node.find(seg)
+            if child is None:
+                msg = f"no field named {seg!r} at this level"
+                raise KeyError(msg)
+            return child
+        if isinstance(node, SequenceNode) and isinstance(seg, int):
+            if not (0 <= seg < len(node.items)):
+                msg = f"index {seg} out of range for sequence of length {len(node.items)}"
+                raise KeyError(msg)
+            return node.items[seg]
+        if isinstance(node, MappingNode) and isinstance(seg, int):
+            if not (0 <= seg < len(node.entries)):
+                msg = f"index {seg} out of range for mapping of length {len(node.entries)}"
+                raise KeyError(msg)
+            # Index into mapping selects the value side of the pair —
+            # rename_key handles the key side via its dedicated mutation.
+            return node.entries[seg][1]
+        msg = (
+            f"cannot navigate segment {seg!r} into {type(node).__name__} "
+            f"(no rule for ({type(node).__name__}, {type(seg).__name__}))"
+        )
+        raise KeyError(msg)
 
     def _walk_to_sequence(self, path: str) -> SequenceNode:
         """Resolve ``path`` and return the SequenceNode at that location."""
@@ -697,11 +1217,13 @@ class FormTree(BaseModel):
             return ValidationResult.fail(["cannot add to a fixed-length tuple"])
         if seq.item_type_name is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
-        self._push_snapshot(_snap.take(self.root))
+        # Resolve + build BEFORE snapshotting — failure here must not pollute
+        # the undo history (mirrors the validate-first contract of set_value).
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         child = builder.build(item_type, FieldInfo(annotation=item_type), value)
         child.name = str(len(seq.items))
+        self._push_snapshot(_snap.take(self.root))
         seq.items = [*seq.items, child]
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
@@ -741,10 +1263,10 @@ class FormTree(BaseModel):
             return ValidationResult.fail([f"index {index} out of range"])
         if seq.item_type_name is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
-        self._push_snapshot(_snap.take(self.root))
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         child = builder.build(item_type, FieldInfo(annotation=item_type), value)
+        self._push_snapshot(_snap.take(self.root))
         new_items = [*seq.items[:index], child, *seq.items[index:]]
         for i, it in enumerate(new_items):
             it.name = str(i)
@@ -813,7 +1335,6 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
 
         mp = self._walk_to_mapping(path)
-        self._push_snapshot(_snap.take(self.root))
         key_type = _resolve_type_name(mp.key_type_name)
         value_type = _resolve_type_name(mp.value_type_name)
         reg = default_registry()
@@ -823,6 +1344,7 @@ class FormTree(BaseModel):
         v_node = v_builder.build(value_type, FieldInfo(annotation=value_type), value)
         k_node.name = "key"
         v_node.name = "value"
+        self._push_snapshot(_snap.take(self.root))
         mp.entries = [*mp.entries, (k_node, v_node)]
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
@@ -943,10 +1465,10 @@ class FormTree(BaseModel):
                     f"(0..{len(union.variant_type_names) - 1})"
                 ]
             )
-        self._push_snapshot(_snap.take(self.root))
         v_type = _resolve_type_name(union.variant_type_names[variant_index])
         builder = default_registry().find(v_type)
         new_selected = builder.build(v_type, FieldInfo(annotation=v_type), seed)
+        self._push_snapshot(_snap.take(self.root))
         union.selected_index = variant_index
         union.selected = new_selected
         if self.draft_path is not None:

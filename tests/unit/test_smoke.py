@@ -120,3 +120,97 @@ def test_kitchen_mutation_smoke() -> None:
     # Walk all five mutations back.
     for _ in range(5):
         assert tree.undo() is True
+
+
+class TestPhase3Sink:
+    """End-to-end smoke for the 13 new Plan 3 type families."""
+
+    def test_build_succeeds_for_all_phase3_types(self) -> None:
+        from pydantic_studio import build_form_tree
+        from tests.fixtures.schemas import Phase3Sink
+
+        tree = build_form_tree(Phase3Sink)
+        # Confirm all 14 fields rendered as nodes.
+        assert len(tree.root.fields) == 14
+
+    def test_to_instance_round_trip_with_defaults(self) -> None:
+        from datetime import date, datetime, time, timedelta
+        from ipaddress import IPv4Address, IPv6Network
+        from pathlib import Path
+        from uuid import UUID
+
+        from pydantic_studio import build_form_tree
+        from tests.fixtures.schemas import Phase3Sink
+
+        tree = build_form_tree(Phase3Sink)
+        instance = tree.to_instance()
+        assert instance.when == datetime(2026, 5, 6, 12, 0)
+        assert instance.on == date(2026, 5, 6)
+        assert instance.at == time(9, 30)
+        assert instance.interval == timedelta(seconds=30)
+        assert instance.bind == IPv4Address("127.0.0.1")
+        assert instance.allow == IPv6Network("fe80::/64")
+        assert "api.example.com" in str(instance.api)
+        assert instance.contact == "ops@example.com"
+        assert instance.home == Path("/home/user")
+        assert instance.request_id == UUID(int=0)
+        assert instance.api_key.get_secret_value() == "default-key"
+        assert instance.token.get_secret_value() == b"default-token"
+        assert instance.name_re.pattern == r"^[a-z]+$"
+        assert instance.blob == b"\x00\x01\x02"
+
+    def test_set_value_each_field(self) -> None:
+        """One set_value per node type — proves the validate-first contract
+        works for every new node."""
+        from datetime import date, datetime, time, timedelta
+        from ipaddress import IPv4Address
+        from uuid import uuid4
+
+        from pydantic_studio import build_form_tree
+        from tests.fixtures.schemas import Phase3Sink
+
+        tree = build_form_tree(Phase3Sink)
+        new_uuid = uuid4()
+        mutations = [
+            ("when", datetime(2027, 1, 1, 12, 0)),
+            ("on", date(2027, 1, 1)),
+            ("at", time(15, 45)),
+            ("interval", timedelta(minutes=10)),
+            ("bind", "192.168.1.1"),
+            ("allow", "2001:db8::/32"),
+            ("api", "https://newapi.example.com"),
+            ("contact", "new@example.com"),
+            ("home", "/srv/data"),
+            ("request_id", new_uuid),
+            ("api_key", "new-secret"),
+            ("token", b"new-token"),
+            ("name_re", r"^[A-Z]+$"),
+            ("blob", b"\xff\xfe"),
+        ]
+        for path, value in mutations:
+            result = tree.set_value(path, value)
+            assert result.ok, f"set_value({path!r}, {value!r}) failed: {result.errors}"
+
+        instance = tree.to_instance()
+        assert instance.when == datetime(2027, 1, 1, 12, 0)
+        assert instance.bind == IPv4Address("192.168.1.1")
+        assert instance.contact == "new@example.com"
+        assert instance.api_key.get_secret_value() == "new-secret"
+        assert instance.token.get_secret_value() == b"new-token"
+
+    def test_snapshot_round_trip(self) -> None:
+        """Full FormTree.model_dump_json + model_validate_json round-trip
+        must preserve every node type."""
+        from pydantic_studio import build_form_tree
+        from pydantic_studio.tree.nodes import FormTree
+        from tests.fixtures.schemas import Phase3Sink
+
+        tree = build_form_tree(Phase3Sink)
+        raw = tree.model_dump_json(exclude={"schema_class"})
+        restored = FormTree.model_validate_json(
+            raw, context={"schema_class": Phase3Sink}
+        )
+        # The restored tree must be able to materialize the same instance.
+        original_instance = tree.to_instance()
+        restored_instance = restored.to_instance()
+        assert original_instance == restored_instance
