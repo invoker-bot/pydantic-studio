@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic_studio.types.choices import EnumBuilder, LiteralBuilder
+from pydantic_studio.types.core_schema_fallback import CoreSchemaFallbackBuilder
 from pydantic_studio.types.mapping import DictBuilder
 from pydantic_studio.types.models import GroupBuilder
 from pydantic_studio.types.network import (
@@ -98,6 +99,13 @@ def default_registry() -> Registry:
         # only when no more-specific builder did. It also needs a back-
         # reference to the registry for recursive dispatch.
         reg.register(GroupBuilder(reg))
+        # Schema-introspecting fallback for user-defined types declaring
+        # ``__get_pydantic_core_schema__`` (config-path wrappers, opaque-id
+        # value objects, units-aware numbers, …). Lowest priority — only
+        # fires after every specific builder above has rejected the type.
+        # In particular, types like ``EmailStr`` / ``HttpUrl`` keep their
+        # dedicated builders and don't degrade into bare ``str``.
+        reg.register_fallback(CoreSchemaFallbackBuilder(reg))
         _DEFAULT_REGISTRY = reg
     return _DEFAULT_REGISTRY
 
