@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
-from pydantic_core import PydanticUndefined
 
 from pydantic_studio.tree.nodes import UnionNode
 from pydantic_studio.types.annotated import (
@@ -19,6 +18,7 @@ from pydantic_studio.types.annotated import (
     is_union_type,
     strip_annotated,
 )
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -59,9 +59,7 @@ class UnionBuilder:
         selected_index, selected = self._preselect(variants, existing)
 
         if selected is None:
-            default = field_info.get_default(call_default_factory=True)
-            if default is PydanticUndefined:
-                default = None
+            default = field_default(field_info)
             if default is not None:
                 selected_index, selected = self._preselect(variants, default)
 

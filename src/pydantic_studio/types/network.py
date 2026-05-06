@@ -10,18 +10,12 @@ from ipaddress import (
 )
 from typing import TYPE_CHECKING, Any, Literal, get_origin
 
-from pydantic_core import PydanticUndefined
-
 from pydantic_studio.tree.nodes import EmailNode, IpAddressNode, IpNetworkNode, UrlNode
 from pydantic_studio.types.annotated import strip_annotated
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
-
-
-def _default(field_info: FieldInfo) -> Any:
-    d = field_info.get_default(call_default_factory=True)
-    return None if d is PydanticUndefined else d
 
 
 def _coerce_existing_to_str(existing: Any) -> str | None:
@@ -46,7 +40,7 @@ class IpAddressBuilder:
     ) -> IpAddressNode:
         unwrapped = strip_annotated(type_)
         version: Literal[4, 6] = 4 if unwrapped is IPv4Address else 6
-        default = _coerce_existing_to_str(_default(field_info))
+        default = _coerce_existing_to_str(field_default(field_info))
         return IpAddressNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -69,7 +63,7 @@ class IpNetworkBuilder:
     ) -> IpNetworkNode:
         unwrapped = strip_annotated(type_)
         version: Literal[4, 6] = 4 if unwrapped is IPv4Network else 6
-        default = _coerce_existing_to_str(_default(field_info))
+        default = _coerce_existing_to_str(field_default(field_info))
         return IpNetworkNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -111,7 +105,7 @@ class UrlBuilder:
         unwrapped = strip_annotated(type_)
         url_cls = get_origin(unwrapped) or unwrapped
         target_type_name = f"{url_cls.__module__}.{url_cls.__name__}"
-        default = _default(field_info)
+        default = field_default(field_info)
         default_str = str(default) if default is not None else None
         existing_str = str(existing) if existing is not None else None
         return UrlNode(
@@ -143,7 +137,7 @@ class EmailBuilder:
         return _is_email_str(type_)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
-        default = _default(field_info)
+        default = field_default(field_info)
         return EmailNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,

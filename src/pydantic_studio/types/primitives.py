@@ -5,8 +5,6 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from pydantic_core import PydanticUndefined
-
 from pydantic_studio.tree.nodes import (
     BoolNode,
     DecimalNode,
@@ -15,14 +13,10 @@ from pydantic_studio.tree.nodes import (
     StringNode,
 )
 from pydantic_studio.types.metadata import extract_constraints
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
-
-
-def _default(field_info: FieldInfo) -> Any:
-    d = field_info.get_default(call_default_factory=True)
-    return None if d is PydanticUndefined else d
 
 
 class StringBuilder:
@@ -38,7 +32,7 @@ class StringBuilder:
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=_default(field_info),
+            default=field_default(field_info),
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
             pattern=c.get("pattern"),
@@ -59,7 +53,7 @@ class IntBuilder:
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=_default(field_info),
+            default=field_default(field_info),
             ge=c.get("ge"),
             le=c.get("le"),
             gt=c.get("gt"),
@@ -81,7 +75,7 @@ class FloatBuilder:
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=_default(field_info),
+            default=field_default(field_info),
             ge=c.get("ge"),
             le=c.get("le"),
             gt=c.get("gt"),
@@ -102,7 +96,7 @@ class BoolBuilder:
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=_default(field_info),
+            default=field_default(field_info),
         )
 
 
@@ -119,7 +113,7 @@ class DecimalBuilder:
             description=field_info.description,
             required=field_info.is_required(),
             value=existing,
-            default=_default(field_info),
+            default=field_default(field_info),
             max_digits=c.get("max_digits"),
             decimal_places=c.get("decimal_places"),
             ge=c.get("ge"),

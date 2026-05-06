@@ -7,17 +7,11 @@ from __future__ import annotations
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
-from pydantic_core import PydanticUndefined
-
 from pydantic_studio.types.annotated import strip_annotated
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
-
-
-def _default(field_info: FieldInfo) -> Any:
-    d = field_info.get_default(call_default_factory=True)
-    return None if d is PydanticUndefined else d
 
 
 def _path_to_str(value: Any) -> Any:
@@ -39,7 +33,7 @@ class PathBuilder:
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
         from pydantic_studio.tree.nodes import PathNode as _PathNode
 
-        default = _path_to_str(_default(field_info))
+        default = _path_to_str(field_default(field_info))
         existing_v = _path_to_str(existing)
         return _PathNode(
             name=field_info.alias or "<unnamed>",
@@ -66,7 +60,7 @@ class UuidBuilder:
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
         from pydantic_studio.tree.nodes import UuidNode as _UuidNode
 
-        default = _default(field_info)
+        default = field_default(field_info)
         return _UuidNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -129,7 +123,7 @@ class PatternBuilder:
         def _explicit_flags(pat: re.Pattern) -> int:  # type: ignore[type-arg]
             return int(pat.flags) & ~_implicit
 
-        default = _default(field_info)
+        default = field_default(field_info)
         if isinstance(default, re.Pattern):
             default_src: str | None = default.pattern
             default_flags = _explicit_flags(default)
@@ -164,7 +158,7 @@ class BytesBuilder:
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
         from pydantic_studio.tree.nodes import BytesNode as _BytesNode
 
-        default = _default(field_info)
+        default = field_default(field_info)
         return _BytesNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -186,7 +180,7 @@ class SecretBuilder:
         kind = _secret_kind(type_)
         if kind is None:  # pragma: no cover
             raise RuntimeError("SecretBuilder.build called with non-secret type")
-        default = _coerce_secret_existing(_default(field_info))
+        default = _coerce_secret_existing(field_default(field_info))
         existing_v = _coerce_secret_existing(existing)
         return _SecretNode(
             name=field_info.alias or "<unnamed>",
