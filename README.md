@@ -237,6 +237,34 @@ A FastAPI app boots on `127.0.0.1:<port>`, opens your browser, and shows the sam
 - Mobile / responsive layout (Plan 8)
 - TOML / JSON output (Plan 7)
 
+## TOML + JSON I/O (v0.0.7)
+
+```bash
+$ uv run pydantic-studio fill mypkg.config:AppSettings --out config.toml
+$ uv run pydantic-studio fill mypkg.config:AppSettings --out config.json
+$ uv run pydantic-studio run mypkg.config:AppSettings config.toml
+```
+
+Format inferred from extension. Programmatic API:
+
+```python
+from pydantic_studio import load_config, save_config
+
+tree = load_config("config.toml", AppSettings)
+tree.set_value("port", 9090)
+save_config(tree, "config.toml")  # writes TOML preserving comments
+```
+
+Or call format-specific helpers directly: `load_toml`/`save_toml`, `load_json`/`save_json`.
+
+### Format support matrix
+
+| Format | Read | Write | Comments preserved on edit |
+|---|---|---|---|
+| YAML  | ruamel.yaml | ruamel.yaml | ✓ (Phase 4) |
+| TOML  | tomllib (stdlib) | tomlkit | description comments only (Phase 7); v0.0.8 polishes user-comment preservation |
+| JSON  | stdlib json | model_dump_json(indent=2) | n/a (JSON has no comments) |
+
 ## License
 
 MIT
