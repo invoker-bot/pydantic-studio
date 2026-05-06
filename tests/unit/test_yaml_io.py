@@ -156,3 +156,92 @@ class TestSaveYamlNewFile:
         out = tmp_path / "nested" / "subdir" / "config.yaml"
         save_yaml(tree, out)
         assert out.exists()
+
+
+class TestSaveYamlPreservesComments:
+    """When a source file or yaml_source exists, save_yaml must preserve
+    user-edited comments on fields that still exist in the schema."""
+
+    def test_user_comment_survives_round_trip(self, tmp_path: Path) -> None:
+        from pydantic_studio import save_yaml
+
+        # User-authored YAML with a custom comment.
+        src = tmp_path / "config.yaml"
+        src.write_text(
+            "# my custom note about the service\n"
+            "name: prod\n"
+            "port: 8080\n"
+            "debug: false\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, Server)
+        tree.set_value("port", 9090)
+        save_yaml(tree, src)
+
+        content = src.read_text(encoding="utf-8")
+        # User comment must still appear.
+        assert "my custom note about the service" in content
+        # Updated value applied.
+        assert "9090" in content
+        assert "8080" not in content
+
+    def test_unknown_field_is_dropped_on_save(self, tmp_path: Path) -> None:
+        """Per spec §10.1 rule #4 — fields no longer in the schema get
+        dropped on save."""
+        from pydantic_studio import save_yaml
+
+        src = tmp_path / "config.yaml"
+        src.write_text(
+            "name: prod\n"
+            "port: 8080\n"
+            "obsolete_field: gone\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, Server)
+        save_yaml(tree, src)
+        content = src.read_text(encoding="utf-8")
+        assert "obsolete_field" not in content
+        assert "gone" not in content
+
+    def test_save_to_existing_file_without_load(self, tmp_path: Path) -> None:
+        """If the user calls save_yaml with a tree that was NOT loaded from
+        the target path but the path already exists, comments from the file
+        should still be preserved (re-load on save semantics)."""
+        from pydantic_studio import save_yaml
+
+        # Pre-existing file with a comment.
+        src = tmp_path / "config.yaml"
+        src.write_text(
+            "# pre-existing comment\n"
+            "name: alpha\n"
+            "port: 7777\n",
+            encoding="utf-8",
+        )
+
+        # Build a fresh tree (NOT loaded from the file).
+        tree = build_form_tree(Server)
+        tree.set_value("port", 9090)
+        save_yaml(tree, src)
+
+        content = src.read_text(encoding="utf-8")
+        assert "pre-existing comment" in content
+        assert "9090" in content
+
+    def test_inline_comment_preserved(self, tmp_path: Path) -> None:
+        """Inline (end-of-line) comments must also survive."""
+        from pydantic_studio import save_yaml
+
+        src = tmp_path / "config.yaml"
+        src.write_text(
+            "name: prod  # production deployment\n"
+            "port: 8080  # standard HTTP\n"
+            "debug: false\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, Server)
+        tree.set_value("port", 9090)
+        save_yaml(tree, src)
+
+        content = src.read_text(encoding="utf-8")
+        assert "production deployment" in content
+        assert "standard HTTP" in content

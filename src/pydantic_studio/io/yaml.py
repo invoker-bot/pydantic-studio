@@ -74,19 +74,21 @@ def load_yaml(path: str | Path, schema: type[BaseModel]) -> FormTree:
 def save_yaml(tree: FormTree, path: str | Path) -> None:
     """Write a FormTree to a YAML file with smart-comment generation.
 
+    Resolves the source CommentedMap in this priority order:
+
+    1. ``tree.yaml_source`` (set by ``load_yaml``)
+    2. The current contents of ``path`` (if it exists)
+    3. None (write a fresh map with description comments)
+
+    User comments from the source are preserved verbatim on fields that
+    still exist in the schema (per spec §10.1 rule #3). New fields get
+    description comments from ``FieldInfo.description``. Fields removed
+    from the schema are dropped silently in v0.0.4 (rule #4 — stderr
+    warning is deferred to v0.0.5).
+
     The tree is first materialized via ``tree.to_instance()`` so that
     schema defaults are resolved into the output (a fresh tree with all
-    defaults still produces a populated YAML rather than ``{}``). The
-    resulting model is then dumped, schema-ordered, into a CommentedMap
-    whose comments come from each field's ``FieldInfo.description``
-    (T8 — new files). T9 will extend this to source comments from a
-    stashed CommentedMap when one is available, preserving user edits;
-    this docstring will be revised at that time.
-
-    Behavior (T8):
-    - Builds a new CommentedMap with description comments derived from
-      ``FieldInfo.description``, regardless of whether ``path`` exists
-      or ``tree.yaml_source`` is set. (T9 will branch on yaml_source.)
+    defaults still produces a populated YAML rather than ``{}``).
 
     The write is atomic: writes to a temp file in the same directory,
     then ``os.replace``s into place. Parent directories are created as
@@ -107,12 +109,27 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
         msg = "tree.schema_class is None; cannot derive description comments"
         raise ValueError(msg)
 
+    # Resolve the source CommentedMap (priority: tree.yaml_source > on-disk).
+    source: CommentedMap | None = None
+    if tree.yaml_source is not None:
+        source = (
+            tree.yaml_source
+            if isinstance(tree.yaml_source, CommentedMap)
+            else None
+        )
+    elif path.exists():
+        yaml_loader = _yaml()
+        with path.open("r", encoding="utf-8") as f:
+            loaded = yaml_loader.load(f)
+        if isinstance(loaded, CommentedMap):
+            source = loaded
+
     # Run through validation so schema defaults are resolved into concrete
     # values — ``tree.to_python()`` alone omits keys whose nodes are unset,
     # which would produce an empty YAML file for a brand-new tree.
     instance = tree.to_instance()
     data = instance.model_dump(mode="python")
-    cm = _build_commented_map(data, schema)
+    cm = _build_commented_map(data, schema, source)
     yaml = _yaml()
 
     fd, tmp = tempfile.mkstemp(prefix=".tmp-yaml-", dir=str(path.parent))
@@ -126,31 +143,85 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
 
 
 def _build_commented_map(
-    data: dict[str, Any], schema: type[BaseModel]
+    data: dict[str, Any],
+    schema: type[BaseModel],
+    source: CommentedMap | None = None,
 ) -> CommentedMap:
-    """Construct a CommentedMap whose keys follow ``schema``'s definition
-    order and whose entries carry description comments.
+    """Construct a CommentedMap with keys in schema definition order.
 
-    Nested BaseModel fields recurse — their nested CommentedMaps also get
-    description comments per the nested schema's FieldInfo.
+    Comment selection per key:
+
+    1. If ``source`` has a user comment on this key, copy it forward.
+    2. Otherwise, fall back to ``FieldInfo.description``.
+    3. If neither, the key gets no comment.
+
+    Document-level (top-of-file) comments on ``source`` are also copied
+    onto the returned map — ruamel stores those on ``ca.comment`` rather
+    than per-key, so the per-key copy alone would lose them.
+
+    Nested BaseModel fields recurse — the nested source (if any) is
+    threaded through.
     """
     cm = CommentedMap()
+    # Document-level comment (top-of-file) lives on ca.comment, not in
+    # ca.items[key]. Copy it once before per-key processing.
+    if source is not None:
+        src_ca = getattr(source, "ca", None)
+        if src_ca is not None and src_ca.comment is not None:
+            cm.ca.comment = src_ca.comment
+
     for field_name, field_info in schema.model_fields.items():
         if field_name not in data:
             continue
         value = data[field_name]
         nested_schema = _nested_schema_class(field_info)
+        nested_source: CommentedMap | None = None
+        if (
+            source is not None
+            and field_name in source
+            and isinstance(source[field_name], CommentedMap)
+        ):
+            nested_source = source[field_name]
+
         if isinstance(value, dict) and nested_schema is not None:
-            cm[field_name] = _build_commented_map(value, nested_schema)
+            cm[field_name] = _build_commented_map(
+                value, nested_schema, nested_source
+            )
         else:
             cm[field_name] = value
-        if field_info.description:
-            # Place description as a comment BEFORE the key.
+
+        # Copy the source comment if present, else use the description.
+        copied = _copy_comment_if_present(source, cm, field_name)
+        if not copied and field_info.description:
             cm.yaml_set_comment_before_after_key(
                 field_name,
                 before=field_info.description,
             )
     return cm
+
+
+def _copy_comment_if_present(
+    source: CommentedMap | None, target: CommentedMap, key: str
+) -> bool:
+    """If ``source`` has any comments associated with ``key``, copy them
+    onto ``target``. Returns True if a comment was copied.
+
+    ruamel.yaml stores per-key comments on the parent CommentedMap in
+    ``ca.items`` (a dict keyed by child name → list of CommentToken).
+    Copying the entry verbatim preserves every kind of per-key comment
+    (before, inline, after) without parsing the structure.
+    """
+    if source is None or key not in source:
+        return False
+    src_ca = getattr(source, "ca", None)
+    if src_ca is None:
+        return False
+    src_items = src_ca.items.get(key)
+    if not src_items:
+        return False
+    # Detach the list so subsequent mutations on either side don't alias.
+    target.ca.items[key] = list(src_items)
+    return True
 
 
 def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
