@@ -48,7 +48,9 @@ class PreviewPane(RichLog):
         if schema is None:
             return "<no schema bound>"
         try:
-            data = self.form_tree.to_instance().model_dump(mode="python")
+            # mode="json" coerces Enum members, datetime/date/time, Decimal, UUID, etc.
+            # into YAML-representable scalars (strings/numbers/bools).
+            data = self.form_tree.to_instance().model_dump(mode="json")
         except ValidationFailedError:
             data = self.form_tree.to_python()
         if not data:

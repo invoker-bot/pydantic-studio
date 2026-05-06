@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from textual.containers import Horizontal
-from textual.widgets import Checkbox, Input, Label, Static
+from textual.widgets import Checkbox, Input, Label, Select, Static
 
 from pydantic_studio.renderers.textual_.widgets.editor import NodeEditor
 
@@ -179,7 +179,77 @@ class BoolEditor(NodeEditor):
 
 
 class ChoiceEditor(NodeEditor):
-    """Stub — full impl in Task 8."""
+    """Dropdown bound to an EnumNode or LiteralNode."""
 
     def compose(self) -> ComposeResult:
-        yield Static(f"{self.node.name}: <choice stub>")
+        # Seed ``node.value`` from ``node.default`` so a user who never opens
+        # the dropdown still sees the schema-default value reflected in the
+        # form tree (matches TextInputEditor behaviour).
+        if (
+            getattr(self.node, "value", None) is None
+            and getattr(self.node, "default", None) is not None
+        ):
+            self.node.value = self.node.default
+
+        options = self._build_options()
+        initial = self._initial_value_id()
+        with Horizontal():
+            yield Label(f"{self.node.name}: ", classes="field-label")
+            yield Select(
+                options=options,
+                value=initial if initial is not None else Select.NULL,
+                id=f"select-{TextInputEditor._sanitize_id(self.field_path)}",
+                allow_blank=True,
+            )
+        yield Static(
+            "",
+            id=f"error-{TextInputEditor._sanitize_id(self.field_path)}",
+            classes="field-error",
+        )
+
+    def _build_options(self) -> list[tuple[str, str]]:
+        """Return list of (label, value_id) tuples for the Select widget."""
+        if self.node.kind == "enum":
+            # EnumNode.choices: list[tuple[str, EnumMember]]
+            return [(name, name) for name, _member in self.node.choices]
+        # LiteralNode.choices: list[Any]
+        return [(repr(c), repr(c)) for c in self.node.choices]
+
+    def _initial_value_id(self) -> str | None:
+        v = getattr(self.node, "value", None)
+        if v is None:
+            return None
+        if self.node.kind == "enum":
+            from enum import Enum
+
+            return v.name if isinstance(v, Enum) else None
+        return repr(v)
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.value == Select.NULL:
+            return
+        # Map back from the Select's value id to the actual node value.
+        value: Any
+        if self.node.kind == "enum":
+            for name, member in self.node.choices:
+                if name == event.value:
+                    value = member
+                    break
+            else:
+                return
+        else:
+            for c in self.node.choices:
+                if repr(c) == event.value:
+                    value = c
+                    break
+            else:
+                return
+        ok, msg = self.commit(value)
+        try:
+            error_widget = self.query_one(
+                f"#error-{TextInputEditor._sanitize_id(self.field_path)}",
+                Static,
+            )
+        except Exception:
+            return
+        error_widget.update("" if ok else (msg or "invalid"))

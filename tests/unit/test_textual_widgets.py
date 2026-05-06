@@ -96,3 +96,47 @@ async def test_bool_editor_toggles() -> None:
         node = tree.root.find("enabled")
         assert node is not None
         assert node.value is True
+
+
+@pytest.mark.asyncio
+async def test_choice_editor_for_enum() -> None:
+    from enum import Enum
+
+    class Color(Enum):
+        RED = "red"
+        BLUE = "blue"
+
+    class M(BaseModel):
+        favorite: Color = Color.RED
+
+    tree = build_form_tree(M)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Select
+
+        selects = list(app.screen.query(Select))
+        assert len(selects) == 1
+        node = tree.root.find("favorite")
+        assert node is not None
+        assert node.value == Color.RED
+
+
+@pytest.mark.asyncio
+async def test_choice_editor_for_literal() -> None:
+    from typing import Literal
+
+    class M(BaseModel):
+        level: Literal["debug", "info", "warn"] = "info"
+
+    tree = build_form_tree(M)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Select
+
+        selects = list(app.screen.query(Select))
+        assert len(selects) == 1
+        node = tree.root.find("level")
+        assert node is not None
+        assert node.value == "info"
