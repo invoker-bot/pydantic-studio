@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from pydantic_studio import build_form_tree
-from tests.fixtures.schemas import WithDict, WithList, WithUnion
+from tests.fixtures.schemas import WithDict, WithList
 
 
 class TestSnapshotOrderingHoist:
     """When resolve fails, no spurious snapshot should be pushed."""
 
-    def test_add_item_with_unresolvable_item_type(self, monkeypatch) -> None:
+    def test_add_item_with_unresolvable_item_type(self) -> None:
         tree = build_form_tree(WithList)
         # Corrupt the SequenceNode's stored item-type name so resolve raises.
         tags = tree.root.find("tags")
@@ -46,9 +46,6 @@ class TestSnapshotOrderingHoist:
         assert len(tree.snapshots) == snapshots_before
 
     def test_select_variant_with_unresolvable_variant(self) -> None:
-        tree = build_form_tree(WithUnion)
-        value_node = tree.root.find("value")
-        assert value_node is not None
         # WithUnion is `int | str`, which is demoted to int via UnionBuilder
         # because Pydantic's smart-union narrows it. We need an actual
         # multi-variant union for this test — build one inline.
