@@ -113,6 +113,60 @@ uv pip install 'pydantic-studio[email]'
 
 Without the extra, EmailNode falls back to a permissive `'@'`-presence check.
 
+## YAML I/O (v0.0.4)
+
+Pydantic Studio now reads and writes YAML config files using `ruamel.yaml`'s round-trip mode. User-edited comments survive an edit; new files get auto-generated description comments from your schema's `Field(description=...)` annotations.
+
+### Generate a stub
+
+```bash
+$ uv run pydantic-studio fill mypkg.config:AppSettings --out config.yaml
+$ cat config.yaml
+# The API URL
+api_url: https://api.example.com
+# Listening port
+port: 8080
+# Enable debug logging
+debug: false
+```
+
+### Load + edit + save
+
+```python
+from pathlib import Path
+from pydantic_studio import load_yaml, save_yaml
+from mypkg.config import AppSettings
+
+tree = load_yaml(Path("config.yaml"), AppSettings)
+tree.set_value("port", 9090)
+save_yaml(tree, Path("config.yaml"))
+# User comments preserved; port now 9090.
+```
+
+### Validate without parsing
+
+```bash
+$ uv run pydantic-studio check mypkg.config:AppSettings config.yaml
+config.yaml: OK
+
+$ uv run pydantic-studio run mypkg.config:AppSettings config.yaml
+AppSettings(api_url='https://api.example.com', port=8080, debug=False)
+```
+
+### What's not in v0.0.4
+
+- TOML / JSON I/O (Plan 6)
+- `pydantic-studio edit` (waits on the renderer phase)
+- `${ENV_VAR}` secret-handling templates (deferred to a security pass)
+
+### Smart writer rules
+
+When generating YAML:
+1. Field order matches the schema definition (not the file's existing order).
+2. Description comments come from `Field(description=...)`.
+3. User comments on existing fields are preserved verbatim.
+4. Fields removed from the schema are dropped silently (this becomes a stderr warning in a later release).
+
 ## License
 
 MIT

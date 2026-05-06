@@ -85,6 +85,14 @@ class WithOptional(BaseModel):
     age: int | None = None
 
 
+class Server(BaseModel):
+    """Minimal schema with descriptions for YAML golden tests."""
+
+    name: str = Field(default="prod", description="Service identifier")
+    port: int = Field(default=8080, description="Listening port", ge=1, le=65535)
+    debug: bool = Field(default=False, description="Enable debug logging")
+
+
 class Phase3Sink(BaseModel):
     """Kitchen-sink schema covering every Plan 3 type. Defaults exercise
     the build path; Phase-3 smoke tests mutate one field at a time and

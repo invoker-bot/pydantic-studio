@@ -11,18 +11,12 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any
 
-from pydantic_core import PydanticUndefined
-
 from pydantic_studio.tree.nodes import DateNode, DatetimeNode, TimedeltaNode, TimeNode
 from pydantic_studio.types.annotated import strip_annotated
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
-
-
-def _default(field_info: FieldInfo) -> Any:
-    d = field_info.get_default(call_default_factory=True)
-    return None if d is PydanticUndefined else d
 
 
 class DatetimeBuilder:
@@ -34,7 +28,7 @@ class DatetimeBuilder:
     def build(
         self, type_: type, field_info: FieldInfo, existing: Any
     ) -> DatetimeNode:
-        default = _default(field_info)
+        default = field_default(field_info)
         return DatetimeNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -56,7 +50,7 @@ class DateBuilder:
         return strip_annotated(type_) is date
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> DateNode:
-        default = _default(field_info)
+        default = field_default(field_info)
         return DateNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -73,7 +67,7 @@ class TimeBuilder:
         return strip_annotated(type_) is time
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> TimeNode:
-        default = _default(field_info)
+        default = field_default(field_info)
         return TimeNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
@@ -92,7 +86,7 @@ class TimedeltaBuilder:
     def build(
         self, type_: type, field_info: FieldInfo, existing: Any
     ) -> TimedeltaNode:
-        default = _default(field_info)
+        default = field_default(field_info)
         return TimedeltaNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,

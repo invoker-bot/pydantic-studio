@@ -18,6 +18,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Discriminator,
+    Field,
     ValidationInfo,
     field_serializer,
     field_validator,
@@ -603,7 +604,13 @@ class SecretNode(FormNode):
         if self.value is None:
             return None
         if self.secret_kind == "str":
+            assert isinstance(self.value, str), (
+                f"SecretNode(secret_kind='str').value must be str, got {type(self.value).__name__}"
+            )
             return SecretStr(self.value)
+        assert isinstance(self.value, (bytes, bytearray)), (
+            f"SecretNode(secret_kind='bytes').value must be bytes, got {type(self.value).__name__}"
+        )
         return SecretBytes(self.value)
 
 
@@ -1056,6 +1063,10 @@ class FormTree(BaseModel):
     cursor: int = 0
     snapshot_limit: int = 50
     draft_path: FsPath | None = None
+
+    # Stashed source CommentedMap for round-trip save (preserves comments).
+    # Excluded from JSON snapshots — re-populated only via load_yaml.
+    yaml_source: Any = Field(default=None, exclude=True, repr=False)
 
     def to_python(self) -> dict[str, Any]:
         return self.root.to_python()

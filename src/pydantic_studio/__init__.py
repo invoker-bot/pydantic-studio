@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 from pydantic_studio.exceptions import (
     CancelledByUser,
@@ -10,6 +10,7 @@ from pydantic_studio.exceptions import (
     PydanticStudioError,
     ValidationFailedError,
 )
+from pydantic_studio.io import load_yaml, save_yaml
 from pydantic_studio.tree.builder import (
     NodeBuilder,
     Registry,
@@ -93,6 +94,8 @@ __all__ = [
     "ValidationResult",
     "__version__",
     "build_form_tree",
+    "load_yaml",
     "register_builder",
     "reset_default_registry",
+    "save_yaml",
 ]
