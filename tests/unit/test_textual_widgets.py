@@ -140,3 +140,42 @@ async def test_choice_editor_for_literal() -> None:
         node = tree.root.find("level")
         assert node is not None
         assert node.value == "info"
+
+
+@pytest.mark.asyncio
+async def test_sequence_editor_renders_existing_items() -> None:
+    class M(BaseModel):
+        tags: list[str] = []
+
+    tree = build_form_tree(M, existing={"tags": ["a", "b"]})
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Button
+
+        # SequenceEditor should mount one row per item plus an "Add" button.
+        # Each row has a Remove button.
+        buttons = [str(b.label) for b in app.screen.query(Button)]
+        assert any("Add" in label for label in buttons)
+        assert sum(1 for label in buttons if "Remove" in label) == 2
+
+
+@pytest.mark.asyncio
+async def test_sequence_editor_add_button() -> None:
+    class M(BaseModel):
+        tags: list[str] = []
+
+    tree = build_form_tree(M, existing={"tags": ["a"]})
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Button
+
+        buttons = list(app.screen.query(Button))
+        add_btn = next(b for b in buttons if "Add" in str(b.label))
+        await pilot.click(add_btn)
+        await pilot.pause()
+        # Now there should be 2 items.
+        tags = tree.root.find("tags")
+        assert tags is not None
+        assert len(tags.items) == 2
