@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-studio"
-version = "0.0.4"
+version = "0.0.5"
 description = "Interactive editor for Pydantic models — produces config.yaml/.toml/.json"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,7 @@ dependencies = [
   "typer>=0.12",
   "rich>=13",
   "ruamel.yaml>=0.18",
+  "textual>=0.85",
 ]
 
 [project.scripts]

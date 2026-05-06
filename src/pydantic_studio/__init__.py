@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 from pydantic_studio.exceptions import (
     CancelledByUser,
@@ -11,6 +11,7 @@ from pydantic_studio.exceptions import (
     ValidationFailedError,
 )
 from pydantic_studio.io import load_yaml, save_yaml
+from pydantic_studio.renderers.textual_ import StudioApp, run_app
 from pydantic_studio.tree.builder import (
     NodeBuilder,
     Registry,
@@ -85,6 +86,7 @@ __all__ = [
     "SecretNode",
     "SequenceNode",
     "StringNode",
+    "StudioApp",
     "TimeNode",
     "TimedeltaNode",
     "UnionNode",
@@ -97,5 +99,6 @@ __all__ = [
     "load_yaml",
     "register_builder",
     "reset_default_registry",
+    "run_app",
     "save_yaml",
 ]
