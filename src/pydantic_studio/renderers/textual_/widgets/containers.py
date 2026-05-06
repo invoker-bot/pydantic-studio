@@ -61,12 +61,22 @@ class SequenceEditor(NodeEditor):
     async def _on_add(self) -> None:
         result = self.form_tree.add_item(self.field_path)
         if not result.ok:
+            self.app.notify(
+                f"Add failed: {result.errors[0] if result.errors else 'invalid'}",
+                severity="error",
+                timeout=6,
+            )
             return
         await self._rebuild()
 
     async def _on_remove(self, index: int) -> None:
         result = self.form_tree.remove_item(self.field_path, index)
         if not result.ok:
+            self.app.notify(
+                f"Remove failed: {result.errors[0] if result.errors else 'invalid'}",
+                severity="error",
+                timeout=6,
+            )
             return
         await self._rebuild()
 
@@ -138,12 +148,22 @@ class MappingEditor(NodeEditor):
             i += 1
         result = self.form_tree.add_entry(self.field_path, key=f"key{i}")
         if not result.ok:
+            self.app.notify(
+                f"Add failed: {result.errors[0] if result.errors else 'invalid'}",
+                severity="error",
+                timeout=6,
+            )
             return
         await self._rebuild()
 
     async def _on_remove(self, index: int) -> None:
         result = self.form_tree.remove_entry(self.field_path, index)
         if not result.ok:
+            self.app.notify(
+                f"Remove failed: {result.errors[0] if result.errors else 'invalid'}",
+                severity="error",
+                timeout=6,
+            )
             return
         await self._rebuild()
 
@@ -196,8 +216,15 @@ class UnionEditor(NodeEditor):
         for i, name in enumerate(self.node.variant_type_names):
             if name == event.value:
                 result = self.form_tree.select_variant(self.field_path, i)
-                if result.ok:
-                    await self._rebuild()
+                if not result.ok:
+                    self.app.notify(
+                        f"Select variant failed: "
+                        f"{result.errors[0] if result.errors else 'invalid'}",
+                        severity="error",
+                        timeout=6,
+                    )
+                    return
+                await self._rebuild()
                 return
 
     async def _rebuild(self) -> None:

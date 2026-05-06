@@ -85,15 +85,6 @@ class TextInputEditor(NodeEditor):
     """
 
     def compose(self) -> ComposeResult:
-        # Seed ``node.value`` from ``node.default`` so a failed parse on the
-        # first edit doesn't blow away the schema-default value (the displayed
-        # value the user sees on initial render).
-        if (
-            getattr(self.node, "value", None) is None
-            and getattr(self.node, "default", None) is not None
-        ):
-            self.node.value = self.node.default
-
         with Horizontal():
             yield Label(f"{self.node.name}: ", classes="field-label")
             yield Input(
@@ -109,9 +100,10 @@ class TextInputEditor(NodeEditor):
 
     @staticmethod
     def _sanitize_id(path: str) -> str:
-        """Textual widget ids must be valid Python identifiers — strip dots/brackets."""
+        """Pre-escape underscores so ``a.b`` and ``a_b`` map differently."""
         return (
-            path.replace(".", "_")
+            path.replace("_", "__")
+            .replace(".", "_")
             .replace("[", "_")
             .replace("]", "")
             or "root"
@@ -182,15 +174,6 @@ class ChoiceEditor(NodeEditor):
     """Dropdown bound to an EnumNode or LiteralNode."""
 
     def compose(self) -> ComposeResult:
-        # Seed ``node.value`` from ``node.default`` so a user who never opens
-        # the dropdown still sees the schema-default value reflected in the
-        # form tree (matches TextInputEditor behaviour).
-        if (
-            getattr(self.node, "value", None) is None
-            and getattr(self.node, "default", None) is not None
-        ):
-            self.node.value = self.node.default
-
         options = self._build_options()
         initial = self._initial_value_id()
         with Horizontal():

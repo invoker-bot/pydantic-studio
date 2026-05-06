@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel
 
 from pydantic_studio import load_yaml
 from pydantic_studio.tree.builder import build_form_tree
@@ -245,3 +246,26 @@ class TestSaveYamlPreservesComments:
         content = src.read_text(encoding="utf-8")
         assert "production deployment" in content
         assert "standard HTTP" in content
+
+
+class TestSaveYamlEnumBearing:
+    """Regression: save_yaml on schemas with Enum fields."""
+
+    def test_save_yaml_with_enum_field(self, tmp_path: Path) -> None:
+        from enum import Enum
+
+        from pydantic_studio import build_form_tree, save_yaml
+
+        class Color(Enum):
+            RED = "red"
+            BLUE = "blue"
+
+        class M(BaseModel):
+            favorite: Color = Color.RED
+
+        out = tmp_path / "out.yaml"
+        tree = build_form_tree(M)
+        save_yaml(tree, out)
+        assert out.exists()
+        content = out.read_text(encoding="utf-8")
+        assert "red" in content

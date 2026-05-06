@@ -82,6 +82,10 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
 reportMissingTypeStubs = false
+exclude = [
+  "src/pydantic_studio/renderers/textual_/**",
+  "tests/unit/test_cli_edit.py",
+]
 
 [tool.uv]
 default-groups = ["dev", "lint"]

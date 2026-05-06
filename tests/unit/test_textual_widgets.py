@@ -62,6 +62,7 @@ async def test_text_input_editor_validation_error_keeps_old_value() -> None:
         age: int = 5
 
     tree = build_form_tree(M)
+    tree.set_value("age", 5)  # Explicit seed (was implicit via default-seeding)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -119,7 +120,8 @@ async def test_choice_editor_for_enum() -> None:
         assert len(selects) == 1
         node = tree.root.find("favorite")
         assert node is not None
-        assert node.value == Color.RED
+        # Default is reflected via node.default (no implicit value-seeding).
+        assert node.default == Color.RED
 
 
 @pytest.mark.asyncio
@@ -139,7 +141,8 @@ async def test_choice_editor_for_literal() -> None:
         assert len(selects) == 1
         node = tree.root.find("level")
         assert node is not None
-        assert node.value == "info"
+        # Default is reflected via node.default (no implicit value-seeding).
+        assert node.default == "info"
 
 
 @pytest.mark.asyncio
