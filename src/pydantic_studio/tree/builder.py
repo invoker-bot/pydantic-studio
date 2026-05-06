@@ -29,6 +29,7 @@ from pydantic_studio.types.primitives import (
 from pydantic_studio.types.registry import NodeBuilder, Registry
 from pydantic_studio.types.sequences import ListBuilder, SetBuilder, TupleBuilder
 from pydantic_studio.types.special import (
+    BytesBuilder,
     PathBuilder,
     PatternBuilder,
     SecretBuilder,
@@ -87,6 +88,7 @@ def default_registry() -> Registry:
         reg.register(UuidBuilder())
         reg.register(SecretBuilder())
         reg.register(PatternBuilder())
+        reg.register(BytesBuilder())
         reg.register(ListBuilder(reg))
         reg.register(SetBuilder(reg))
         reg.register(TupleBuilder(reg))

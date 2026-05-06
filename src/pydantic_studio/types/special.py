@@ -155,6 +155,25 @@ class PatternBuilder:
         )
 
 
+class BytesBuilder:
+    """Matches plain ``bytes``."""
+
+    def matches(self, type_: type) -> bool:
+        return strip_annotated(type_) is bytes
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
+        from pydantic_studio.tree.nodes import BytesNode as _BytesNode
+
+        default = _default(field_info)
+        return _BytesNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            value=existing if existing is not None else default,
+            default=default,
+        )
+
+
 class SecretBuilder:
     """Matches ``pydantic.SecretStr`` and ``pydantic.SecretBytes``."""
 

@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, SecretBytes, SecretStr
 
-from pydantic_studio import PathNode, PatternNode, SecretNode, UuidNode, build_form_tree
+from pydantic_studio import BytesNode, PathNode, PatternNode, SecretNode, UuidNode, build_form_tree
 
 
 class WithPath(BaseModel):
@@ -257,3 +257,45 @@ class TestPatternNode:
         tree = build_form_tree(WithPattern)
         instance = tree.to_instance()
         assert instance.name_re.match("hello")
+
+
+class WithBytes(BaseModel):
+    blob: bytes = b"\x00\x01\x02"
+    nonce: bytes = b""
+
+
+class TestBytesNode:
+    def test_build_uses_bytes_node(self) -> None:
+        tree = build_form_tree(WithBytes)
+        blob = tree.root.find("blob")
+        assert isinstance(blob, BytesNode)
+        assert blob.value == b"\x00\x01\x02"
+
+    def test_validate_accepts_bytes(self) -> None:
+        node = BytesNode(name="x", value=None)
+        assert node.validate_value(b"data") == ()
+
+    def test_validate_accepts_bytearray(self) -> None:
+        node = BytesNode(name="x", value=None)
+        assert node.validate_value(bytearray(b"data")) == ()
+
+    def test_validate_rejects_str(self) -> None:
+        node = BytesNode(name="x", value=None)
+        errors = node.validate_value("data")
+        assert errors
+
+    def test_to_python_returns_bytes(self) -> None:
+        node = BytesNode(name="x", value=b"hello")
+        assert node.to_python() == b"hello"
+
+    def test_snapshot_round_trip(self) -> None:
+        """Pydantic emits bytes as base64 in JSON; round-trip recovers them."""
+        node = BytesNode(name="x", value=b"\x00\xff\x80")
+        raw = node.model_dump_json()
+        restored = BytesNode.model_validate_json(raw)
+        assert restored.value == node.value
+
+    def test_to_instance_round_trip(self) -> None:
+        tree = build_form_tree(WithBytes)
+        instance = tree.to_instance()
+        assert instance.blob == b"\x00\x01\x02"

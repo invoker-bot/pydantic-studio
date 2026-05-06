@@ -639,6 +639,69 @@ class PatternNode(FormNode):
         return _re.compile(self.value, self.flags)
 
 
+class BytesNode(FormNode):
+    """Holds a ``bytes`` value (JSON-serialized as hex to guarantee lossless
+    round-trips — Pydantic's default JSON bytes handling is UTF-8 encoding,
+    which is not safe for arbitrary binary data).
+
+    The ``_value_hex`` / ``_default_hex`` *string* fields are the on-disk
+    representation; the ``value`` / ``default`` *bytes* properties are the
+    in-memory API.  External code should use ``value`` and ``default``; the
+    hex fields are an implementation detail.
+    """
+
+    kind: Literal["bytes"] = "bytes"
+    # Store as hex strings so JSON serialization is always lossless.
+    _value_hex: str | None = None
+    _default_hex: str | None = None
+
+    # Public fields (bytes); private storage is the hex strings above.
+    value: bytes | None = None
+    default: bytes | None = None
+
+    @field_serializer("value", when_used="json")
+    def _serialize_value(self, v: bytes | None) -> str | None:
+        if v is None:
+            return None
+        return v.hex()
+
+    @field_serializer("default", when_used="json")
+    def _serialize_default(self, v: bytes | None) -> str | None:
+        if v is None:
+            return None
+        return v.hex()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decode_hex_fields(cls, data: Any) -> Any:
+        """On JSON load, ``value``/``default`` arrive as hex strings.
+        Convert them back to ``bytes`` before field assignment so Pydantic
+        receives the correct type.
+        """
+        import contextlib
+
+        if not isinstance(data, dict):
+            return data
+        for key in ("value", "default"):
+            raw = data.get(key)
+            if isinstance(raw, str):
+                with contextlib.suppress(ValueError):
+                    data = {**data, key: bytes.fromhex(raw)}
+        return data
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, (bytes, bytearray)):
+            return (f"expected bytes, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> bytes | None:
+        if self.value is None:
+            return None
+        return bytes(self.value)
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -961,6 +1024,7 @@ AnyNode = Annotated[
     | UuidNode
     | SecretNode
     | PatternNode
+    | BytesNode
     | EnumNode
     | LiteralNode
     | SequenceNode

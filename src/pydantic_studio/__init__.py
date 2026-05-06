@@ -19,6 +19,7 @@ from pydantic_studio.tree.builder import (
 )
 from pydantic_studio.tree.nodes import (
     BoolNode,
+    BytesNode,
     DateNode,
     DatetimeNode,
     DecimalNode,
@@ -58,6 +59,7 @@ def register_builder(builder: NodeBuilder) -> None:
 
 __all__ = [
     "BoolNode",
+    "BytesNode",
     "CancelledByUser",
     "DateNode",
     "DatetimeNode",
