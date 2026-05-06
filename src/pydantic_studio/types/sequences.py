@@ -34,6 +34,12 @@ def _build_items(
 
     if existing is None:
         return []
+    if not isinstance(existing, (list, tuple, set, frozenset)):
+        msg = (
+            f"expected list/tuple/set for sequence value, got "
+            f"{type(existing).__name__}"
+        )
+        raise TypeError(msg)
     item_finfo = FieldInfo(annotation=item_type)
     item_builder = registry.find(item_type)
     items: list[Any] = []

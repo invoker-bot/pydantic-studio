@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from pydantic_studio import build_form_tree
-from tests.fixtures.schemas import WithDict, WithList
+from tests.fixtures.schemas import WithDict, WithList, WithSet
 
 
 class TestSnapshotOrderingHoist:
@@ -105,3 +105,34 @@ class TestUnionPreSelectViaModelValidate:
         assert union.selected is not None
         assert union.selected.kind == "int"
         assert union.selected.value == 42
+
+
+class TestBuildItemsIsinstanceGuard:
+    """`_build_items` should reject non-sequence existing values cleanly."""
+
+    def test_string_existing_is_rejected(self) -> None:
+        """A bare string is iterable but iterating yields chars — almost
+        always a user mistake. Reject loudly."""
+        with pytest.raises(TypeError, match="expected list/tuple/set"):
+            build_form_tree(WithList, existing={"tags": "abc"})
+
+    def test_int_existing_is_rejected(self) -> None:
+        with pytest.raises(TypeError, match="expected list/tuple/set"):
+            build_form_tree(WithList, existing={"tags": 42})
+
+    def test_dict_existing_is_rejected(self) -> None:
+        with pytest.raises(TypeError, match="expected list/tuple/set"):
+            build_form_tree(WithList, existing={"tags": {"a": 1}})
+
+    def test_list_existing_accepted(self) -> None:
+        """Regression: valid input must still work after the guard lands."""
+        tree = build_form_tree(WithList, existing={"tags": ["a", "b"]})
+        tags = tree.root.find("tags")
+        assert tags is not None
+        assert len(tags.items) == 2
+
+    def test_set_existing_accepted(self) -> None:
+        tree = build_form_tree(WithSet, existing={"flags": {"a", "b"}})
+        flags = tree.root.find("flags")
+        assert flags is not None
+        assert len(flags.items) == 2
