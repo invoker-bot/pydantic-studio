@@ -61,3 +61,29 @@ def _collect_tree_labels(sidebar) -> list[str]:
 
     walk(sidebar.root)
     return labels
+
+
+@pytest.mark.asyncio
+async def test_preview_renders_yaml_on_mount() -> None:
+    """The preview pane should render the current tree as YAML."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    tree = build_form_tree(Server)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()  # let on_mount push EditorScreen
+        preview = app.screen.query_one("#preview")
+        # The preview widget should have content with the schema's defaults.
+        rendered = _read_log_lines(preview)
+        all_text = "\n".join(rendered)
+        assert "name:" in all_text
+        assert "port:" in all_text
+
+
+def _read_log_lines(widget) -> list[str]:
+    """Extract text lines from a RichLog widget. Pilot has no direct
+    accessor, so we reach into the widget's internal Strip list."""
+    if hasattr(widget, "lines"):
+        return [str(line) for line in widget.lines]
+    return []

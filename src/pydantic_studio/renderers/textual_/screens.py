@@ -8,6 +8,7 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
+from pydantic_studio.renderers.textual_.widgets.preview import PreviewPane
 from pydantic_studio.renderers.textual_.widgets.sidebar import Sidebar
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ class EditorScreen(Screen):
         with Horizontal():
             yield Sidebar(self.app.tree)
             yield Static("[editor]", id="editor-placeholder")
-            yield Static("[preview]", id="preview-placeholder")
+            yield PreviewPane(self.app.tree)
         yield Footer()
 
     def action_quit(self) -> None:
