@@ -74,18 +74,30 @@ def load_yaml(path: str | Path, schema: type[BaseModel]) -> FormTree:
 def save_yaml(tree: FormTree, path: str | Path) -> None:
     """Write a FormTree to a YAML file with smart-comment generation.
 
-    Behavior:
-    - If ``path`` does not exist: builds a new CommentedMap from
-      ``tree.to_python()`` with description comments derived from each
-      field's ``FieldInfo.description``.
-    - If ``path`` exists OR ``tree.yaml_source`` carries a stashed
-      CommentedMap (loaded via ``load_yaml``): preserves user-edited
-      comments. (Implemented in Task 9 — for now this branch is identical
-      to the new-file branch.)
+    The tree is first materialized via ``tree.to_instance()`` so that
+    schema defaults are resolved into the output (a fresh tree with all
+    defaults still produces a populated YAML rather than ``{}``). The
+    resulting model is then dumped, schema-ordered, into a CommentedMap
+    whose comments come from each field's ``FieldInfo.description``
+    (T8 — new files). T9 will extend this to source comments from a
+    stashed CommentedMap when one is available, preserving user edits;
+    this docstring will be revised at that time.
+
+    Behavior (T8):
+    - Builds a new CommentedMap with description comments derived from
+      ``FieldInfo.description``, regardless of whether ``path`` exists
+      or ``tree.yaml_source`` is set. (T9 will branch on yaml_source.)
 
     The write is atomic: writes to a temp file in the same directory,
     then ``os.replace``s into place. Parent directories are created as
     needed (mirroring ``draft_save``).
+
+    Raises:
+        pydantic_studio.ValidationFailedError: If ``tree`` does not yet
+            represent a valid instance of its schema (e.g. required
+            fields are unset). Propagated from ``tree.to_instance()``.
+            The temp file is cleaned up.
+        ValueError: If ``tree.schema_class`` is None.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
