@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs
 
 from fastapi import Request  # noqa: TC002 (FastAPI introspects this at runtime)
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -255,3 +255,38 @@ def register(app: FastAPI, server: StudioServer) -> None:
                 server.tree.select_variant(path, i)
                 break
         return HTMLResponse(content=render_yaml_preview(server.tree))
+
+    @app.post("/submit", response_class=HTMLResponse)
+    async def submit() -> HTMLResponse:
+        from pydantic import ValidationError
+
+        from pydantic_studio import save_yaml
+        from pydantic_studio.exceptions import ValidationFailedError
+
+        try:
+            server.tree.to_instance()
+        except (ValidationError, ValidationFailedError) as e:
+            return HTMLResponse(
+                content=f"<pre>Validation failed: {e}</pre>",
+                status_code=200,
+            )
+        if server.save_path is not None:
+            save_yaml(server.tree, server.save_path)
+        server.submitted = True
+        return HTMLResponse(
+            content="<h2>Done — you can close this tab.</h2>",
+        )
+
+    @app.post("/cancel", response_class=HTMLResponse)
+    async def cancel() -> HTMLResponse:
+        server.cancelled = True
+        return HTMLResponse(
+            content="<h2>Cancelled — you can close this tab.</h2>",
+        )
+
+    @app.get("/heartbeat", response_class=PlainTextResponse)
+    async def heartbeat() -> PlainTextResponse:
+        import time
+
+        server.last_heartbeat_ts = time.time()
+        return PlainTextResponse(content="ok")

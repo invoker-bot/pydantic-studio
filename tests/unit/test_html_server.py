@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi.testclient import TestClient
 
 from pydantic_studio import build_form_tree
 from tests.fixtures.schemas import Server
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_index_route_returns_html() -> None:
@@ -148,3 +153,36 @@ class TestMapRoute:
         node = tree.root.find("settings")
         assert node is not None
         assert len(node.entries) == 1
+
+
+class TestSubmitCancel:
+    def test_submit_writes_yaml(self, tmp_path: Path) -> None:
+        from pydantic_studio.renderers.html import StudioServer
+
+        out = tmp_path / "out.yaml"
+        tree = build_form_tree(Server)
+        studio_server = StudioServer(tree=tree, save_path=out)
+        client = TestClient(studio_server.app)
+        response = client.post("/submit")
+        assert response.status_code == 200
+        assert out.exists()
+        assert studio_server.submitted is True
+
+    def test_cancel_marks_cancelled(self) -> None:
+        from pydantic_studio.renderers.html import StudioServer
+
+        tree = build_form_tree(Server)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.post("/cancel")
+        assert response.status_code == 200
+        assert studio_server.cancelled is True
+
+    def test_heartbeat_returns_ok(self) -> None:
+        from pydantic_studio.renderers.html import StudioServer
+
+        tree = build_form_tree(Server)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.get("/heartbeat")
+        assert response.status_code == 200
