@@ -27,6 +27,10 @@ dependencies = [
   "rich>=13",
   "ruamel.yaml>=0.18",
   "textual>=0.85",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "jinja2>=3.1",
+  "httpx>=0.27",
 ]
 
 [project.scripts]
