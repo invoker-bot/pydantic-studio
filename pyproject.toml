@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-studio"
-version = "0.0.6"
+version = "0.0.7"
 description = "Interactive editor for Pydantic models — produces config.yaml/.toml/.json"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -31,6 +31,7 @@ dependencies = [
   "uvicorn[standard]>=0.32",
   "jinja2>=3.1",
   "httpx>=0.27",
+  "tomlkit>=0.13",
 ]
 
 [project.scripts]

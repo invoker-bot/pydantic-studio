@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 from pydantic_studio.exceptions import (
     CancelledByUser,
@@ -10,7 +10,16 @@ from pydantic_studio.exceptions import (
     PydanticStudioError,
     ValidationFailedError,
 )
-from pydantic_studio.io import load_yaml, save_yaml
+from pydantic_studio.io import (
+    load_config,
+    load_json,
+    load_toml,
+    load_yaml,
+    save_config,
+    save_json,
+    save_toml,
+    save_yaml,
+)
 from pydantic_studio.renderers.html import StudioServer, run_html_app
 from pydantic_studio.renderers.textual_ import StudioApp, run_app
 from pydantic_studio.tree.builder import (
@@ -98,10 +107,16 @@ __all__ = [
     "ValidationResult",
     "__version__",
     "build_form_tree",
+    "load_config",
+    "load_json",
+    "load_toml",
     "load_yaml",
     "register_builder",
     "reset_default_registry",
     "run_app",
     "run_html_app",
+    "save_config",
+    "save_json",
+    "save_toml",
     "save_yaml",
 ]
