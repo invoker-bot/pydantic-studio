@@ -603,7 +603,13 @@ class SecretNode(FormNode):
         if self.value is None:
             return None
         if self.secret_kind == "str":
+            assert isinstance(self.value, str), (
+                f"SecretNode(secret_kind='str').value must be str, got {type(self.value).__name__}"
+            )
             return SecretStr(self.value)
+        assert isinstance(self.value, (bytes, bytearray)), (
+            f"SecretNode(secret_kind='bytes').value must be bytes, got {type(self.value).__name__}"
+        )
         return SecretBytes(self.value)
 
 
