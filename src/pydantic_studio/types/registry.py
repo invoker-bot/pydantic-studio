@@ -41,6 +41,15 @@ class Registry:
         """Prepend ``builder``; new registrations take priority."""
         self._builders.insert(0, builder)
 
+    def register_fallback(self, builder: NodeBuilder) -> None:
+        """Append ``builder``; checked only after every other builder.
+
+        Use for catch-all builders (schema introspection, generic
+        delegates) that must not shadow more-specific registrations.
+        Re-registering a fallback moves it to the end again.
+        """
+        self._builders.append(builder)
+
     def find(self, type_: type) -> NodeBuilder:
         for b in self._builders:
             if b.matches(type_):
