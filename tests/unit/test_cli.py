@@ -45,3 +45,12 @@ class TestShow:
         result = runner.invoke(app, ["show", "no_colon_here"])
         assert result.exit_code != 0
         assert "module:class" in result.output.lower()
+
+
+class TestVersion:
+    def test_version_subcommand_prints_version(self) -> None:
+        from pydantic_studio import __version__
+
+        result = runner.invoke(app, ["version"])
+        assert result.exit_code == 0
+        assert __version__ in result.output
