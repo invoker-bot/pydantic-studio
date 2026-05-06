@@ -12,6 +12,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -534,6 +535,28 @@ class PathNode(FormNode):
         return _Path(self.value)
 
 
+class UuidNode(FormNode):
+    """Holds a ``uuid.UUID`` value.
+
+    Pydantic round-trips UUIDs as strings via JSON, so the proper field
+    type works directly with no custom serializer.
+    """
+
+    kind: Literal["uuid"] = "uuid"
+    value: UUID | None = None
+    default: UUID | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, UUID):
+            return (f"expected UUID, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> UUID | None:
+        return self.value
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -853,6 +876,7 @@ AnyNode = Annotated[
     | UrlNode
     | EmailNode
     | PathNode
+    | UuidNode
     | EnumNode
     | LiteralNode
     | SequenceNode

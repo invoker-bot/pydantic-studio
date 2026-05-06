@@ -48,3 +48,29 @@ class PathBuilder:
             value=existing_v if existing_v is not None else default,
             default=default,
         )
+
+
+def _is_uuid_type(type_: Any) -> bool:
+    from uuid import UUID
+
+    unwrapped = strip_annotated(type_)
+    return unwrapped is UUID
+
+
+class UuidBuilder:
+    """Matches ``uuid.UUID``."""
+
+    def matches(self, type_: type) -> bool:
+        return _is_uuid_type(type_)
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
+        from pydantic_studio.tree.nodes import UuidNode as _UuidNode
+
+        default = _default(field_info)
+        return _UuidNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            value=existing if existing is not None else default,
+            default=default,
+        )

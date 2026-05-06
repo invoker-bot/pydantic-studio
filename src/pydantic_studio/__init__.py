@@ -40,6 +40,7 @@ from pydantic_studio.tree.nodes import (
     TimeNode,
     UnionNode,
     UrlNode,
+    UuidNode,
 )
 from pydantic_studio.tree.validation import ValidationResult
 
@@ -81,6 +82,7 @@ __all__ = [
     "TimedeltaNode",
     "UnionNode",
     "UrlNode",
+    "UuidNode",
     "ValidationFailedError",
     "ValidationResult",
     "__version__",
