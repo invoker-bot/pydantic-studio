@@ -75,3 +75,31 @@ def test_edit_without_file_builds_fresh_tree(tmp_path: Path, monkeypatch) -> Non
 def test_edit_unknown_schema_errors() -> None:
     result = runner.invoke(app, ["edit", "nosuch:Foo"])
     assert result.exit_code != 0
+
+
+def test_edit_web_frontend(tmp_path, monkeypatch) -> None:
+    """edit --frontend web routes to run_html_app."""
+    captured: dict[str, object] = {}
+
+    def fake_run(tree, save_path=None) -> None:
+        captured["tree"] = tree
+        captured["save_path"] = save_path
+
+    import pydantic_studio.renderers.html as html_module
+
+    monkeypatch.setattr(html_module, "run_html_app", fake_run)
+
+    result = runner.invoke(
+        app,
+        ["edit", "--frontend", "web", "tests.fixtures.schemas:Server"],
+    )
+    assert result.exit_code == 0
+    assert "tree" in captured
+
+
+def test_edit_unknown_frontend_errors() -> None:
+    result = runner.invoke(
+        app,
+        ["edit", "--frontend", "vr", "tests.fixtures.schemas:Server"],
+    )
+    assert result.exit_code != 0
