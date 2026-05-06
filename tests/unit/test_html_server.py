@@ -49,3 +49,47 @@ def test_index_renders_form_fields() -> None:
     assert "name:" in text
     assert "port:" in text
     assert "debug:" in text
+
+
+class TestFieldRoute:
+    def test_field_post_updates_tree_and_returns_preview(self) -> None:
+        from pydantic_studio.renderers.html import StudioServer
+
+        tree = build_form_tree(Server)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.post("/field/name", data={"value": "newname"})
+        assert response.status_code == 200
+        assert "newname" in response.text
+        node = tree.root.find("name")
+        assert node is not None
+        assert node.value == "newname"
+
+    def test_field_post_int_parses(self) -> None:
+        from pydantic_studio.renderers.html import StudioServer
+
+        tree = build_form_tree(Server)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.post("/field/port", data={"value": "9090"})
+        assert response.status_code == 200
+        node = tree.root.find("port")
+        assert node is not None
+        assert node.value == 9090
+
+    def test_field_post_validation_failure_keeps_old_value(self) -> None:
+        from pydantic_studio.renderers.html import StudioServer
+
+        tree = build_form_tree(Server)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        # port has le=65535; provide something out of range.
+        response = client.post("/field/port", data={"value": "99999"})
+        # 200 (HTMX-friendly), but tree not mutated.
+        assert response.status_code == 200
+        node = tree.root.find("port")
+        assert node is not None
+        # Default Server.port = 8080; value is None on a fresh tree
+        # (default-seeding was removed in T1 housekeeping). Either is fine —
+        # what matters is that the failed parse didn't poison the value.
+        assert node.value != 99999
