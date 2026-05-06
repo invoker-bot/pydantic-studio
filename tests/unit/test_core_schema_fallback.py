@@ -554,3 +554,23 @@ def test_money_propagates_decimal_constraints():
     assert amount_node.max_digits == 10
     assert amount_node.decimal_places == 2
     assert amount_node.ge == 0
+
+
+def test_custom_type_instance_as_default_strips_to_none():
+    """When a user passes a custom-type instance as the field default
+    (``when: Timestamp = Timestamp(date(...))``), the underlying scalar
+    builder cannot validate the wrapper against ``DateNode(default=...)``.
+    The fallback strips the default rather than crashing — the form
+    still builds with default=None, and ``required`` reflects that the
+    user *did* supply a default originally."""
+
+    class M(BaseModel):
+        when: Timestamp = Timestamp(date(2026, 1, 1))
+
+    tree = build_form_tree(M)
+    when_node = next(c for c in tree.root.fields if c.name == "when")
+    assert isinstance(when_node, DateNode)
+    assert when_node.default is None
+    # User supplied a default → field is not required, even though we
+    # stripped the un-unwrappable value.
+    assert when_node.required is False

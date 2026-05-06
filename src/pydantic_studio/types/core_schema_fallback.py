@@ -107,6 +107,7 @@ class CoreSchemaFallbackBuilder:
             # ``matches`` should have rejected this — defensive.
             raise NoBuilderError(type_)
         new_field_info = _augment_field_info(field_info, schema)
+        new_field_info = _strip_or_unwrap_default(new_field_info, type_)
         return self._registry.find(underlying).build(underlying, new_field_info, existing)
 
 
@@ -220,6 +221,52 @@ def _augment_field_info(field_info: FieldInfo, schema: Any) -> FieldInfo:
     merged = list(extracted) + list(getattr(field_info, "metadata", None) or [])
     new_fi = copy.copy(field_info)
     new_fi.metadata = merged
+    return new_fi
+
+
+def _strip_or_unwrap_default(field_info: FieldInfo, type_: type) -> FieldInfo:
+    """Reconcile the field's default with the underlying primitive builder.
+
+    When a user writes ``when: Timestamp = Timestamp(date(...))`` the
+    field's default is an instance of the wrapper class — but the
+    underlying builder (``DateBuilder`` here) only understands the
+    primitive type and rejects the wrapper at ``DateNode(default=...)``
+    validation time.
+
+    We try ``TypeAdapter.dump_python`` first: if the user supplied a
+    ``serialization=...`` arm in their core_schema, this returns the
+    primitive form and we splice it back into the field info. If
+    serialization is undefined (the common case), ``dump_python`` echoes
+    the wrapper instance unchanged — we then strip the default to None
+    so the form still builds. The user loses the default-display in
+    that case, but the form opens; explicit ``serialization=`` in the
+    custom type's schema unlocks the full unwrap path.
+    """
+    if not isinstance(type_, type):
+        return field_info
+    try:
+        raw = field_info.get_default(call_default_factory=True)
+    except Exception:
+        return field_info
+    if raw is None or not isinstance(raw, type_):
+        return field_info  # no default, or already primitive
+
+    try:
+        # ``warnings=False`` silences PydanticSerializationUnexpectedValue
+        # for wrappers without a serialization arm — we treat that as
+        # "no unwrap" below and strip the default anyway.
+        unwrapped = TypeAdapter(type_).dump_python(raw, mode="python", warnings=False)
+    except Exception:
+        unwrapped = raw  # treat as un-unwrappable
+
+    new_fi = copy.copy(field_info)
+    new_fi.default_factory = None
+    # If dump_python echoed the wrapper unchanged, no serializer is in
+    # play — strip the default rather than recurse on it.
+    if isinstance(unwrapped, type_) or unwrapped is raw:
+        new_fi.default = None
+    else:
+        new_fi.default = unwrapped
     return new_fi
 
 
