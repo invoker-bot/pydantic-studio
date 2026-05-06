@@ -228,20 +228,34 @@ def edit(
         None,
         help="Path to a YAML file. If omitted, edits a fresh tree.",
     ),
+    frontend: str = typer.Option(
+        "tui",
+        "--frontend",
+        "-f",
+        help="UI to launch: 'tui' (Textual) or 'web' (FastAPI+HTMX).",
+    ),
 ) -> None:
-    """Launch the Textual editor for a Pydantic schema.
-
-    With FILE: load it via ``load_yaml``, edit interactively, save back.
-    Without FILE: build a fresh tree from the schema's defaults; saves
-    are disabled (read-only mode).
-    """
-    from pydantic_studio import load_yaml
-    from pydantic_studio.renderers.textual_ import StudioApp
+    """Launch an editor for a Pydantic schema."""
+    from pydantic_studio import build_form_tree, load_yaml
 
     schema = _load_schema(target)
     if file is not None and file.exists():
         tree = load_yaml(file, schema)
     else:
         tree = build_form_tree(schema)
-    app_instance = StudioApp(tree=tree, save_path=file)
-    app_instance.run()
+
+    if frontend == "tui":
+        from pydantic_studio.renderers.textual_ import StudioApp
+
+        StudioApp(tree=tree, save_path=file).run()
+    elif frontend == "web":
+        from pydantic_studio.renderers import html as html_module
+
+        html_module.run_html_app(tree=tree, save_path=file)
+    else:
+        typer.secho(
+            f"Unknown frontend {frontend!r}. Use 'tui' or 'web'.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)

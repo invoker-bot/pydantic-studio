@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>pydantic-studio — {{ schema_name }}</title>
+  <link rel="stylesheet" href="/static/studio.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>{{ schema_name }}</h1>
+  </header>
+  <main>
+    <aside id="sidebar">
+      <ul>
+        {% for path, label in groups %}
+        <li><a href="#" data-group-path="{{ path }}">{{ label }}</a></li>
+        {% endfor %}
+      </ul>
+    </aside>
+    <section id="form">
+      {% include "form.html.jinja" %}
+    </section>
+    <section id="preview">
+      <pre id="preview-content">{{ preview }}</pre>
+    </section>
+  </main>
+</body>
+</html>

@@ -148,6 +148,8 @@ async def test_undo_reverts_last_mutation(tmp_path) -> None:
     from pydantic_studio.renderers.textual_ import StudioApp
 
     tree = build_form_tree(Server)
+    # Explicit seed (was implicit via default-seeding).
+    tree.set_value("port", 8080)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -190,3 +192,33 @@ async def test_smoke_edit_save_cycle(tmp_path) -> None:
     instance = reloaded.to_instance()
     assert instance.name == "smoke-test"
     assert instance.port == 12345
+
+
+@pytest.mark.asyncio
+async def test_smoke_edit_save_cycle_with_enum(tmp_path) -> None:
+    """End-to-end: enum-bearing schema, edit-save round-trip."""
+    from enum import Enum
+
+    from pydantic import BaseModel
+
+    from pydantic_studio import StudioApp, build_form_tree, load_yaml
+
+    class Color(Enum):
+        RED = "red"
+        BLUE = "blue"
+
+    class M(BaseModel):
+        favorite: Color = Color.RED
+
+    out = tmp_path / "smoke_enum.yaml"
+    tree = build_form_tree(M)
+    app = StudioApp(tree=tree, save_path=out)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+s")
+        await pilot.pause()
+
+    assert out.exists()
+    reloaded = load_yaml(out, M)
+    instance = reloaded.to_instance()
+    assert instance.favorite == Color.RED

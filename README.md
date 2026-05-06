@@ -206,6 +206,37 @@ app = StudioApp(tree=tree, save_path="config.yaml")
 app.run()  # blocks until the user quits
 ```
 
+## HTML Renderer (v0.0.6)
+
+```bash
+$ uv run pydantic-studio edit --frontend web mypkg.config:AppSettings config.yaml
+```
+
+A FastAPI app boots on `127.0.0.1:<port>`, opens your browser, and shows the same three-region layout as the TUI. Edits POST to HTMX endpoints; the server validates and returns updated preview HTML.
+
+### Routes
+
+| Route | Method | Effect |
+|---|---|---|
+| `/` | GET | Index page |
+| `/field/<path>` | POST | Update a leaf field's value |
+| `/seq/<path>/add` | POST | Append item to a SequenceNode |
+| `/seq/<path>/remove?index=<i>` | POST | Remove item at index |
+| `/map/<path>/add` | POST | Add a placeholder entry to a MappingNode |
+| `/map/<path>/remove?index=<i>` | POST | Remove entry at index |
+| `/union/<path>/select` | POST | Pick a UnionNode variant |
+| `/submit` | POST | `to_instance()` → `save_yaml` → exit |
+| `/cancel` | POST | Mark cancelled |
+| `/heartbeat` | GET | Keepalive (tab-close detection — Plan 8 polish) |
+
+### What's not in v0.0.6
+
+- Full Tailwind CSS pipeline (Plan 8) — current CSS is minimal hand-written
+- Alpine.js sprinkles (Plan 8)
+- `/heartbeat` 30s timeout enforcement — currently only tracks last-seen; auto-cancel lands in Plan 8
+- Mobile / responsive layout (Plan 8)
+- TOML / JSON output (Plan 7)
+
 ## License
 
 MIT

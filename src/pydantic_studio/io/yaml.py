@@ -128,7 +128,7 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
     # values — ``tree.to_python()`` alone omits keys whose nodes are unset,
     # which would produce an empty YAML file for a brand-new tree.
     instance = tree.to_instance()
-    data = instance.model_dump(mode="python")
+    data = instance.model_dump(mode="json")
     cm = _build_commented_map(data, schema, source)
     yaml = _yaml()
 
