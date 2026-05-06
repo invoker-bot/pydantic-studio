@@ -52,6 +52,67 @@ fixed-length `tuple[T1, T2, ...]`, `dict[K, V]`, true unions (`int | str`),
 and Optional (`T | None`). Pydantic v2 constrained types (`constr`,
 `conint`, ...) are supported via the metadata extractor.
 
+## Type coverage (v0.0.3)
+
+Pydantic Studio now models the following types out of the box:
+
+**Primitives:** `str`, `int`, `float`, `bool`, `Decimal`
+**Choices:** `Enum`, `Literal[...]`
+**Containers:** `list[T]`, `set[T]`, `tuple[T, ...]`, `tuple[T1, T2, ...]`, `dict[K, V]`
+**Unions:** `T | U`, `Optional[T]`
+**Temporal:** `datetime`, `date`, `time`, `timedelta`
+**Network:** `IPv4Address`, `IPv6Address`, `IPv4Network`, `IPv6Network`,
+            `AnyUrl`, `HttpUrl`, `FileUrl` (any Pydantic URL class), `EmailStr`
+**Special:** `pathlib.Path`, `uuid.UUID`, `SecretStr`, `SecretBytes`, `re.Pattern`, `bytes`
+
+### Example
+
+```python
+from datetime import datetime
+from pathlib import Path
+from pydantic import BaseModel, HttpUrl, SecretStr
+
+from pydantic_studio import build_form_tree
+
+
+class AppConfig(BaseModel):
+    api_url: HttpUrl = HttpUrl("https://api.example.com")
+    api_key: SecretStr = SecretStr("default-key")
+    home: Path = Path("/srv/app")
+    started_at: datetime = datetime(2026, 5, 6, 12, 0)
+
+
+tree = build_form_tree(AppConfig)
+tree.set_value("api_url", "https://newapi.example.com")
+config = tree.to_instance()
+print(config.api_url)
+# https://newapi.example.com/
+```
+
+### Schema introspection CLI
+
+```bash
+$ uv run pydantic-studio show mypkg.config:AppConfig
+AppConfig
+├── api_url :: url = 'https://api.example.com'
+├── api_key :: secret = 'default-key'
+├── home :: path = '/srv/app'
+└── started_at :: datetime = datetime.datetime(2026, 5, 6, 12, 0)
+```
+
+The CLI is intentionally minimal in v0.0.3 — only `show` (schema introspection)
+ships. `edit` / `check` / `render` arrive in v0.0.4 with YAML I/O.
+
+### Optional: email-validator
+
+`EmailStr` requires the `email-validator` package. Install with:
+
+```bash
+uv pip install 'pydantic-studio[email]'
+```
+
+Without the extra, EmailNode falls back to a permissive `'@'`-presence check.
+
 ## License
 
 MIT
