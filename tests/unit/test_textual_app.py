@@ -101,3 +101,21 @@ async def test_editor_pane_mounts() -> None:
         await pilot.pause()
         editor = app.screen.query_one("#editor")
         assert editor is not None
+
+
+@pytest.mark.asyncio
+async def test_editor_pane_mounts_one_input_per_field() -> None:
+    """After T6, Server's name+port get TextInputEditors; debug uses BoolEditor stub."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    tree = build_form_tree(Server)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Input
+
+        inputs = list(app.screen.query(Input))
+        # Server has name (str), port (int), debug (bool).
+        # Bool gets a stub Static -> 2 Input widgets (name, port).
+        assert len(inputs) == 2

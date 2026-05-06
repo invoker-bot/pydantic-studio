@@ -80,12 +80,10 @@ class NodeEditor(Widget):
         Concrete editor implementations land in Tasks 6-9.
         """
         # Late imports avoid circular dependencies during widget bootstrap
-        # AND tolerate missing editor classes during incremental dev.
-        from pydantic_studio.renderers.textual_.widgets.containers import (
-            MappingEditor,
-            SequenceEditor,
-            UnionEditor,
-        )
+        # AND tolerate missing editor classes during incremental dev. The
+        # container editors (Sequence/Mapping/Union) land in T9, so import
+        # them lazily inside the branches that need them — otherwise dispatch
+        # for ``string`` would fail on the missing module.
         from pydantic_studio.renderers.textual_.widgets.scalars import (
             BoolEditor,
             ChoiceEditor,
@@ -98,10 +96,22 @@ class NodeEditor(Widget):
         if kind in ("enum", "literal"):
             return ChoiceEditor(node, path, tree)
         if kind == "sequence":
+            from pydantic_studio.renderers.textual_.widgets.containers import (
+                SequenceEditor,
+            )
+
             return SequenceEditor(node, path, tree)
         if kind == "mapping":
+            from pydantic_studio.renderers.textual_.widgets.containers import (
+                MappingEditor,
+            )
+
             return MappingEditor(node, path, tree)
         if kind == "union":
+            from pydantic_studio.renderers.textual_.widgets.containers import (
+                UnionEditor,
+            )
+
             return UnionEditor(node, path, tree)
         # All other kinds use the generic text input — string / int / float /
         # decimal / date* / ip* / url / email / path / uuid / secret / pattern / bytes.
