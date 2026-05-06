@@ -299,3 +299,42 @@ class TestBytesNode:
         tree = build_form_tree(WithBytes)
         instance = tree.to_instance()
         assert instance.blob == b"\x00\x01\x02"
+
+
+class TestPublicApi:
+    """Smoke check: every new node class is importable from pydantic_studio."""
+
+    def test_imports(self) -> None:
+        from pydantic_studio import (
+            BytesNode,
+            DateNode,
+            DatetimeNode,
+            EmailNode,
+            FormNode,
+            IpAddressNode,
+            IpNetworkNode,
+            PathNode,
+            PatternNode,
+            SecretNode,
+            TimedeltaNode,
+            TimeNode,
+            UrlNode,
+            UuidNode,
+        )
+
+        for cls in (
+            BytesNode,
+            DateNode,
+            DatetimeNode,
+            EmailNode,
+            IpAddressNode,
+            IpNetworkNode,
+            PathNode,
+            PatternNode,
+            SecretNode,
+            TimeNode,
+            TimedeltaNode,
+            UrlNode,
+            UuidNode,
+        ):
+            assert issubclass(cls, FormNode), cls.__name__
