@@ -130,34 +130,30 @@ def version() -> None:
 
 @app.command()
 def fill(
-    target: str = typer.Argument(
-        ..., help="module:Class identifier of the Pydantic schema."
-    ),
+    target: str = typer.Argument(..., help="module:Class identifier."),
     out: Path | None = typer.Option(  # noqa: B008
         None,
         "--out",
         "-o",
-        help="Path to write the YAML stub. If omitted, write to stdout.",
+        help=(
+            "Path to write the stub. Format inferred from extension. "
+            "If omitted, writes YAML to stdout."
+        ),
     ),
 ) -> None:
-    """Emit a YAML stub populated with the schema's defaults.
+    """Emit a config stub populated with the schema's defaults."""
+    import io as _io
 
-    With ``--out FILE``, writes to that path with description comments.
-    Without ``--out``, writes to stdout.
-    """
-    import io
-
-    from pydantic_studio import build_form_tree, save_yaml
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.io.dispatch import save_config
 
     schema = _load_schema(target)
     tree = build_form_tree(schema)
     if out is not None:
-        save_yaml(tree, out)
+        save_config(tree, out)
         typer.echo(f"Wrote {out}")
         return
-    # Stdout path: write to a temp file then echo its contents (avoids
-    # duplicating save_yaml's CommentedMap-building logic). Use io.StringIO
-    # via the YAML object directly.
+    # Stdout path: YAML default.
     from pydantic_studio.io.yaml import _build_commented_map, _yaml
 
     schema_class = tree.schema_class
@@ -168,11 +164,10 @@ def fill(
             err=True,
         )
         raise typer.Exit(code=1)
-    # Materialize to instance to resolve defaults (matches save_yaml semantics).
     instance = tree.to_instance()
     data = instance.model_dump(mode="python")
     cm = _build_commented_map(data, schema_class, None)
-    buf = io.StringIO()
+    buf = _io.StringIO()
     _yaml().dump(cm, buf)
     typer.echo(buf.getvalue(), nl=False)
 
@@ -180,17 +175,17 @@ def fill(
 @app.command()
 def run(
     target: str = typer.Argument(..., help="module:Class identifier."),
-    file: Path = typer.Argument(..., help="Path to a YAML config file."),  # noqa: B008
+    file: Path = typer.Argument(..., help="Path to a config file (extension picks format)."),  # noqa: B008
 ) -> None:
-    """Load a YAML file, validate against the schema, print the model dump."""
+    """Load a config file, validate against the schema, print the model dump."""
     from pydantic import ValidationError
 
-    from pydantic_studio import load_yaml
     from pydantic_studio.exceptions import ValidationFailedError
+    from pydantic_studio.io.dispatch import load_config
 
     schema = _load_schema(target)
     try:
-        tree = load_yaml(file, schema)
+        tree = load_config(file, schema)
         instance = tree.to_instance()
     except (ValidationError, ValidationFailedError) as e:
         typer.secho(f"Validation failed: {e}", fg=typer.colors.RED, err=True)
@@ -201,17 +196,17 @@ def run(
 @app.command()
 def check(
     target: str = typer.Argument(..., help="module:Class identifier."),
-    file: Path = typer.Argument(..., help="Path to a YAML config file."),  # noqa: B008
+    file: Path = typer.Argument(..., help="Path to a config file (extension picks format)."),  # noqa: B008
 ) -> None:
-    """Load a YAML file and validate it against the schema. Silent on success."""
+    """Load + validate. Silent on success."""
     from pydantic import ValidationError
 
-    from pydantic_studio import load_yaml
     from pydantic_studio.exceptions import ValidationFailedError
+    from pydantic_studio.io.dispatch import load_config
 
     schema = _load_schema(target)
     try:
-        tree = load_yaml(file, schema)
+        tree = load_config(file, schema)
         tree.to_instance()
     except (ValidationError, ValidationFailedError) as e:
         typer.secho(f"{file}: validation failed", fg=typer.colors.RED, err=True)
@@ -236,11 +231,13 @@ def edit(
     ),
 ) -> None:
     """Launch an editor for a Pydantic schema."""
-    from pydantic_studio import build_form_tree, load_yaml
+    from pydantic_studio import build_form_tree
 
     schema = _load_schema(target)
     if file is not None and file.exists():
-        tree = load_yaml(file, schema)
+        from pydantic_studio.io.dispatch import load_config
+
+        tree = load_config(file, schema)
     else:
         tree = build_form_tree(schema)
 

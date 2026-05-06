@@ -148,3 +148,54 @@ class TestCheck:
             ["check", "tests.fixtures.schemas:Server", str(cfg)],
         )
         assert result.exit_code != 0
+
+
+class TestFillFormats:
+    def test_fill_emits_toml(self, tmp_path) -> None:
+        out = tmp_path / "out.toml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:Server", "--out", str(out)],
+        )
+        assert result.exit_code == 0
+        content = out.read_text(encoding="utf-8")
+        assert "name =" in content or 'name = "prod"' in content
+
+    def test_fill_emits_json(self, tmp_path) -> None:
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:Server", "--out", str(out)],
+        )
+        assert result.exit_code == 0
+        content = out.read_text(encoding="utf-8")
+        assert content.lstrip().startswith("{")
+        assert '"name"' in content
+
+
+class TestRunFormats:
+    def test_run_loads_toml(self, tmp_path) -> None:
+        cfg = tmp_path / "config.toml"
+        cfg.write_text(
+            'name = "prod"\nport = 8080\ndebug = true\n',
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["run", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+        assert result.exit_code == 0
+        assert "prod" in result.output
+
+    def test_run_loads_json(self, tmp_path) -> None:
+        cfg = tmp_path / "config.json"
+        cfg.write_text(
+            '{"name": "prod", "port": 8080, "debug": true}\n',
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["run", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+        assert result.exit_code == 0
+        assert "prod" in result.output
