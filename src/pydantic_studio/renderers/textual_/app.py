@@ -58,6 +58,18 @@ class StudioApp(App):
     def on_mount(self) -> None:
         self.push_screen(EditorScreen())
 
+    async def action_quit(self) -> None:  # type: ignore[override]
+        """Delegate quit to the active screen so the EditorScreen's
+        unsaved-changes prompt runs before exit. Falls back to the
+        framework default if the active screen has no quit handler.
+        """
+        screen = self.screen
+        screen_quit = getattr(screen, "action_quit", None)
+        if screen_quit is not None and not isinstance(screen, App):
+            screen_quit()
+            return
+        self.exit()
+
 
 def run_app(tree: FormTree, save_path: str | Path | None = None) -> None:
     """Launch the StudioApp synchronously. Blocks until the user quits."""

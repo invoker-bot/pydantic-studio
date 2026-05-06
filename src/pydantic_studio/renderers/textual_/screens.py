@@ -27,6 +27,11 @@ class EditorScreen(Screen):
         ("ctrl+y", "redo", "Redo"),
     ]
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._last_save_snapshot_count: int = 0
+        self._quit_confirm_active: bool = False
+
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
@@ -36,7 +41,36 @@ class EditorScreen(Screen):
         yield Footer()
 
     def action_quit(self) -> None:
-        self.app.exit()
+        """Quit. If dirty, show a confirm prompt; otherwise exit immediately.
+
+        First Ctrl+Q on dirty tree → set _quit_confirm_active + notify.
+        Second Ctrl+Q within the window → exit unconditionally.
+        Esc → cancel the prompt (handled in on_key).
+        """
+        if getattr(self, "_quit_confirm_active", False):
+            # Confirm-discard.
+            self.app.exit()
+            return
+        is_dirty = (
+            len(self.app.tree.snapshots)
+            > getattr(self, "_last_save_snapshot_count", 0)
+        )
+        if not is_dirty:
+            self.app.exit()
+            return
+        self._quit_confirm_active = True
+        self.notify(
+            "Unsaved changes! Press Ctrl+Q again to discard, Esc to cancel.",
+            severity="warning",
+            timeout=10,
+        )
+
+    def on_key(self, event) -> None:
+        if (
+            getattr(self, "_quit_confirm_active", False)
+            and event.key == "escape"
+        ):
+            self._quit_confirm_active = False
 
     def action_save(self) -> None:
         """Persist the tree to save_path. No-op if save_path is None."""
@@ -49,6 +83,7 @@ class EditorScreen(Screen):
 
             save_yaml(self.app.tree, save_path)
             self.notify(f"Saved to {save_path}", severity="information")
+            self._last_save_snapshot_count = len(self.app.tree.snapshots)
         except Exception as e:
             self.notify(f"Save failed: {e}", severity="error", timeout=8)
 
