@@ -48,7 +48,7 @@ def _is_uuid_type(type_: Any) -> bool:
     from uuid import UUID
 
     unwrapped = strip_annotated(type_)
-    return unwrapped is UUID
+    return isinstance(unwrapped, type) and issubclass(unwrapped, UUID)
 
 
 class UuidBuilder:
@@ -71,15 +71,24 @@ class UuidBuilder:
 
 
 def _secret_kind(type_: Any) -> str | None:
-    """Detect SecretStr / SecretBytes; return ``"str"``, ``"bytes"``, or None."""
-    unwrapped = strip_annotated(type_)
-    name = getattr(unwrapped, "__name__", "")
-    module = getattr(unwrapped, "__module__", "")
-    if not module.startswith("pydantic"):
+    """Detect ``SecretStr`` / ``SecretBytes`` (or subclasses thereof); return
+    ``"str"``, ``"bytes"``, or ``None`` for other types.
+
+    Subclass detection honours Pydantic's hierarchy — ``class
+    TokenSecret(SecretStr): pass`` is the recommended way to declare a
+    domain-specific masked credential type, and the parent's core_schema
+    is inherited.
+    """
+    try:
+        from pydantic import SecretBytes, SecretStr
+    except ImportError:  # pragma: no cover — pydantic is a hard dep
         return None
-    if name == "SecretStr":
+    unwrapped = strip_annotated(type_)
+    if not isinstance(unwrapped, type):
+        return None
+    if issubclass(unwrapped, SecretStr):
         return "str"
-    if name == "SecretBytes":
+    if issubclass(unwrapped, SecretBytes):
         return "bytes"
     return None
 
@@ -150,10 +159,11 @@ class PatternBuilder:
 
 
 class BytesBuilder:
-    """Matches plain ``bytes``."""
+    """Matches ``bytes`` and any subclass of it."""
 
     def matches(self, type_: type) -> bool:
-        return strip_annotated(type_) is bytes
+        unwrapped = strip_annotated(type_)
+        return isinstance(unwrapped, type) and issubclass(unwrapped, bytes)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
         from pydantic_studio.tree.nodes import BytesNode as _BytesNode

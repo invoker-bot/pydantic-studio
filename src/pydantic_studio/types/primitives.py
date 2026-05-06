@@ -12,6 +12,7 @@ from pydantic_studio.tree.nodes import (
     IntNode,
     StringNode,
 )
+from pydantic_studio.types.annotated import strip_annotated
 from pydantic_studio.types.metadata import extract_constraints
 from pydantic_studio.types.utils import field_default
 
@@ -19,11 +20,21 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
 
+def _is_subclass_of(type_: Any, target: type) -> bool:
+    """``True`` when ``type_`` (after Annotated-stripping) is a class
+    derived from ``target``. The ``isinstance(..., type)`` guard rejects
+    typing special forms (``Any``, ``Literal[...]``, ``Union[...]``)
+    that would crash ``issubclass``.
+    """
+    unwrapped = strip_annotated(type_)
+    return isinstance(unwrapped, type) and issubclass(unwrapped, target)
+
+
 class StringBuilder:
-    """Builds a StringNode for bare ``str`` fields."""
+    """Builds a StringNode for ``str`` and any subclass of it."""
 
     def matches(self, type_: type) -> bool:
-        return type_ is str
+        return _is_subclass_of(type_, str)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> StringNode:
         c = extract_constraints(field_info)
@@ -40,11 +51,12 @@ class StringBuilder:
 
 
 class IntBuilder:
-    """Builds an IntNode for bare ``int`` fields (excluding ``bool``)."""
+    """Builds an IntNode for ``int`` (and subclasses, excluding ``bool``)."""
 
     def matches(self, type_: type) -> bool:
-        # Exclude bool, which is a subclass of int in Python.
-        return type_ is int
+        # ``bool`` is a subclass of ``int`` in Python — exclude it so
+        # bare bool fields land in BoolBuilder.
+        return _is_subclass_of(type_, int) and not _is_subclass_of(type_, bool)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> IntNode:
         c = extract_constraints(field_info)
@@ -63,10 +75,10 @@ class IntBuilder:
 
 
 class FloatBuilder:
-    """Builds a FloatNode for bare ``float`` fields."""
+    """Builds a FloatNode for ``float`` and any subclass of it."""
 
     def matches(self, type_: type) -> bool:
-        return type_ is float
+        return _is_subclass_of(type_, float)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> FloatNode:
         c = extract_constraints(field_info)
@@ -85,10 +97,11 @@ class FloatBuilder:
 
 
 class BoolBuilder:
-    """Builds a BoolNode for bare ``bool`` fields."""
+    """Builds a BoolNode for ``bool`` (subclassing ``bool`` is not
+    allowed in Python so ``issubclass`` collapses to identity)."""
 
     def matches(self, type_: type) -> bool:
-        return type_ is bool
+        return _is_subclass_of(type_, bool)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> BoolNode:
         return BoolNode(
@@ -101,10 +114,10 @@ class BoolBuilder:
 
 
 class DecimalBuilder:
-    """Builds a DecimalNode for bare ``Decimal`` fields."""
+    """Builds a DecimalNode for ``Decimal`` and any subclass of it."""
 
     def matches(self, type_: type) -> bool:
-        return type_ is Decimal
+        return _is_subclass_of(type_, Decimal)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> DecimalNode:
         c = extract_constraints(field_info)

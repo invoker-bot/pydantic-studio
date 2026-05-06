@@ -19,11 +19,20 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
 
+def _is_subclass_of(type_: Any, target: type) -> bool:
+    """``True`` when ``type_`` (after Annotated-stripping) is a class
+    derived from ``target``. The ``isinstance(..., type)`` guard rejects
+    typing special forms that would crash ``issubclass``.
+    """
+    unwrapped = strip_annotated(type_)
+    return isinstance(unwrapped, type) and issubclass(unwrapped, target)
+
+
 class DatetimeBuilder:
-    """Matches ``datetime.datetime`` annotations."""
+    """Matches ``datetime.datetime`` and subclasses."""
 
     def matches(self, type_: type) -> bool:
-        return strip_annotated(type_) is datetime
+        return _is_subclass_of(type_, datetime)
 
     def build(
         self, type_: type, field_info: FieldInfo, existing: Any
@@ -39,15 +48,15 @@ class DatetimeBuilder:
 
 
 class DateBuilder:
-    """Matches ``datetime.date`` annotations.
+    """Matches ``datetime.date`` and subclasses, but *not* ``datetime``.
 
-    Note: this must come *after* DatetimeBuilder in the registry's match
-    order if we ever check `issubclass(t, date)` — but ``strip_annotated(t)
-    is date`` is identity-based, so order doesn't matter here.
+    ``datetime`` IS-A ``date`` in the stdlib, so the subclass-aware
+    matcher would otherwise grab plain ``datetime`` fields away from
+    DatetimeBuilder. Mirrors the ``bool ⊆ int`` exclusion in IntBuilder.
     """
 
     def matches(self, type_: type) -> bool:
-        return strip_annotated(type_) is date
+        return _is_subclass_of(type_, date) and not _is_subclass_of(type_, datetime)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> DateNode:
         default = field_default(field_info)
@@ -61,10 +70,10 @@ class DateBuilder:
 
 
 class TimeBuilder:
-    """Matches ``datetime.time`` annotations."""
+    """Matches ``datetime.time`` and subclasses."""
 
     def matches(self, type_: type) -> bool:
-        return strip_annotated(type_) is time
+        return _is_subclass_of(type_, time)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> TimeNode:
         default = field_default(field_info)
@@ -78,10 +87,10 @@ class TimeBuilder:
 
 
 class TimedeltaBuilder:
-    """Matches ``datetime.timedelta`` annotations."""
+    """Matches ``datetime.timedelta`` and subclasses."""
 
     def matches(self, type_: type) -> bool:
-        return strip_annotated(type_) is timedelta
+        return _is_subclass_of(type_, timedelta)
 
     def build(
         self, type_: type, field_info: FieldInfo, existing: Any

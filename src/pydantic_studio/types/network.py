@@ -29,17 +29,19 @@ def _coerce_existing_to_str(existing: Any) -> str | None:
 
 
 class IpAddressBuilder:
-    """Matches ``ipaddress.IPv4Address`` and ``ipaddress.IPv6Address``."""
+    """Matches ``IPv4Address`` / ``IPv6Address`` and any subclass of either."""
 
     def matches(self, type_: type) -> bool:
         unwrapped = strip_annotated(type_)
-        return unwrapped is IPv4Address or unwrapped is IPv6Address
+        if not isinstance(unwrapped, type):
+            return False
+        return issubclass(unwrapped, IPv4Address) or issubclass(unwrapped, IPv6Address)
 
     def build(
         self, type_: type, field_info: FieldInfo, existing: Any
     ) -> IpAddressNode:
         unwrapped = strip_annotated(type_)
-        version: Literal[4, 6] = 4 if unwrapped is IPv4Address else 6
+        version: Literal[4, 6] = 4 if issubclass(unwrapped, IPv4Address) else 6
         default = _coerce_existing_to_str(field_default(field_info))
         return IpAddressNode(
             name=field_info.alias or "<unnamed>",
@@ -52,17 +54,19 @@ class IpAddressBuilder:
 
 
 class IpNetworkBuilder:
-    """Matches ``ipaddress.IPv4Network`` and ``ipaddress.IPv6Network``."""
+    """Matches ``IPv4Network`` / ``IPv6Network`` and any subclass of either."""
 
     def matches(self, type_: type) -> bool:
         unwrapped = strip_annotated(type_)
-        return unwrapped is IPv4Network or unwrapped is IPv6Network
+        if not isinstance(unwrapped, type):
+            return False
+        return issubclass(unwrapped, IPv4Network) or issubclass(unwrapped, IPv6Network)
 
     def build(
         self, type_: type, field_info: FieldInfo, existing: Any
     ) -> IpNetworkNode:
         unwrapped = strip_annotated(type_)
-        version: Literal[4, 6] = 4 if unwrapped is IPv4Network else 6
+        version: Literal[4, 6] = 4 if issubclass(unwrapped, IPv4Network) else 6
         default = _coerce_existing_to_str(field_default(field_info))
         return IpNetworkNode(
             name=field_info.alias or "<unnamed>",
@@ -75,24 +79,20 @@ class IpNetworkBuilder:
 
 
 def _is_pydantic_url_type(type_: Any) -> bool:
-    """Detect Pydantic's URL types.
+    """Detect Pydantic's URL family — ``AnyUrl`` and any subclass.
 
-    Pydantic v2 URL classes (``AnyUrl``, ``HttpUrl``, ``FileUrl``, etc.) are
-    plain Python classes whose ``__module__`` is ``pydantic.networks`` and
-    whose name ends with ``"Url"``.  We check the unwrapped type (after
-    stripping any ``Annotated`` wrapper) and its ``get_origin`` fallback to
-    handle both direct references and any future ``Annotated`` variants.
+    Pydantic v2's URL hierarchy (``AnyUrl``, ``AnyHttpUrl``, ``HttpUrl``,
+    ``FileUrl``, ``WebsocketUrl``, ...) all derive from ``AnyUrl``. User
+    domain types (``class HttpsUrl(AnyUrl): pass``) inherit the same
+    ``core_schema``, so an ``issubclass(_, AnyUrl)`` check honours
+    Pydantic's canonical hierarchy and accepts user subclasses defined
+    outside the ``pydantic.*`` module tree.
     """
+    from pydantic import AnyUrl
+
     unwrapped = strip_annotated(type_)
-    # If strip_annotated left an Annotated alias (nested), resolve one more level.
     candidate = get_origin(unwrapped) or unwrapped
-    if not isinstance(candidate, type):
-        return False
-    module = getattr(candidate, "__module__", "")
-    if not (module == "pydantic" or module.startswith("pydantic.")):
-        return False
-    name = getattr(candidate, "__name__", "")
-    return name == "Url" or name.endswith("Url")
+    return isinstance(candidate, type) and issubclass(candidate, AnyUrl)
 
 
 class UrlBuilder:
