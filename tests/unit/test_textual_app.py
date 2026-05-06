@@ -119,3 +119,48 @@ async def test_editor_pane_mounts_one_input_per_field() -> None:
         # Server has name (str), port (int), debug (bool).
         # Bool gets a stub Static -> 2 Input widgets (name, port).
         assert len(inputs) == 2
+
+
+@pytest.mark.asyncio
+async def test_save_writes_yaml(tmp_path) -> None:
+    """Ctrl+S persists the tree to save_path via save_yaml."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    out = tmp_path / "out.yaml"
+    tree = build_form_tree(Server)
+    app = StudioApp(tree=tree, save_path=out)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+s")
+        await pilot.pause()
+    # File should exist with the schema's defaults.
+    assert out.exists()
+    content = out.read_text(encoding="utf-8")
+    assert "name:" in content
+    assert "port:" in content
+
+
+@pytest.mark.asyncio
+async def test_undo_reverts_last_mutation(tmp_path) -> None:
+    """Ctrl+Z calls tree.undo() and refreshes the preview."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    tree = build_form_tree(Server)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        # Mutate via direct API (simpler than driving through widgets).
+        tree.set_value("port", 9999)
+        port_node = tree.root.find("port")
+        assert port_node is not None
+        assert port_node.value == 9999
+        # Trigger undo.
+        await pilot.press("ctrl+z")
+        await pilot.pause()
+        # Tree restored.
+        port_node_after = tree.root.find("port")
+        assert port_node_after is not None
+        # The default for Server.port is 8080.
+        assert port_node_after.value == 8080

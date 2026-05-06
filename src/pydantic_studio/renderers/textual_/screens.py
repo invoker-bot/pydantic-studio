@@ -22,6 +22,9 @@ class EditorScreen(Screen):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         ("ctrl+q", "quit", "Quit"),
+        ("ctrl+s", "save", "Save"),
+        ("ctrl+z", "undo", "Undo"),
+        ("ctrl+y", "redo", "Redo"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -34,6 +37,43 @@ class EditorScreen(Screen):
 
     def action_quit(self) -> None:
         self.app.exit()
+
+    def action_save(self) -> None:
+        """Persist the tree to save_path. No-op if save_path is None."""
+        save_path = self.app.save_path
+        if save_path is None:
+            self.notify("Read-only mode (no save path)", severity="warning")
+            return
+        try:
+            from pydantic_studio import save_yaml
+
+            save_yaml(self.app.tree, save_path)
+            self.notify(f"Saved to {save_path}", severity="information")
+        except Exception as e:
+            self.notify(f"Save failed: {e}", severity="error", timeout=8)
+
+    def action_undo(self) -> None:
+        if self.app.tree.undo():
+            self._reload_editor_pane()
+            self.refresh_preview()
+
+    def action_redo(self) -> None:
+        if self.app.tree.redo():
+            self._reload_editor_pane()
+            self.refresh_preview()
+
+    def _reload_editor_pane(self) -> None:
+        """After undo/redo the FormTree was rehydrated from a snapshot —
+        re-mount the editor pane so its widgets reflect the new state."""
+        try:
+            editor = self.query_one(EditorPane)
+        except Exception:
+            return
+        # Re-resolve the focused group at the same path.
+        path = getattr(editor, "_current_group_path", "")
+        group = self._resolve_group(path)
+        if group is not None:
+            editor.set_group(group, path)
 
     def refresh_preview(self) -> None:
         """Called by NodeEditor.commit() after a successful set_value."""
