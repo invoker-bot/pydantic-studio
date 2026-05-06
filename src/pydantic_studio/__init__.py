@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 from pydantic_studio.exceptions import (
     CancelledByUser,
@@ -16,6 +16,7 @@ from pydantic_studio.io import (
     load_toml,
     load_yaml,
     save_config,
+    save_draft_yaml,
     save_json,
     save_toml,
     save_yaml,
@@ -28,6 +29,13 @@ from pydantic_studio.tree.builder import (
     build_form_tree,
     default_registry,
     reset_default_registry,
+)
+from pydantic_studio.tree.draft import (
+    delete_draft,
+    draft_newer_than,
+    find_draft,
+    load_draft,
+    save_draft,
 )
 from pydantic_studio.tree.nodes import (
     BoolNode,
@@ -107,7 +115,11 @@ __all__ = [
     "ValidationResult",
     "__version__",
     "build_form_tree",
+    "delete_draft",
+    "draft_newer_than",
+    "find_draft",
     "load_config",
+    "load_draft",
     "load_json",
     "load_toml",
     "load_yaml",
@@ -116,6 +128,8 @@ __all__ = [
     "run_app",
     "run_html_app",
     "save_config",
+    "save_draft",
+    "save_draft_yaml",
     "save_json",
     "save_toml",
     "save_yaml",

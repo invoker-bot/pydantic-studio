@@ -265,6 +265,38 @@ Or call format-specific helpers directly: `load_toml`/`save_toml`, `load_json`/`
 | TOML  | tomllib (stdlib) | tomlkit | description comments only (Phase 7); v0.0.8 polishes user-comment preservation |
 | JSON  | stdlib json | model_dump_json(indent=2) | n/a (JSON has no comments) |
 
+## Polish (v0.0.8)
+
+### Draft persistence
+
+```python
+from pydantic_studio import save_draft, load_draft, delete_draft, find_draft
+
+save_draft(tree, ".pydantic-studio.draft.json")
+existing = find_draft(".")
+if existing:
+    tree = load_draft(existing, MyConfig)
+delete_draft(existing)
+```
+
+### Partial-tree YAML save
+
+```python
+from pydantic_studio import save_draft_yaml
+save_draft_yaml(tree, "draft.yaml")  # works even if to_instance() would raise
+```
+
+### HTML heartbeat timeout
+
+```python
+from pydantic_studio import run_html_app
+run_html_app(tree, "config.yaml", heartbeat_timeout_seconds=60)  # default 30s
+```
+
+### TUI quit confirmation
+
+`Ctrl+Q` on a dirty tree warns before exiting. Press `Ctrl+Q` again to confirm-discard, or `Esc` to cancel.
+
 ## License
 
 MIT
