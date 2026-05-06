@@ -1,0 +1,82 @@
+# Architecture
+
+pydantic-studio has three layers, in dependency order from the bottom up:
+
+## Form tree — the canonical state
+
+The `FormTree` is a Pydantic v2 hierarchy mirroring the user's schema.
+Every field is a `FormNode` subclass (24 of them total): `StringNode`,
+`IntNode`, `EnumNode`, `SequenceNode`, `MappingNode`, `UnionNode`,
+`GroupNode`, etc. The discriminator is the `kind` field; nested nodes
+form a tree rooted at a `GroupNode`.
+
+**The tree is the single source of truth.** Renderers translate user
+intent into mutations (`tree.set_value("path.to.field", value)`) and
+translate tree state into pixels — they own no canonical state.
+
+Mutations follow a **validate-first contract**: `set_value()` runs the
+node's `validate_value()` first; on failure, no mutation occurs and the
+returned `ValidationResult.fail(errors)` reports the issue. On success,
+a snapshot is pushed to the undo ring before the mutation.
+
+## I/O — format-aware load/save
+
+YAML round-trip (`load_yaml` / `save_yaml`) uses `ruamel.yaml.YAML(typ='rt')`
+to preserve user-edited comments. New keys get description comments from
+`Field(description=...)`. Smart writer rules in spec §10.1 — schema-order
+field emission, drop-deleted-fields, etc.
+
+TOML round-trip uses stdlib `tomllib` (read) + `tomlkit` (write). JSON
+uses stdlib `json` + `model_dump_json(indent=2)`. The
+`load_config`/`save_config` dispatchers pick the right format based on
+file extension.
+
+## Renderers — frontends
+
+Three first-class renderers share the same FormTree mutation API:
+
+- **Textual TUI** (`pydantic_studio.renderers.textual_`) — `StudioApp` +
+  `EditorScreen` + per-node-kind widgets. Tested via `App.run_test()`
+  and `Pilot`.
+- **HTML browser** (`pydantic_studio.renderers.html`) — FastAPI server
+  + Jinja2 templates + HTMX-driven swaps. Heartbeat polling detects
+  abandoned tabs.
+- **CLI shorthand** (`pydantic_studio.cli`) — `fill`, `run`, `check`,
+  `edit`, `show`, `version`. Uses typer.
+
+Adding a 4th renderer (e.g., a Tk desktop app) means implementing one
+new module under `renderers/`. The tree stays untouched.
+
+## Cross-frontend identity
+
+A **path** identifies any node in the tree (e.g.,
+`database.replicas[2].host`). Both renderers send the same path strings;
+the tree's `set_value` and friends resolve them. A draft saved from web
+can be resumed in TUI, and vice versa, because the persisted format is
+the FormTree's own JSON dump.
+
+## Type registry
+
+Each Pydantic type is built into the tree by a `NodeBuilder`. The
+default registry knows 26 builders (one per type family — primitive,
+choice, sequence, mapping, union, datetime, network, special). Users
+can extend via `register_builder(MyCustomBuilder())` to support types
+the default registry doesn't recognize.
+
+## Snapshots + draft persistence
+
+Every mutation pushes a snapshot (`tree.model_dump_json()` bytes) to a
+bounded ring buffer. `tree.undo()` / `tree.redo()` restore from
+snapshots.
+
+The `tree.draft` module persists the full tree to
+`<cwd>/.pydantic-studio.draft.json` for crash recovery. On startup, CLI
+commands check for a newer draft via `find_draft()` +
+`draft_newer_than()` and prompt to resume.
+
+## Validation
+
+Field-level validation runs on every mutation via
+`FormNode.validate_value()`. Cross-field validation (Pydantic
+`@model_validator`) runs only at submit time via `tree.to_instance()`,
+so users can stage incomplete state without errors.
