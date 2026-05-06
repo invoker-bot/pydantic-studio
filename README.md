@@ -167,6 +167,45 @@ When generating YAML:
 3. User comments on existing fields are preserved verbatim.
 4. Fields removed from the schema are dropped silently (this becomes a stderr warning in a later release).
 
+## Textual TUI (v0.0.5)
+
+Pydantic Studio now ships a Textual-based terminal UI:
+
+```bash
+$ uv run pydantic-studio edit mypkg.config:AppSettings config.yaml
+```
+
+The TUI shows three regions:
+
+- **Sidebar** (left): tree of nested groups. Click a group to focus its fields in the editor.
+- **Editor** (center): scrollable widgets for each field. TextInput for scalars, Checkbox for bools, Select for Enum/Literal, expandable rows for sequences and mappings, variant picker for unions.
+- **Preview** (right): live YAML render — updates after every successful mutation.
+
+### Key bindings
+
+- `Ctrl+S` — save (writes via `save_yaml`; refuses if the tree fails validation)
+- `Ctrl+Z` / `Ctrl+Y` — undo / redo
+- `Ctrl+Q` — quit (no prompt yet — Plan 6 polish)
+
+### What's not in v0.0.5
+
+- HTML renderer (Plan 6)
+- TOML / JSON I/O (Plan 7)
+- Light theme + custom theme.css (Plan 8 polish)
+- `save_draft_yaml` for partial-tree saves (Plan 6)
+- Status-bar widget for error display (currently surfaces via `notify()` toasts)
+- Per-Sequence drag-to-reorder (Plan 6)
+
+### Programmatic usage
+
+```python
+from pydantic_studio import build_form_tree, StudioApp
+
+tree = build_form_tree(MyConfig)
+app = StudioApp(tree=tree, save_path="config.yaml")
+app.run()  # blocks until the user quits
+```
+
 ## License
 
 MIT
