@@ -1,11 +1,19 @@
-"""Format I/O for pydantic-studio.
-
-Currently exports ``load_yaml`` and ``save_yaml`` (Plan 4). TOML and JSON
-writers join in Plan 6.
-"""
+"""Format I/O for pydantic-studio."""
 
 from __future__ import annotations
 
+from pydantic_studio.io.dispatch import load_config, save_config
+from pydantic_studio.io.json_ import load_json, save_json
+from pydantic_studio.io.toml import load_toml, save_toml
 from pydantic_studio.io.yaml import load_yaml, save_yaml
 
-__all__ = ["load_yaml", "save_yaml"]
+__all__ = [
+    "load_config",
+    "load_json",
+    "load_toml",
+    "load_yaml",
+    "save_config",
+    "save_json",
+    "save_toml",
+    "save_yaml",
+]
