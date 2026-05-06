@@ -115,6 +115,57 @@ async def _read_form_value(request: Request, key: str = "value") -> str:
     return values[0] if values else ""
 
 
+async def _read_form_field(request: Request, field: str) -> str:
+    """Read a single form field from urlencoded body — avoids python-multipart."""
+    body = await request.body()
+    parsed = parse_qs(body.decode("utf-8"))
+    values = parsed.get(field, [""])
+    return values[0] if values else ""
+
+
+def _render_seq_partial(server: StudioServer, path: str) -> HTMLResponse:
+    """Re-render <div id="seq-{path}"> after add/remove."""
+    node = _resolve_node(server, path)
+    if node is None:
+        return HTMLResponse(content="<pre>not found</pre>")
+    parts = [f'<div id="seq-{path}">']
+    parts.append(
+        f'<button hx-post="/seq/{path}/add" '
+        f'hx-target="#seq-{path}" hx-swap="outerHTML">+ Add</button>'
+    )
+    for i in range(len(node.items)):
+        parts.append(
+            f'<div class="seq-row">'
+            f"<span>[{i}] {node.items[i].kind}</span>"
+            f'<button hx-post="/seq/{path}/remove?index={i}" '
+            f'hx-target="#seq-{path}" hx-swap="outerHTML">remove</button>'
+            "</div>"
+        )
+    parts.append("</div>")
+    return HTMLResponse(content="".join(parts))
+
+
+def _render_map_partial(server: StudioServer, path: str) -> HTMLResponse:
+    node = _resolve_node(server, path)
+    if node is None:
+        return HTMLResponse(content="<pre>not found</pre>")
+    parts = [f'<div id="map-{path}">']
+    parts.append(
+        f'<button hx-post="/map/{path}/add" '
+        f'hx-target="#map-{path}" hx-swap="outerHTML">+ Add Entry</button>'
+    )
+    for i, (k_node, v_node) in enumerate(node.entries):
+        parts.append(
+            f'<div class="map-row">'
+            f"<span>{k_node.value} → {v_node.value}</span>"
+            f'<button hx-post="/map/{path}/remove?index={i}" '
+            f'hx-target="#map-{path}" hx-swap="outerHTML">remove</button>'
+            "</div>"
+        )
+    parts.append("</div>")
+    return HTMLResponse(content="".join(parts))
+
+
 def register(app: FastAPI, server: StudioServer) -> None:
     """Wire all routes onto the FastAPI app."""
 
@@ -159,4 +210,48 @@ def register(app: FastAPI, server: StudioServer) -> None:
         # so the user sees current state (errors should be surfaced via OOB
         # swap or status bar in a future polish pass).
         server.tree.set_value(path, parsed_value)
+        return HTMLResponse(content=render_yaml_preview(server.tree))
+
+    @app.post("/seq/{path:path}/add", response_class=HTMLResponse)
+    async def seq_add(path: str) -> HTMLResponse:
+        server.tree.add_item(path)
+        return _render_seq_partial(server, path)
+
+    @app.post("/seq/{path:path}/remove", response_class=HTMLResponse)
+    async def seq_remove(path: str, index: int = 0) -> HTMLResponse:
+        server.tree.remove_item(path, index)
+        return _render_seq_partial(server, path)
+
+    @app.post("/map/{path:path}/add", response_class=HTMLResponse)
+    async def map_add(path: str) -> HTMLResponse:
+        node = _resolve_node(server, path)
+        if node is None:
+            return HTMLResponse(content="<pre>field not found</pre>", status_code=404)
+        existing_keys = {
+            getattr(k_node, "value", "") for k_node, _ in node.entries
+        }
+        i = 0
+        while f"key{i}" in existing_keys:
+            i += 1
+        server.tree.add_entry(path, key=f"key{i}")
+        return _render_map_partial(server, path)
+
+    @app.post("/map/{path:path}/remove", response_class=HTMLResponse)
+    async def map_remove(path: str, index: int = 0) -> HTMLResponse:
+        server.tree.remove_entry(path, index)
+        return _render_map_partial(server, path)
+
+    @app.post("/union/{path:path}/select", response_class=HTMLResponse)
+    async def union_select(path: str, request: Request) -> HTMLResponse:
+        from pydantic_studio.renderers.html.render import render_yaml_preview
+
+        # Read variant from form body using the same urlencoded helper as /field.
+        variant = await _read_form_field(request, "variant")
+        node = _resolve_node(server, path)
+        if node is None:
+            return HTMLResponse(content="<pre>field not found</pre>", status_code=404)
+        for i, name in enumerate(node.variant_type_names):
+            if name == variant:
+                server.tree.select_variant(path, i)
+                break
         return HTMLResponse(content=render_yaml_preview(server.tree))

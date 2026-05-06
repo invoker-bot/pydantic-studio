@@ -93,3 +93,58 @@ class TestFieldRoute:
         # (default-seeding was removed in T1 housekeeping). Either is fine —
         # what matters is that the failed parse didn't poison the value.
         assert node.value != 99999
+
+
+class TestSeqRoute:
+    def test_seq_add(self) -> None:
+        from pydantic import BaseModel
+
+        from pydantic_studio.renderers.html import StudioServer
+
+        class M(BaseModel):
+            tags: list[str] = []
+
+        tree = build_form_tree(M)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.post("/seq/tags/add")
+        assert response.status_code == 200
+        node = tree.root.find("tags")
+        assert node is not None
+        assert len(node.items) == 1
+
+    def test_seq_remove(self) -> None:
+        from pydantic import BaseModel
+
+        from pydantic_studio.renderers.html import StudioServer
+
+        class M(BaseModel):
+            tags: list[str] = []
+
+        tree = build_form_tree(M, existing={"tags": ["a", "b", "c"]})
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.post("/seq/tags/remove?index=1")
+        assert response.status_code == 200
+        node = tree.root.find("tags")
+        assert node is not None
+        assert len(node.items) == 2
+
+
+class TestMapRoute:
+    def test_map_add(self) -> None:
+        from pydantic import BaseModel
+
+        from pydantic_studio.renderers.html import StudioServer
+
+        class M(BaseModel):
+            settings: dict[str, int] = {}
+
+        tree = build_form_tree(M)
+        studio_server = StudioServer(tree=tree, save_path=None)
+        client = TestClient(studio_server.app)
+        response = client.post("/map/settings/add")
+        assert response.status_code == 200
+        node = tree.root.find("settings")
+        assert node is not None
+        assert len(node.entries) == 1
