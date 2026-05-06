@@ -186,3 +186,37 @@ class TestSubmitCancel:
         client = TestClient(studio_server.app)
         response = client.get("/heartbeat")
         assert response.status_code == 200
+
+
+def test_heartbeat_timeout_marks_cancelled() -> None:
+    """If too much time passes since the last heartbeat, server marks cancelled."""
+    import time
+
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(
+        tree=tree,
+        save_path=None,
+        heartbeat_timeout_seconds=0.1,
+    )
+    studio_server.last_heartbeat_ts = time.time()
+    time.sleep(0.15)
+    studio_server._check_heartbeat_timeout()
+    assert studio_server.cancelled is True
+
+
+def test_heartbeat_recent_does_not_cancel() -> None:
+    import time
+
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(
+        tree=tree,
+        save_path=None,
+        heartbeat_timeout_seconds=10.0,
+    )
+    studio_server.last_heartbeat_ts = time.time()
+    studio_server._check_heartbeat_timeout()
+    assert studio_server.cancelled is False
