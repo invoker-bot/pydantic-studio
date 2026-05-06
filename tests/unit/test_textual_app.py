@@ -87,3 +87,17 @@ def _read_log_lines(widget) -> list[str]:
     if hasattr(widget, "lines"):
         return [str(line) for line in widget.lines]
     return []
+
+
+@pytest.mark.asyncio
+async def test_editor_pane_mounts() -> None:
+    """The editor pane mounts; concrete child editors land in T6+."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    tree = build_form_tree(Server)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        editor = app.screen.query_one("#editor")
+        assert editor is not None
