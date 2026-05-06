@@ -8,6 +8,8 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
+from pydantic_studio.renderers.textual_.widgets.sidebar import Sidebar
+
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
@@ -27,7 +29,7 @@ class EditorScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
-            yield Static("[sidebar]", id="sidebar-placeholder")
+            yield Sidebar(self.app.tree)
             yield Static("[editor]", id="editor-placeholder")
             yield Static("[preview]", id="preview-placeholder")
         yield Footer()

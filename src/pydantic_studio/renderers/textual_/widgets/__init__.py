@@ -1,6 +1,7 @@
-"""Textual widgets for pydantic-studio.
+"""Textual widgets for pydantic-studio."""
 
-Re-exports concrete widget classes used elsewhere. Each widget is in a
-focused module (sidebar.py, preview.py, editor.py, scalars.py,
-containers.py).
-"""
+from __future__ import annotations
+
+from pydantic_studio.renderers.textual_.widgets.sidebar import Sidebar
+
+__all__ = ["Sidebar"]
