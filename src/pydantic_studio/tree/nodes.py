@@ -460,6 +460,39 @@ class UrlNode(FormNode):
         return self._adapter().validate_python(self.value)
 
 
+class EmailNode(FormNode):
+    """Holds an email address as a string, validated via Pydantic's
+    ``EmailStr`` (which depends on ``email-validator``).
+    """
+
+    kind: Literal["email"] = "email"
+    value: str | None = None
+    default: str | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected str email, got {type(value).__name__}",)
+        # Lazy import: email-validator is an optional dep; if missing, fall
+        # back to a permissive '@'-presence check so EmailNode still works
+        # in environments that haven't installed the extra.
+        try:
+            from email_validator import EmailNotValidError, validate_email
+        except ImportError:
+            if "@" not in value or value.startswith("@") or value.endswith("@"):
+                return (f"invalid email: {value!r}",)
+            return ()
+        try:
+            validate_email(value, check_deliverability=False)
+        except EmailNotValidError as e:
+            return (str(e),)
+        return ()
+
+    def to_python(self) -> str | None:
+        return self.value
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -777,6 +810,7 @@ AnyNode = Annotated[
     | IpAddressNode
     | IpNetworkNode
     | UrlNode
+    | EmailNode
     | EnumNode
     | LiteralNode
     | SequenceNode

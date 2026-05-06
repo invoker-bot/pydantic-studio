@@ -9,9 +9,9 @@ from ipaddress import (
     IPv6Network,
 )
 
-from pydantic import AnyHttpUrl, AnyUrl, BaseModel, FileUrl, HttpUrl
+from pydantic import AnyHttpUrl, AnyUrl, BaseModel, EmailStr, FileUrl, HttpUrl
 
-from pydantic_studio import IpAddressNode, IpNetworkNode, UrlNode, build_form_tree
+from pydantic_studio import EmailNode, IpAddressNode, IpNetworkNode, UrlNode, build_form_tree
 
 
 class WithIp(BaseModel):
@@ -204,3 +204,57 @@ class TestUrlNode:
         assert result.ok
         instance = tree.to_instance()
         assert "newapi.example.com" in str(instance.api)
+
+
+class WithEmail(BaseModel):
+    contact: EmailStr = "ops@example.com"
+    fallback: EmailStr | None = None
+
+
+class TestEmailNode:
+    def test_build_uses_email_node(self) -> None:
+        tree = build_form_tree(WithEmail)
+        contact = tree.root.find("contact")
+        assert isinstance(contact, EmailNode)
+        assert contact.value == "ops@example.com"
+
+    def test_validate_accepts_well_formed_email(self) -> None:
+        node = EmailNode(name="x", value=None)
+        assert node.validate_value("user@example.com") == ()
+
+    def test_validate_rejects_no_at_sign(self) -> None:
+        node = EmailNode(name="x", value=None)
+        errors = node.validate_value("not-an-email")
+        assert errors
+
+    def test_validate_rejects_non_string(self) -> None:
+        node = EmailNode(name="x", value=None)
+        errors = node.validate_value(123)
+        assert errors
+        assert "expected str" in errors[0]
+
+    def test_required_none_fails(self) -> None:
+        node = EmailNode(name="x", required=True, value=None)
+        assert node.validate_value(None) == ("value is required",)
+
+    def test_optional_none_ok(self) -> None:
+        tree = build_form_tree(WithEmail)
+        fallback = tree.root.find("fallback")
+        assert isinstance(fallback, EmailNode)
+        assert fallback.required is False
+        assert fallback.value is None
+
+    def test_to_python_returns_string(self) -> None:
+        node = EmailNode(name="x", value="user@example.com")
+        assert node.to_python() == "user@example.com"
+
+    def test_snapshot_round_trip(self) -> None:
+        node = EmailNode(name="x", value="ops@example.com")
+        raw = node.model_dump_json()
+        restored = EmailNode.model_validate_json(raw)
+        assert restored.value == node.value
+
+    def test_to_instance_round_trip(self) -> None:
+        tree = build_form_tree(WithEmail)
+        instance = tree.to_instance()
+        assert instance.contact == "ops@example.com"

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal, get_origin
 
 from pydantic_core import PydanticUndefined
 
-from pydantic_studio.tree.nodes import IpAddressNode, IpNetworkNode, UrlNode
+from pydantic_studio.tree.nodes import EmailNode, IpAddressNode, IpNetworkNode, UrlNode
 from pydantic_studio.types.annotated import strip_annotated
 
 if TYPE_CHECKING:
@@ -121,4 +121,33 @@ class UrlBuilder:
             value=existing_str if existing_str is not None else default_str,
             default=default_str,
             target_type_name=target_type_name,
+        )
+
+
+def _is_email_str(type_: Any) -> bool:
+    """Detect ``pydantic.EmailStr`` regardless of how it was annotated.
+
+    EmailStr in Pydantic v2 is a plain class in ``pydantic.networks``; we
+    check the raw type directly (not via strip_annotated) so the name/module
+    check always hits the EmailStr class object itself.
+    """
+    name = getattr(type_, "__name__", "")
+    module = getattr(type_, "__module__", "")
+    return name == "EmailStr" and module.startswith("pydantic")
+
+
+class EmailBuilder:
+    """Matches ``pydantic.EmailStr``."""
+
+    def matches(self, type_: type) -> bool:
+        return _is_email_str(type_)
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
+        default = _default(field_info)
+        return EmailNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            value=existing if existing is not None else default,
+            default=default,
         )
