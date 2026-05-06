@@ -175,3 +175,47 @@ def fill(
     buf = io.StringIO()
     _yaml().dump(cm, buf)
     typer.echo(buf.getvalue(), nl=False)
+
+
+@app.command()
+def run(
+    target: str = typer.Argument(..., help="module:Class identifier."),
+    file: Path = typer.Argument(..., help="Path to a YAML config file."),  # noqa: B008
+) -> None:
+    """Load a YAML file, validate against the schema, print the model dump."""
+    from pydantic import ValidationError
+
+    from pydantic_studio import load_yaml
+    from pydantic_studio.exceptions import ValidationFailedError
+
+    schema = _load_schema(target)
+    try:
+        tree = load_yaml(file, schema)
+        instance = tree.to_instance()
+    except (ValidationError, ValidationFailedError) as e:
+        typer.secho(f"Validation failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+    typer.echo(repr(instance))
+
+
+@app.command()
+def check(
+    target: str = typer.Argument(..., help="module:Class identifier."),
+    file: Path = typer.Argument(..., help="Path to a YAML config file."),  # noqa: B008
+) -> None:
+    """Load a YAML file and validate it against the schema. Silent on success."""
+    from pydantic import ValidationError
+
+    from pydantic_studio import load_yaml
+    from pydantic_studio.exceptions import ValidationFailedError
+
+    schema = _load_schema(target)
+    try:
+        tree = load_yaml(file, schema)
+        tree.to_instance()
+    except (ValidationError, ValidationFailedError) as e:
+        typer.secho(f"{file}: validation failed", fg=typer.colors.RED, err=True)
+        for line in str(e).splitlines():
+            typer.echo(f"  {line}", err=True)
+        raise typer.Exit(code=1) from e
+    typer.echo(f"{file}: OK")

@@ -81,3 +81,70 @@ class TestFill:
     def test_fill_unknown_schema_errors(self) -> None:
         result = runner.invoke(app, ["fill", "nosuch:Foo"])
         assert result.exit_code != 0
+
+
+class TestRun:
+    def test_run_prints_validated_model(self, tmp_path) -> None:
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(
+            "name: prod\n"
+            "port: 8080\n"
+            "debug: true\n",
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["run", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+        assert result.exit_code == 0
+        # The model dump appears in stdout.
+        assert "name='prod'" in result.output or "name: prod" in result.output
+        assert "8080" in result.output
+        assert "debug=True" in result.output or "debug: true" in result.output.lower()
+
+    def test_run_validation_failure_exits_nonzero(self, tmp_path) -> None:
+        cfg = tmp_path / "bad.yaml"
+        cfg.write_text(
+            "name: prod\n"
+            "port: 99999\n"  # exceeds Server.port's le=65535
+            "debug: false\n",
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["run", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+        assert result.exit_code != 0
+        # Useful: surface the field that failed.
+        assert "port" in result.output.lower()
+
+
+class TestCheck:
+    def test_check_silent_on_valid(self, tmp_path) -> None:
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(
+            "name: prod\n"
+            "port: 8080\n",
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["check", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+        assert result.exit_code == 0
+        # Output should be brief — just an OK marker, not the full model.
+        # The exact text is up to the implementation; verify it's short.
+        assert len(result.output) < 200
+
+    def test_check_invalid_exits_nonzero(self, tmp_path) -> None:
+        cfg = tmp_path / "bad.yaml"
+        cfg.write_text(
+            "name: prod\n"
+            "port: -5\n",  # below Server.port's ge=1
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["check", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+        assert result.exit_code != 0
