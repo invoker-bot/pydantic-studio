@@ -88,7 +88,11 @@ def _walk(node: Any, parent: Tree) -> None:
             _walk(item, branch)
     elif isinstance(node, MappingNode):
         for k_node, v_node in node.entries:
-            entry_branch = branch.add(f"[cyan]entry[/cyan] :: {k_node.value!r}")
+            # MappingNode keys are always primitive nodes (StringNode/IntNode/etc.),
+            # which all have a `.value` attribute. The discriminated union doesn't
+            # narrow here, so suppress pyright with a getattr fallback.
+            key_repr = repr(getattr(k_node, "value", k_node.name))
+            entry_branch = branch.add(f"[cyan]entry[/cyan] :: {key_repr}")
             _walk(v_node, entry_branch)
     elif isinstance(node, UnionNode):
         if node.selected is not None:
