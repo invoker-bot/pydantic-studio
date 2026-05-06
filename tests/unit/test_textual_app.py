@@ -164,3 +164,29 @@ async def test_undo_reverts_last_mutation(tmp_path) -> None:
         assert port_node_after is not None
         # The default for Server.port is 8080.
         assert port_node_after.value == 8080
+
+
+@pytest.mark.asyncio
+async def test_smoke_edit_save_cycle(tmp_path) -> None:
+    """End-to-end: build tree, mutate via API, save via Ctrl+S, reload, verify."""
+    from pydantic_studio import (
+        StudioApp,
+        build_form_tree,
+        load_yaml,
+    )
+
+    out = tmp_path / "smoke.yaml"
+    tree = build_form_tree(Server)
+    tree.set_value("name", "smoke-test")
+    tree.set_value("port", 12345)
+    app = StudioApp(tree=tree, save_path=out)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+s")
+        await pilot.pause()
+
+    assert out.exists()
+    reloaded = load_yaml(out, Server)
+    instance = reloaded.to_instance()
+    assert instance.name == "smoke-test"
+    assert instance.port == 12345
