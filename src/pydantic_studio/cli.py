@@ -219,3 +219,29 @@ def check(
             typer.echo(f"  {line}", err=True)
         raise typer.Exit(code=1) from e
     typer.echo(f"{file}: OK")
+
+
+@app.command()
+def edit(
+    target: str = typer.Argument(..., help="module:Class identifier."),
+    file: Path | None = typer.Argument(  # noqa: B008
+        None,
+        help="Path to a YAML file. If omitted, edits a fresh tree.",
+    ),
+) -> None:
+    """Launch the Textual editor for a Pydantic schema.
+
+    With FILE: load it via ``load_yaml``, edit interactively, save back.
+    Without FILE: build a fresh tree from the schema's defaults; saves
+    are disabled (read-only mode).
+    """
+    from pydantic_studio import load_yaml
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    schema = _load_schema(target)
+    if file is not None and file.exists():
+        tree = load_yaml(file, schema)
+    else:
+        tree = build_form_tree(schema)
+    app_instance = StudioApp(tree=tree, save_path=file)
+    app_instance.run()
