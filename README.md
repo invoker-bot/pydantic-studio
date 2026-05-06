@@ -5,8 +5,22 @@ Interactive editor for Pydantic models. Generate and edit `config.yaml` /
 
 ## Status
 
-Phase 2 (Type Coverage) — alpha. Programmatic API only; CLI / TUI / Web
-coming in later phases.
+**v0.1.0 — Alpha.** All nine implementation phases complete:
+
+| Phase | Feature | Tag |
+|---|---|---|
+| 1 | Form Tree | v0.0.1-phase-1 |
+| 2 | Type coverage 1 | v0.0.2-phase-2 |
+| 3 | Type coverage 2 + show CLI | v0.0.3-phase-3 |
+| 4 | YAML I/O + fill/run/check CLI | v0.0.4-phase-4 |
+| 5 | Textual TUI | v0.0.5-phase-5 |
+| 6 | HTML browser renderer | v0.0.6-phase-6 |
+| 7 | TOML + JSON I/O | v0.0.7-phase-7 |
+| 8 | Polish (drafts, heartbeat, quit prompt) | v0.0.8-phase-8 |
+| 9 | Documentation | v0.1.0 |
+
+📖 **Docs:** Run `uv run mkdocs serve` to read the full tutorial /
+architecture / API reference / examples locally on `127.0.0.1:8000`.
 
 ## Quick example (programmatic)
 
