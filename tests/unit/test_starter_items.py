@@ -136,3 +136,76 @@ class TestBuildItemsIsinstanceGuard:
         flags = tree.root.find("flags")
         assert flags is not None
         assert len(flags.items) == 2
+
+
+class TestItemLevelSetValue:
+    """set_value should accept paths into sequence items and mapping entries."""
+
+    def test_set_list_item_by_index(self) -> None:
+        tree = build_form_tree(WithList, existing={"tags": ["alpha", "beta"]})
+        result = tree.set_value("tags[0]", "ALPHA")
+        assert result.ok, f"expected ok, got errors {result.errors}"
+        tags = tree.root.find("tags")
+        assert tags is not None
+        assert tags.items[0].value == "ALPHA"
+        assert tags.items[1].value == "beta"
+
+    def test_set_list_item_validation_failure_keeps_old_value(self) -> None:
+        tree = build_form_tree(WithList, existing={"tags": ["alpha"]})
+        result = tree.set_value("tags[0]", 123)  # int into string slot
+        assert not result.ok
+        tags = tree.root.find("tags")
+        assert tags is not None
+        assert tags.items[0].value == "alpha", "old value must survive failed set"
+
+    def test_set_list_item_out_of_range(self) -> None:
+        tree = build_form_tree(WithList, existing={"tags": ["x"]})
+        with pytest.raises(KeyError, match="index 5"):
+            tree.set_value("tags[5]", "y")
+
+    def test_set_nested_list_item(self) -> None:
+        from pydantic import BaseModel
+
+        class Server(BaseModel):
+            host: str = "localhost"
+            port: int = 8080
+
+        class Cluster(BaseModel):
+            replicas: list[Server] = []
+
+        tree = build_form_tree(
+            Cluster, existing={"replicas": [{"host": "h1"}, {"host": "h2"}]}
+        )
+        result = tree.set_value("replicas[1].host", "newhost")
+        assert result.ok
+        replicas = tree.root.find("replicas")
+        assert replicas is not None
+        # replicas[1] is a GroupNode; navigate to find its host child.
+        server_1 = replicas.items[1]
+        from pydantic_studio import GroupNode
+        assert isinstance(server_1, GroupNode)
+        host = server_1.find("host")
+        assert host is not None
+        assert host.value == "newhost"
+
+    def test_set_mapping_value_by_key_index(self) -> None:
+        tree = build_form_tree(WithDict, existing={"settings": {"port": 80, "rps": 100}})
+        # MappingNode entries use integer indices — entry [0] is ("port", 80),
+        # [1] is ("rps", 100). set_value targets the value side.
+        result = tree.set_value("settings[1]", 200)
+        assert result.ok
+        settings = tree.root.find("settings")
+        assert settings is not None
+        _k, v_node = settings.entries[1]
+        assert v_node.value == 200
+
+    def test_set_value_pushes_snapshot_for_undo(self) -> None:
+        tree = build_form_tree(WithList, existing={"tags": ["a"]})
+        snapshots_before = len(tree.snapshots)
+        tree.set_value("tags[0]", "A")
+        assert len(tree.snapshots) == snapshots_before + 1
+        # Undo restores previous value.
+        assert tree.undo()
+        tags_after_undo = tree.root.find("tags")
+        assert tags_after_undo is not None
+        assert tags_after_undo.items[0].value == "a"

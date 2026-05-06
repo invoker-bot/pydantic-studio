@@ -608,6 +608,12 @@ class FormTree(BaseModel):
     def set_value(self, path: str, value: Any) -> ValidationResult:
         """Set ``value`` at the given path; runs node-local validation.
 
+        Path segments may be field names (str) — for navigating into
+        GroupNode children — or integer indices — for SequenceNode items
+        and MappingNode entries (where the index targets the *value* side
+        of the (key, value) pair). The terminal segment identifies the
+        node whose ``value`` field is mutated.
+
         On success: push a snapshot, write the value to the target node,
         clear ``target.error``, and return ``ValidationResult.ok()``.
 
@@ -627,26 +633,15 @@ class FormTree(BaseModel):
         if not path_obj.segments:
             msg = "cannot set value on the root group itself"
             raise ValueError(msg)
-        parent: Any = self.root
-        for seg in path_obj.segments[:-1]:
-            if isinstance(parent, GroupNode) and isinstance(seg, str):
-                child = parent.find(seg)
-                if child is None:
-                    msg = f"no field named {seg!r} at this level"
-                    raise KeyError(msg)
-                parent = child
-            else:
-                msg = f"cannot navigate segment {seg!r} (not a group)"
-                raise KeyError(msg)
 
+        # Walk all but the last segment, pivoting on the current node's type.
+        node: Any = self.root
+        for seg in path_obj.segments[:-1]:
+            node = self._descend(node, seg)
+
+        # Resolve the terminal segment to a target node.
         last = path_obj.segments[-1]
-        if not (isinstance(parent, GroupNode) and isinstance(last, str)):
-            msg = f"cannot set on non-group parent at segment {last!r}"
-            raise KeyError(msg)
-        target = parent.find(last)
-        if target is None:
-            msg = f"no field named {last!r}"
-            raise KeyError(msg)
+        target = self._descend(node, last)
 
         errors = target.validate_value(value)
         if errors:
@@ -660,6 +655,41 @@ class FormTree(BaseModel):
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
+
+    def _descend(self, node: Any, seg: Any) -> Any:
+        """Navigate one path segment into ``node``.
+
+        Pivots on ``node``'s type:
+        - GroupNode + str → child by name
+        - SequenceNode + int → items[seg]
+        - MappingNode + int → entries[seg][1] (the value node)
+
+        Raises KeyError on any mismatch (out-of-range index, unknown name,
+        or type/segment mismatch).
+        """
+        if isinstance(node, GroupNode) and isinstance(seg, str):
+            child = node.find(seg)
+            if child is None:
+                msg = f"no field named {seg!r} at this level"
+                raise KeyError(msg)
+            return child
+        if isinstance(node, SequenceNode) and isinstance(seg, int):
+            if not (0 <= seg < len(node.items)):
+                msg = f"index {seg} out of range for sequence of length {len(node.items)}"
+                raise KeyError(msg)
+            return node.items[seg]
+        if isinstance(node, MappingNode) and isinstance(seg, int):
+            if not (0 <= seg < len(node.entries)):
+                msg = f"index {seg} out of range for mapping of length {len(node.entries)}"
+                raise KeyError(msg)
+            # Index into mapping selects the value side of the pair —
+            # rename_key handles the key side via its dedicated mutation.
+            return node.entries[seg][1]
+        msg = (
+            f"cannot navigate segment {seg!r} into {type(node).__name__} "
+            f"(no rule for ({type(node).__name__}, {type(seg).__name__}))"
+        )
+        raise KeyError(msg)
 
     def _walk_to_sequence(self, path: str) -> SequenceNode:
         """Resolve ``path`` and return the SequenceNode at that location."""
