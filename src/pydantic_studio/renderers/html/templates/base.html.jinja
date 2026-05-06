@@ -12,13 +12,17 @@
   </header>
   <main>
     <aside id="sidebar">
-      <p>(sidebar — Task 5)</p>
+      <ul>
+        {% for path, label in groups %}
+        <li><a href="#" data-group-path="{{ path }}">{{ label }}</a></li>
+        {% endfor %}
+      </ul>
     </aside>
     <section id="form">
-      <p>(form — Task 5)</p>
+      {% include "form.html.jinja" %}
     </section>
     <section id="preview">
-      <pre id="preview-content">(preview — Task 5)</pre>
+      <pre id="preview-content">{{ preview }}</pre>
     </section>
   </main>
 </body>

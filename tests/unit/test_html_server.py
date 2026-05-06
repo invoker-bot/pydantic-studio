@@ -31,3 +31,21 @@ def test_static_htmx_serves() -> None:
     assert response.status_code == 200
     # Real htmx is at least a few KB; the stub was a single line.
     assert len(response.content) > 1000
+
+
+def test_index_renders_form_fields() -> None:
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(studio_server.app)
+    response = client.get("/")
+    assert response.status_code == 200
+    text = response.text
+    # Each Server field should appear with an htmx-bound input.
+    assert 'name="value"' in text
+    assert "hx-post" in text
+    # The field names appear as labels.
+    assert "name:" in text
+    assert "port:" in text
+    assert "debug:" in text

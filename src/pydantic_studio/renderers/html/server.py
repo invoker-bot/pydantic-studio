@@ -59,6 +59,13 @@ class StudioServer:
 
     def render_index(self, request: Request) -> HTMLResponse:
         """Render the index page."""
+        from pydantic_studio.renderers.html.render import (
+            initial_value_str,
+            list_groups,
+            list_root_fields,
+            render_yaml_preview,
+        )
+
         schema_name = (
             self.tree.schema_name.split(":")[-1]
             if ":" in self.tree.schema_name
@@ -70,6 +77,10 @@ class StudioServer:
             {
                 "schema_name": schema_name,
                 "tree": self.tree,
+                "fields": list_root_fields(self.tree),
+                "groups": list_groups(self.tree),
+                "preview": render_yaml_preview(self.tree),
+                "initial_value_str": initial_value_str,
             },
         )
 
