@@ -18,6 +18,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Discriminator,
+    Field,
     ValidationInfo,
     field_serializer,
     field_validator,
@@ -1062,6 +1063,10 @@ class FormTree(BaseModel):
     cursor: int = 0
     snapshot_limit: int = 50
     draft_path: FsPath | None = None
+
+    # Stashed source CommentedMap for round-trip save (preserves comments).
+    # Excluded from JSON snapshots — re-populated only via load_yaml.
+    yaml_source: Any = Field(default=None, exclude=True, repr=False)
 
     def to_python(self) -> dict[str, Any]:
         return self.root.to_python()
