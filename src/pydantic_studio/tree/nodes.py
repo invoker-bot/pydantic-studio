@@ -493,6 +493,47 @@ class EmailNode(FormNode):
         return self.value
 
 
+class PathNode(FormNode):
+    """Holds a filesystem path as a string.
+
+    Stored as a string (not a ``Path`` instance) so JSON round-trip is
+    OS-portable — `Path("/etc/x")` becomes `WindowsPath` on Windows, which
+    breaks equality on round-trip across platforms. ``set_value`` accepts
+    either a string or a ``Path`` instance and normalizes to ``str``.
+    """
+
+    kind: Literal["path"] = "path"
+    value: str | None = None
+    default: str | None = None
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    @field_validator("value", "default", mode="before")
+    @classmethod
+    def _normalize_path(cls, v: Any) -> Any:
+        from pathlib import PurePath
+
+        if isinstance(v, PurePath):
+            return str(v)
+        return v
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from pathlib import PurePath
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, (str, PurePath)):
+            return (f"expected str or Path, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> Any:
+        from pathlib import Path as _Path
+
+        if self.value is None:
+            return None
+        return _Path(self.value)
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -811,6 +852,7 @@ AnyNode = Annotated[
     | IpNetworkNode
     | UrlNode
     | EmailNode
+    | PathNode
     | EnumNode
     | LiteralNode
     | SequenceNode

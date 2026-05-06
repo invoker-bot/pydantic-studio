@@ -28,6 +28,7 @@ from pydantic_studio.types.primitives import (
 )
 from pydantic_studio.types.registry import NodeBuilder, Registry
 from pydantic_studio.types.sequences import ListBuilder, SetBuilder, TupleBuilder
+from pydantic_studio.types.special import PathBuilder
 from pydantic_studio.types.temporal import (
     DateBuilder,
     DatetimeBuilder,
@@ -77,6 +78,7 @@ def default_registry() -> Registry:
         reg.register(IpNetworkBuilder())
         reg.register(UrlBuilder())
         reg.register(EmailBuilder())
+        reg.register(PathBuilder())
         reg.register(ListBuilder(reg))
         reg.register(SetBuilder(reg))
         reg.register(TupleBuilder(reg))
