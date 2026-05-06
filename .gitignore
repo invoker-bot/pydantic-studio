@@ -44,3 +44,6 @@ verify_spec.py
 
 # pydantic-studio
 .pydantic-studio.draft.json
+
+# mkdocs build output
+site/
