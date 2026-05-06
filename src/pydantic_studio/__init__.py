@@ -19,6 +19,8 @@ from pydantic_studio.tree.builder import (
 )
 from pydantic_studio.tree.nodes import (
     BoolNode,
+    DateNode,
+    DatetimeNode,
     DecimalNode,
     EnumNode,
     FloatNode,
@@ -30,6 +32,7 @@ from pydantic_studio.tree.nodes import (
     MappingNode,
     SequenceNode,
     StringNode,
+    TimeNode,
     UnionNode,
 )
 from pydantic_studio.tree.validation import ValidationResult
@@ -47,6 +50,8 @@ def register_builder(builder: NodeBuilder) -> None:
 __all__ = [
     "BoolNode",
     "CancelledByUser",
+    "DateNode",
+    "DatetimeNode",
     "DecimalNode",
     "EnumNode",
     "FloatNode",
@@ -62,6 +67,7 @@ __all__ = [
     "Registry",
     "SequenceNode",
     "StringNode",
+    "TimeNode",
     "UnionNode",
     "ValidationFailedError",
     "ValidationResult",

@@ -8,7 +8,7 @@ the abstract base ``FormNode``.
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
 from typing import Annotated, Any, Literal
@@ -222,6 +222,67 @@ class DecimalNode(FormNode):
         return (f"expected Decimal, got {type(value).__name__}",)
 
     def to_python(self) -> Decimal | None:
+        return self.value
+
+
+class DatetimeNode(FormNode):
+    """Holds a timezone-aware-or-naive ``datetime.datetime`` value.
+
+    Pydantic emits ISO 8601 strings on ``model_dump_json`` and parses them
+    back on ``model_validate_json``, so no custom serializer is needed.
+    """
+
+    kind: Literal["datetime"] = "datetime"
+    value: datetime | None = None
+    default: datetime | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        # Reject date/time subclasses explicitly — datetime IS-A date in Python,
+        # but a date field cannot take a datetime and vice versa. We need an
+        # exact-type check.
+        if type(value) is not datetime:
+            return (f"expected datetime, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> datetime | None:
+        return self.value
+
+
+class DateNode(FormNode):
+    """Holds a ``datetime.date`` value (no time component)."""
+
+    kind: Literal["date"] = "date"
+    value: date | None = None
+    default: date | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if type(value) is not date:  # exact-type: rejects datetime subclass
+            return (f"expected date, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> date | None:
+        return self.value
+
+
+class TimeNode(FormNode):
+    """Holds a ``datetime.time`` value (no date component)."""
+
+    kind: Literal["time"] = "time"
+    value: time | None = None
+    default: time | None = None
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if type(value) is not time:
+            return (f"expected time, got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> time | None:
         return self.value
 
 
@@ -535,6 +596,9 @@ AnyNode = Annotated[
     | FloatNode
     | BoolNode
     | DecimalNode
+    | DatetimeNode
+    | DateNode
+    | TimeNode
     | EnumNode
     | LiteralNode
     | SequenceNode

@@ -22,6 +22,7 @@ from pydantic_studio.types.primitives import (
 )
 from pydantic_studio.types.registry import NodeBuilder, Registry
 from pydantic_studio.types.sequences import ListBuilder, SetBuilder, TupleBuilder
+from pydantic_studio.types.temporal import DateBuilder, DatetimeBuilder, TimeBuilder
 from pydantic_studio.types.unions import UnionBuilder
 
 if TYPE_CHECKING:
@@ -57,6 +58,9 @@ def default_registry() -> Registry:
         reg.register(DecimalBuilder())
         reg.register(EnumBuilder())
         reg.register(LiteralBuilder())
+        reg.register(DatetimeBuilder())
+        reg.register(DateBuilder())
+        reg.register(TimeBuilder())
         reg.register(ListBuilder(reg))
         reg.register(SetBuilder(reg))
         reg.register(TupleBuilder(reg))
