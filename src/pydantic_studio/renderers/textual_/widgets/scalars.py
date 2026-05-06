@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from textual.containers import Horizontal
-from textual.widgets import Input, Label, Static
+from textual.widgets import Checkbox, Input, Label, Static
 
 from pydantic_studio.renderers.textual_.widgets.editor import NodeEditor
 
@@ -150,10 +150,32 @@ class TextInputEditor(NodeEditor):
 
 
 class BoolEditor(NodeEditor):
-    """Stub — full impl in Task 7."""
+    """Checkbox bound to a BoolNode."""
 
     def compose(self) -> ComposeResult:
-        yield Static(f"{self.node.name}: <bool stub>")
+        with Horizontal():
+            yield Label(f"{self.node.name}: ", classes="field-label")
+            initial = bool(getattr(self.node, "value", False) or False)
+            yield Checkbox(
+                value=initial,
+                id=f"checkbox-{TextInputEditor._sanitize_id(self.field_path)}",
+            )
+        yield Static(
+            "",
+            id=f"error-{TextInputEditor._sanitize_id(self.field_path)}",
+            classes="field-error",
+        )
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        ok, msg = self.commit(event.value)
+        try:
+            error_widget = self.query_one(
+                f"#error-{TextInputEditor._sanitize_id(self.field_path)}",
+                Static,
+            )
+        except Exception:
+            return
+        error_widget.update("" if ok else (msg or "invalid"))
 
 
 class ChoiceEditor(NodeEditor):

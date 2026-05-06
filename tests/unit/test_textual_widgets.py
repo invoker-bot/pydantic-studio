@@ -74,3 +74,25 @@ async def test_text_input_editor_validation_error_keeps_old_value() -> None:
         age = tree.root.find("age")
         assert age is not None
         assert age.value == 5
+
+
+@pytest.mark.asyncio
+async def test_bool_editor_toggles() -> None:
+    class M(BaseModel):
+        enabled: bool = False
+
+    tree = build_form_tree(M)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Checkbox
+
+        cbs = list(app.screen.query(Checkbox))
+        assert len(cbs) == 1
+        assert cbs[0].value is False
+        # Toggle by setting the value directly (more reliable than click).
+        cbs[0].value = True
+        await pilot.pause()
+        node = tree.root.find("enabled")
+        assert node is not None
+        assert node.value is True
