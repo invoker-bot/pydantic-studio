@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from pydantic_studio.tree.nodes import UnionNode
@@ -82,7 +83,6 @@ class UnionBuilder:
         for BaseModel variants where isinstance fails, try model_validate
         (covers dict→model coercion). Build the variant node on success.
         """
-        from pydantic import BaseModel
         from pydantic.fields import FieldInfo as _FI
 
         if candidate is None:
@@ -97,7 +97,7 @@ class UnionBuilder:
                     return i, selected
             except TypeError:
                 # Some types (Annotated, generics) reject isinstance; skip.
-                pass
+                continue
             # Dict→BaseModel coercion: when isinstance fails for a BaseModel
             # variant, see whether Pydantic could validate the candidate.
             if (
@@ -106,12 +106,12 @@ class UnionBuilder:
                 and isinstance(candidate, dict)
             ):
                 try:
-                    v_type.model_validate(candidate)
+                    validated = v_type.model_validate(candidate)
                 except Exception:
                     continue
                 v_builder = self._registry.find(v_type)
                 selected = v_builder.build(
-                    v_type, _FI(annotation=v_type), candidate
+                    v_type, _FI(annotation=v_type), validated
                 )
                 return i, selected
         return None, None

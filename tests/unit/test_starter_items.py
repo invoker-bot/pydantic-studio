@@ -74,7 +74,6 @@ class TestUnionPreSelectViaModelValidate:
     def test_dict_matches_basemodel_variant(self) -> None:
         from pydantic import BaseModel
 
-        from pydantic_studio import build_form_tree
         from tests.fixtures.schemas import Address
 
         class HasUnion(BaseModel):
@@ -94,7 +93,6 @@ class TestUnionPreSelectViaModelValidate:
     def test_int_still_picks_int_variant(self) -> None:
         from pydantic import BaseModel
 
-        from pydantic_studio import build_form_tree
         from tests.fixtures.schemas import Address
 
         class HasUnion(BaseModel):
