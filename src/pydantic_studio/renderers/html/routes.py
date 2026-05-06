@@ -61,6 +61,17 @@ def _parse_for_kind(kind: str, raw: str) -> tuple[bool, Any]:
             return True, bytes.fromhex(raw)
         if kind == "bool":
             return True, raw.lower() in ("true", "1", "on", "yes")
+        if kind == "any":
+            # ``typing.Any`` carries arbitrary primitives or simple
+            # collections — try parsing as JSON literal first (covers
+            # numbers, booleans, null, arrays, objects in one path);
+            # otherwise treat the input as a plain string.
+            import json
+
+            try:
+                return True, json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                return True, raw
     except (ValueError, TypeError):
         return False, None
     return False, None

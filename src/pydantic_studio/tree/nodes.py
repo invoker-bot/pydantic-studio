@@ -1012,6 +1012,78 @@ class GroupNode(FormNode):
         return out
 
 
+class AnyValueNode(FormNode):
+    """Holds a value of unconstrained type (``typing.Any``).
+
+    Pydantic accepts ``Any`` as an "anything goes" escape hatch — this
+    node carries the value as-is plus a ``mode`` discriminator that
+    indicates the value's runtime shape (``str`` / ``int`` / ``float`` /
+    ``bool`` / ``list`` / ``dict`` / ``null``). Renderers use ``mode``
+    to pick a widget; tree-side validation stays permissive so the
+    underlying ``Any`` semantics are not narrowed by the form.
+
+    Round-trip is direct: ``to_python`` returns ``value`` unchanged
+    and ``model_validate`` accepts it back because ``Any`` does no
+    validation. JSON snapshots round-trip primitives losslessly; non-
+    JSON-native types (tuple, set, custom objects) collapse to their
+    JSON form on reload, which matches what ``Any`` can guarantee.
+
+    ``validate_assignment=True`` plus the ``_sync_mode`` model
+    validator keeps ``mode`` consistent with ``value`` after every
+    ``tree.set_value`` mutation — so renderers always pick the right
+    widget without the caller having to set ``mode`` manually.
+    """
+
+    kind: Literal["any"] = "any"
+    mode: Literal["null", "str", "int", "float", "bool", "list", "dict"] = "null"
+    value: Any = None
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    @model_validator(mode="after")
+    def _sync_mode(self) -> AnyValueNode:
+        inferred = AnyValueNode.infer_mode(self.value)
+        if self.mode != inferred:
+            object.__setattr__(self, "mode", inferred)
+        return self
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        # ``typing.Any`` accepts every value, including None — tree-level
+        # validation imposes nothing. ``required`` carries through from
+        # the field annotation but does not gate values here.
+        return ()
+
+    def to_python(self) -> Any:
+        return self.value
+
+    @staticmethod
+    def infer_mode(value: Any) -> str:
+        """Map ``value``'s runtime type to one of the seven modes.
+
+        ``bool`` is checked before ``int`` because ``bool`` is an int
+        subclass in Python and the order would otherwise mis-classify
+        every boolean as int.
+        """
+        if value is None:
+            return "null"
+        if isinstance(value, bool):
+            return "bool"
+        if isinstance(value, int):
+            return "int"
+        if isinstance(value, float):
+            return "float"
+        if isinstance(value, str):
+            return "str"
+        if isinstance(value, list):
+            return "list"
+        if isinstance(value, dict):
+            return "dict"
+        # tuple / set / custom objects collapse to ``str`` mode so the
+        # form has *some* representation — round-trip uses ``value``
+        # directly so the original object survives in memory.
+        return "str"
+
+
 # Discriminated union — every concrete node type uses ``kind`` as discriminator.
 AnyNode = Annotated[
     StringNode
@@ -1037,7 +1109,8 @@ AnyNode = Annotated[
     | SequenceNode
     | MappingNode
     | UnionNode
-    | GroupNode,
+    | GroupNode
+    | AnyValueNode,
     Discriminator("kind"),
 ]
 

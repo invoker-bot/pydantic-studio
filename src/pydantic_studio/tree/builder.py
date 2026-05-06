@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from pydantic_studio.types.anyfield import AnyBuilder
 from pydantic_studio.types.choices import EnumBuilder, LiteralBuilder
 from pydantic_studio.types.core_schema_fallback import CoreSchemaFallbackBuilder
 from pydantic_studio.types.mapping import DictBuilder
@@ -95,6 +96,11 @@ def default_registry() -> Registry:
         reg.register(TupleBuilder(reg))
         reg.register(DictBuilder(reg))
         reg.register(UnionBuilder(reg))      # before GroupBuilder
+        # ``typing.Any`` is a special-form sentinel — AnyBuilder's match
+        # is an identity check (``type_ is Any``) so order doesn't
+        # collide with anything else, but registering before GroupBuilder
+        # keeps the "specific before catch-all" mental model intact.
+        reg.register(AnyBuilder())
         # GroupBuilder is registered last so it matches *any* BaseModel
         # only when no more-specific builder did. It also needs a back-
         # reference to the registry for recursive dispatch.
