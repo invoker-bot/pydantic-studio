@@ -8,6 +8,7 @@ once YAML round-trip support lands.
 from __future__ import annotations
 
 import importlib
+from pathlib import Path  # noqa: TC003 — typer reads at runtime
 from typing import Any
 
 import typer
@@ -125,3 +126,52 @@ def version() -> None:
     from pydantic_studio import __version__
 
     typer.echo(f"pydantic-studio {__version__}")
+
+
+@app.command()
+def fill(
+    target: str = typer.Argument(
+        ..., help="module:Class identifier of the Pydantic schema."
+    ),
+    out: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--out",
+        "-o",
+        help="Path to write the YAML stub. If omitted, write to stdout.",
+    ),
+) -> None:
+    """Emit a YAML stub populated with the schema's defaults.
+
+    With ``--out FILE``, writes to that path with description comments.
+    Without ``--out``, writes to stdout.
+    """
+    import io
+
+    from pydantic_studio import build_form_tree, save_yaml
+
+    schema = _load_schema(target)
+    tree = build_form_tree(schema)
+    if out is not None:
+        save_yaml(tree, out)
+        typer.echo(f"Wrote {out}")
+        return
+    # Stdout path: write to a temp file then echo its contents (avoids
+    # duplicating save_yaml's CommentedMap-building logic). Use io.StringIO
+    # via the YAML object directly.
+    from pydantic_studio.io.yaml import _build_commented_map, _yaml
+
+    schema_class = tree.schema_class
+    if schema_class is None:
+        typer.secho(
+            "FormTree.schema_class is None — cannot render YAML",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    # Materialize to instance to resolve defaults (matches save_yaml semantics).
+    instance = tree.to_instance()
+    data = instance.model_dump(mode="python")
+    cm = _build_commented_map(data, schema_class, None)
+    buf = io.StringIO()
+    _yaml().dump(cm, buf)
+    typer.echo(buf.getvalue(), nl=False)

@@ -54,3 +54,30 @@ class TestVersion:
         result = runner.invoke(app, ["version"])
         assert result.exit_code == 0
         assert __version__ in result.output
+
+
+class TestFill:
+    def test_fill_emits_stub_to_stdout(self) -> None:
+        result = runner.invoke(app, ["fill", "tests.fixtures.schemas:Server"])
+        assert result.exit_code == 0
+        # Schema fields appear in the stdout YAML.
+        assert "name:" in result.output
+        assert "port:" in result.output
+        # Description comments appear.
+        assert "Service identifier" in result.output
+
+    def test_fill_writes_to_out_file(self, tmp_path) -> None:
+        out = tmp_path / "config.yaml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:Server", "--out", str(out)],
+        )
+        assert result.exit_code == 0
+        assert out.exists()
+        content = out.read_text(encoding="utf-8")
+        assert "name:" in content
+        assert "Listening port" in content
+
+    def test_fill_unknown_schema_errors(self) -> None:
+        result = runner.invoke(app, ["fill", "nosuch:Foo"])
+        assert result.exit_code != 0
