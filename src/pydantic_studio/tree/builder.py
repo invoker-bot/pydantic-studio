@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic_studio.types.choices import EnumBuilder, LiteralBuilder
 from pydantic_studio.types.mapping import DictBuilder
 from pydantic_studio.types.models import GroupBuilder
+from pydantic_studio.types.network import IpAddressBuilder, IpNetworkBuilder
 from pydantic_studio.types.primitives import (
     BoolBuilder,
     DecimalBuilder,
@@ -67,6 +68,8 @@ def default_registry() -> Registry:
         reg.register(DateBuilder())
         reg.register(TimeBuilder())
         reg.register(TimedeltaBuilder())
+        reg.register(IpAddressBuilder())
+        reg.register(IpNetworkBuilder())
         reg.register(ListBuilder(reg))
         reg.register(SetBuilder(reg))
         reg.register(TupleBuilder(reg))

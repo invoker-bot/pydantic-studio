@@ -309,6 +309,103 @@ class TimedeltaNode(FormNode):
         return self.value
 
 
+class IpAddressNode(FormNode):
+    """Holds an IPv4 or IPv6 address as a string.
+
+    The ``version`` field discriminates 4 vs 6 — set by the builder from
+    the field annotation (IPv4Address vs IPv6Address). Stored as a string
+    rather than the ``IPv4Address``/``IPv6Address`` instance because:
+
+    1. Pydantic's union handling for the two address classes is brittle.
+    2. Strings are JSON-friendly without custom serializers.
+    3. ``to_python`` coerces back via ``ipaddress.ip_address`` for the
+       schema's validate step.
+    """
+
+    kind: Literal["ip_address"] = "ip_address"
+    value: str | None = None
+    default: str | None = None
+    version: Literal[4, 6]
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from ipaddress import (
+            AddressValueError,
+            IPv4Address,
+            IPv6Address,
+        )
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        # Accept already-parsed instances of the right version.
+        if self.version == 4 and isinstance(value, IPv4Address):
+            return ()
+        if self.version == 6 and isinstance(value, IPv6Address):
+            return ()
+        if isinstance(value, str):
+            cls = IPv4Address if self.version == 4 else IPv6Address
+            other_cls = IPv6Address if self.version == 4 else IPv4Address
+            other_version = 6 if self.version == 4 else 4
+            try:
+                cls(value)
+            except (AddressValueError, ValueError):
+                # Check if it parses as the other version — if so, give a
+                # clearer "wrong version" message.
+                try:
+                    other_cls(value)
+                    return (
+                        f"expected IPv{self.version} address, "
+                        f"got IPv{other_version}: {value!r}",
+                    )
+                except (AddressValueError, ValueError):
+                    pass
+                return (f"invalid IPv{self.version} address: {value!r}",)
+            return ()
+        return (f"expected IPv{self.version} address, got {type(value).__name__}",)
+
+    def to_python(self) -> Any:
+        from ipaddress import IPv4Address, IPv6Address
+
+        if self.value is None:
+            return None
+        cls = IPv4Address if self.version == 4 else IPv6Address
+        return cls(self.value)
+
+
+class IpNetworkNode(FormNode):
+    """Holds an IPv4 or IPv6 network in CIDR form, as a string."""
+
+    kind: Literal["ip_network"] = "ip_network"
+    value: str | None = None
+    default: str | None = None
+    version: Literal[4, 6]
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from ipaddress import IPv4Network, IPv6Network
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if self.version == 4 and isinstance(value, IPv4Network):
+            return ()
+        if self.version == 6 and isinstance(value, IPv6Network):
+            return ()
+        if isinstance(value, str):
+            cls = IPv4Network if self.version == 4 else IPv6Network
+            try:
+                cls(value, strict=False)
+            except ValueError:
+                return (f"invalid IPv{self.version} network: {value!r}",)
+            return ()
+        return (f"expected IPv{self.version} network, got {type(value).__name__}",)
+
+    def to_python(self) -> Any:
+        from ipaddress import IPv4Network, IPv6Network
+
+        if self.value is None:
+            return None
+        cls = IPv4Network if self.version == 4 else IPv6Network
+        return cls(self.value, strict=False)
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -623,6 +720,8 @@ AnyNode = Annotated[
     | DateNode
     | TimeNode
     | TimedeltaNode
+    | IpAddressNode
+    | IpNetworkNode
     | EnumNode
     | LiteralNode
     | SequenceNode

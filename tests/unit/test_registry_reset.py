@@ -42,9 +42,10 @@ def test_reset_is_idempotent() -> None:
     reset_default_registry()
     reset_default_registry()  # second call must not error
     reg = default_registry()
-    # Default registry registers 17 builders:
+    # Default registry registers 19 builders:
     # String, Int, Float, Bool, Decimal, Enum, Literal,
     # Datetime, Date, Time, Timedelta,
+    # IpAddress, IpNetwork,
     # List, Set, Tuple, Dict, Union, Group.
     # Double-reset must produce the same baseline.
-    assert len(reg) == 17
+    assert len(reg) == 19
