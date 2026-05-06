@@ -406,6 +406,60 @@ class IpNetworkNode(FormNode):
         return cls(self.value, strict=False)
 
 
+class UrlNode(FormNode):
+    """Holds a URL as a string, with the original Pydantic URL type
+    recorded in ``target_type_name`` for round-trip coercion.
+
+    Covers ``AnyUrl``, ``AnyHttpUrl``, ``HttpUrl``, ``FileUrl``,
+    ``WebsocketUrl``, and any other ``Annotated[Url, UrlConstraints(...)]``
+    variant exposed by Pydantic. ``validate_value`` and ``to_python``
+    delegate to a ``TypeAdapter`` built from ``target_type_name`` so
+    each URL subtype's specific constraints (scheme set, default port,
+    etc.) are enforced.
+    """
+
+    kind: Literal["url"] = "url"
+    value: str | None = None
+    default: str | None = None
+    target_type_name: str  # e.g., "pydantic.HttpUrl"
+
+    def _adapter(self) -> Any:
+        """Build (and cache) a TypeAdapter for this URL's target type.
+
+        Cached as an instance attribute via ``object.__setattr__`` to bypass
+        Pydantic's own attribute machinery — TypeAdapters aren't Pydantic
+        fields and shouldn't be model_dumped.
+        """
+        cached = getattr(self, "__url_adapter__", None)
+        if cached is not None:
+            return cached
+        from pydantic import TypeAdapter
+
+        target = _resolve_type_name(self.target_type_name)
+        adapter = TypeAdapter(target)
+        object.__setattr__(self, "__url_adapter__", adapter)
+        return adapter
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        from pydantic import ValidationError
+
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if not isinstance(value, str):
+            return (f"expected str URL, got {type(value).__name__}",)
+        try:
+            self._adapter().validate_python(value)
+        except ValidationError as e:
+            first = e.errors()[0]
+            return (first.get("msg", "invalid URL"),)
+        return ()
+
+    def to_python(self) -> Any:
+        if self.value is None:
+            return None
+        return self._adapter().validate_python(self.value)
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -722,6 +776,7 @@ AnyNode = Annotated[
     | TimedeltaNode
     | IpAddressNode
     | IpNetworkNode
+    | UrlNode
     | EnumNode
     | LiteralNode
     | SequenceNode

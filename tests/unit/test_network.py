@@ -9,9 +9,9 @@ from ipaddress import (
     IPv6Network,
 )
 
-from pydantic import BaseModel
+from pydantic import AnyHttpUrl, AnyUrl, BaseModel, FileUrl, HttpUrl
 
-from pydantic_studio import IpAddressNode, IpNetworkNode, build_form_tree
+from pydantic_studio import IpAddressNode, IpNetworkNode, UrlNode, build_form_tree
 
 
 class WithIp(BaseModel):
@@ -130,3 +130,77 @@ class TestEndToEnd:
         assert result.ok
         instance = tree.to_instance()
         assert instance.bind_v4 == IPv4Address("192.168.1.1")
+
+
+class WithUrls(BaseModel):
+    api: HttpUrl = HttpUrl("https://api.example.com/v1")
+    fallback: AnyUrl = AnyUrl("ftp://files.example.com")
+    asset: FileUrl = FileUrl("file:///srv/assets/logo.png")
+    redirect: AnyHttpUrl = AnyHttpUrl("https://redirect.example.com")
+
+
+class TestUrlNode:
+    def test_build_uses_url_node(self) -> None:
+        tree = build_form_tree(WithUrls)
+        api = tree.root.find("api")
+        assert isinstance(api, UrlNode)
+        assert api.value == "https://api.example.com/v1"
+        # The target_type_name records the original Pydantic type for
+        # round-trip via TypeAdapter.
+        assert "HttpUrl" in api.target_type_name
+
+    def test_validate_accepts_string(self) -> None:
+        node = UrlNode(name="x", value=None, target_type_name="pydantic.HttpUrl")
+        assert node.validate_value("https://example.com") == ()
+
+    def test_validate_rejects_garbage_string(self) -> None:
+        node = UrlNode(name="x", value=None, target_type_name="pydantic.HttpUrl")
+        errors = node.validate_value("://not-valid\x00url")
+        assert errors
+
+    def test_validate_rejects_non_string(self) -> None:
+        node = UrlNode(name="x", value=None, target_type_name="pydantic.AnyUrl")
+        errors = node.validate_value(42)
+        assert errors
+        assert "expected str" in errors[0]
+
+    def test_to_python_coerces_via_target_type(self) -> None:
+        from pydantic import HttpUrl
+
+        node = UrlNode(
+            name="x",
+            value="https://example.com/",
+            target_type_name=f"{HttpUrl.__module__}.HttpUrl",
+        )
+        result = node.to_python()
+        # to_python returns whatever Pydantic's TypeAdapter produces — for
+        # HttpUrl that's a Url instance.
+        assert str(result).rstrip("/") == "https://example.com"
+
+    def test_snapshot_round_trip(self) -> None:
+        node = UrlNode(
+            name="x",
+            value="https://example.com",
+            target_type_name="pydantic.HttpUrl",
+        )
+        raw = node.model_dump_json()
+        restored = UrlNode.model_validate_json(raw)
+        assert restored.value == node.value
+        assert restored.target_type_name == node.target_type_name
+
+    def test_to_instance_round_trip(self) -> None:
+        tree = build_form_tree(WithUrls)
+        instance = tree.to_instance()
+        assert str(instance.api).startswith("https://api.example.com")
+
+    def test_set_value_validates_url_format(self) -> None:
+        tree = build_form_tree(WithUrls)
+        result = tree.set_value("api", "://not-valid\x00url")
+        assert not result.ok
+
+    def test_set_value_accepts_valid_url(self) -> None:
+        tree = build_form_tree(WithUrls)
+        result = tree.set_value("api", "https://newapi.example.com/v2")
+        assert result.ok
+        instance = tree.to_instance()
+        assert "newapi.example.com" in str(instance.api)
