@@ -23,7 +23,12 @@ classifiers = [
 ]
 dependencies = [
   "pydantic>=2.7",
+  "typer>=0.12",
+  "rich>=13",
 ]
+
+[project.scripts]
+pydantic-studio = "pydantic_studio.cli:app"
 
 [project.optional-dependencies]
 email = ["email-validator>=2"]
