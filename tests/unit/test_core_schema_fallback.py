@@ -12,6 +12,7 @@ from pydantic_core import core_schema
 from pydantic_studio.exceptions import NoBuilderError
 from pydantic_studio.tree.builder import build_form_tree
 from pydantic_studio.tree.nodes import (
+    FloatNode,
     GroupNode,
     IntNode,
     MappingNode,
@@ -116,6 +117,68 @@ class BoundedInt:
         return value if isinstance(value, cls) else cls(value)
 
 
+class BoundedString:
+    """Wraps ``str`` with min/max length and a regex pattern."""
+
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.str_schema(min_length=3, max_length=12, pattern=r"^[a-z]+$"),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> BoundedString:
+        return value if isinstance(value, cls) else cls(value)
+
+
+class RangedFloat:
+    """Wraps ``float`` with ge/le/multiple_of."""
+
+    def __init__(self, value: float) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.float_schema(ge=-1.0, le=1.0, multiple_of=0.1),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> RangedFloat:
+        return value if isinstance(value, cls) else cls(value)
+
+
+class SmallList:
+    """Wraps ``list[str]`` with min/max length on the container."""
+
+    def __init__(self, items: list[str]) -> None:
+        self.items = list(items)
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_wrap_validator_function(
+            cls._validate_wrap,
+            core_schema.list_schema(
+                core_schema.str_schema(), min_length=1, max_length=4
+            ),
+        )
+
+    @classmethod
+    def _validate_wrap(cls, value: Any, handler) -> SmallList:
+        return value if isinstance(value, cls) else cls(handler(value))
+
+
 class OpaqueValue:
     """Declares only a ``function-plain`` schema — no inner schema for
     pydantic-studio to introspect, so fallback should pass it through."""
@@ -163,10 +226,6 @@ def test_str_to_str_map_field_builds_mapping_node():
 
 
 def test_bounded_int_resolves_to_int_node():
-    """A custom int-wrapping type builds an IntNode (constraint
-    passthrough from core_schema → field_info is a follow-up — see
-    `xfail` test below)."""
-
     class M(BaseModel):
         n: BoundedInt
 
@@ -175,12 +234,6 @@ def test_bounded_int_resolves_to_int_node():
     assert isinstance(n_node, IntNode)
 
 
-@pytest.mark.xfail(
-    reason="constraints declared in a custom type's core_schema "
-    "(e.g. int_schema(ge=0)) don't yet propagate into the resulting "
-    "node. Follow-up to issue #1.",
-    strict=True,
-)
 def test_bounded_int_propagates_ge_constraint():
     class M(BaseModel):
         n: BoundedInt
@@ -188,6 +241,57 @@ def test_bounded_int_propagates_ge_constraint():
     tree = build_form_tree(M)
     n_node = next(c for c in tree.root.fields if c.name == "n")
     assert n_node.ge == 0
+
+
+def test_bounded_string_propagates_length_and_pattern():
+    class M(BaseModel):
+        s: BoundedString
+
+    tree = build_form_tree(M)
+    s_node = next(c for c in tree.root.fields if c.name == "s")
+    assert isinstance(s_node, StringNode)
+    assert s_node.min_length == 3
+    assert s_node.max_length == 12
+    assert s_node.pattern == r"^[a-z]+$"
+
+
+def test_ranged_float_propagates_ge_le_multiple_of():
+    class M(BaseModel):
+        v: RangedFloat
+
+    tree = build_form_tree(M)
+    v_node = next(c for c in tree.root.fields if c.name == "v")
+    assert isinstance(v_node, FloatNode)
+    assert v_node.ge == -1.0
+    assert v_node.le == 1.0
+    assert v_node.multiple_of == 0.1
+
+
+def test_small_list_propagates_container_length_constraints():
+    class M(BaseModel):
+        items: SmallList = SmallList(["seed"])
+
+    tree = build_form_tree(M, existing={"items": ["x"]})
+    items_node = next(c for c in tree.root.fields if c.name == "items")
+    assert isinstance(items_node, SequenceNode)
+    assert items_node.min_length == 1
+    assert items_node.max_length == 4
+
+
+def test_user_metadata_overrides_schema_constraint():
+    """Schema-derived constraints are *defaults* — when the user adds
+    their own ``Annotated[Custom, Ge(...)]``, the user-supplied value
+    wins (last-item-wins in ``extract_constraints``)."""
+    from typing import Annotated
+
+    from annotated_types import Ge
+
+    class M(BaseModel):
+        n: Annotated[BoundedInt, Ge(10)]
+
+    tree = build_form_tree(M)
+    n_node = next(c for c in tree.root.fields if c.name == "n")
+    assert n_node.ge == 10
 
 
 # ---------- round-trip ----------
