@@ -45,5 +45,5 @@ verify_spec.py
 # pydantic-studio
 .pydantic-studio.draft.json
 
-# mkdocs build output
-site/
+# mkdocs build output (root-level only; docs/site/ holds the docs source)
+/site/
