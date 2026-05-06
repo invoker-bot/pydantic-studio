@@ -74,3 +74,51 @@ class UuidBuilder:
             value=existing if existing is not None else default,
             default=default,
         )
+
+
+def _secret_kind(type_: Any) -> str | None:
+    """Detect SecretStr / SecretBytes; return ``"str"``, ``"bytes"``, or None."""
+    unwrapped = strip_annotated(type_)
+    name = getattr(unwrapped, "__name__", "")
+    module = getattr(unwrapped, "__module__", "")
+    if not module.startswith("pydantic"):
+        return None
+    if name == "SecretStr":
+        return "str"
+    if name == "SecretBytes":
+        return "bytes"
+    return None
+
+
+def _coerce_secret_existing(existing: Any) -> Any:
+    """Unwrap a SecretStr/SecretBytes instance into its raw value, leaving
+    str/bytes/None unchanged."""
+    from pydantic import SecretBytes, SecretStr
+
+    if isinstance(existing, (SecretStr, SecretBytes)):
+        return existing.get_secret_value()
+    return existing
+
+
+class SecretBuilder:
+    """Matches ``pydantic.SecretStr`` and ``pydantic.SecretBytes``."""
+
+    def matches(self, type_: type) -> bool:
+        return _secret_kind(type_) is not None
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
+        from pydantic_studio.tree.nodes import SecretNode as _SecretNode
+
+        kind = _secret_kind(type_)
+        if kind is None:  # pragma: no cover
+            raise RuntimeError("SecretBuilder.build called with non-secret type")
+        default = _coerce_secret_existing(_default(field_info))
+        existing_v = _coerce_secret_existing(existing)
+        return _SecretNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            secret_kind=kind,  # type: ignore[arg-type]
+            value=existing_v if existing_v is not None else default,
+            default=default,
+        )

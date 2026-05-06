@@ -557,6 +557,56 @@ class UuidNode(FormNode):
         return self.value
 
 
+class SecretNode(FormNode):
+    """Holds the plaintext value of a ``pydantic.SecretStr`` or
+    ``pydantic.SecretBytes`` field.
+
+    The ``secret_kind`` field discriminates str vs bytes so renderers can
+    pick the correct widget. ``to_python`` wraps the stored value in the
+    appropriate Pydantic Secret type so model validation passes.
+
+    Security caveat: in v0.0.3, secret values are stored in plaintext in
+    snapshots (in-memory) and in ``draft_save`` JSON (on disk). Don't use
+    drafts on shared storage for sensitive deployments. v0.x will offer
+    encrypted drafts or a "skip secrets in drafts" mode.
+    """
+
+    kind: Literal["secret"] = "secret"
+    value: str | bytes | None = None
+    default: str | bytes | None = None
+    secret_kind: Literal["str", "bytes"]
+
+    @model_validator(mode="after")
+    def _coerce_bytes_fields(self) -> SecretNode:
+        """After JSON load, bytes values come back as ``str`` because Pydantic
+        serializes ``bytes`` as a plain UTF-8 string in the ``str | bytes | None``
+        union. Re-coerce them to ``bytes`` when ``secret_kind == "bytes"``."""
+        if self.secret_kind == "bytes":
+            if isinstance(self.value, str):
+                self.value = self.value.encode()
+            if isinstance(self.default, str):
+                self.default = self.default.encode()
+        return self
+
+    def validate_value(self, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return () if not self.required else ("value is required",)
+        if self.secret_kind == "str" and not isinstance(value, str):
+            return (f"expected str (SecretStr value), got {type(value).__name__}",)
+        if self.secret_kind == "bytes" and not isinstance(value, (bytes, bytearray)):
+            return (f"expected bytes (SecretBytes value), got {type(value).__name__}",)
+        return ()
+
+    def to_python(self) -> Any:
+        from pydantic import SecretBytes, SecretStr
+
+        if self.value is None:
+            return None
+        if self.secret_kind == "str":
+            return SecretStr(self.value)
+        return SecretBytes(self.value)
+
+
 class EnumNode(FormNode):
     """Holds a single value drawn from a closed set of Enum members.
 
@@ -877,6 +927,7 @@ AnyNode = Annotated[
     | EmailNode
     | PathNode
     | UuidNode
+    | SecretNode
     | EnumNode
     | LiteralNode
     | SequenceNode

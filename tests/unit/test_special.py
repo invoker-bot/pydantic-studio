@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretBytes, SecretStr
 
-from pydantic_studio import PathNode, UuidNode, build_form_tree
+from pydantic_studio import PathNode, SecretNode, UuidNode, build_form_tree
 
 
 class WithPath(BaseModel):
@@ -118,3 +118,82 @@ class TestUuidNode:
         tree = build_form_tree(WithUuid)
         instance = tree.to_instance()
         assert instance.request_id == UUID("00000000-0000-0000-0000-000000000000")
+
+
+class WithSecret(BaseModel):
+    api_key: SecretStr = SecretStr("default-key")
+    token: SecretBytes = SecretBytes(b"default-token")
+
+
+class TestSecretNode:
+    def test_build_str_uses_secret_node_kind_str(self) -> None:
+        tree = build_form_tree(WithSecret)
+        api = tree.root.find("api_key")
+        assert isinstance(api, SecretNode)
+        assert api.secret_kind == "str"
+        assert api.value == "default-key"
+
+    def test_build_bytes_uses_secret_node_kind_bytes(self) -> None:
+        tree = build_form_tree(WithSecret)
+        token = tree.root.find("token")
+        assert isinstance(token, SecretNode)
+        assert token.secret_kind == "bytes"
+        assert token.value == b"default-token"
+
+    def test_validate_str_accepts_string(self) -> None:
+        node = SecretNode(name="x", secret_kind="str", value=None)
+        assert node.validate_value("password") == ()
+
+    def test_validate_str_rejects_bytes(self) -> None:
+        node = SecretNode(name="x", secret_kind="str", value=None)
+        errors = node.validate_value(b"password")
+        assert errors
+
+    def test_validate_bytes_accepts_bytes(self) -> None:
+        node = SecretNode(name="x", secret_kind="bytes", value=None)
+        assert node.validate_value(b"token") == ()
+
+    def test_validate_bytes_rejects_str(self) -> None:
+        node = SecretNode(name="x", secret_kind="bytes", value=None)
+        errors = node.validate_value("token")
+        assert errors
+
+    def test_to_python_str_wraps_secret(self) -> None:
+        node = SecretNode(name="x", secret_kind="str", value="password")
+        result = node.to_python()
+        assert isinstance(result, SecretStr)
+        assert result.get_secret_value() == "password"
+
+    def test_to_python_bytes_wraps_secret(self) -> None:
+        node = SecretNode(name="x", secret_kind="bytes", value=b"token")
+        result = node.to_python()
+        assert isinstance(result, SecretBytes)
+        assert result.get_secret_value() == b"token"
+
+    def test_snapshot_round_trip_str(self) -> None:
+        node = SecretNode(name="x", secret_kind="str", value="password")
+        raw = node.model_dump_json()
+        restored = SecretNode.model_validate_json(raw)
+        assert restored.value == "password"
+        assert restored.secret_kind == "str"
+
+    def test_snapshot_round_trip_bytes(self) -> None:
+        """Pydantic encodes bytes as base64 in JSON; round-trip recovers them."""
+        node = SecretNode(name="x", secret_kind="bytes", value=b"token")
+        raw = node.model_dump_json()
+        restored = SecretNode.model_validate_json(raw)
+        assert restored.value == b"token"
+        assert restored.secret_kind == "bytes"
+
+    def test_to_instance_round_trip(self) -> None:
+        tree = build_form_tree(WithSecret)
+        instance = tree.to_instance()
+        assert instance.api_key.get_secret_value() == "default-key"
+        assert instance.token.get_secret_value() == b"default-token"
+
+    def test_set_value_replaces_secret(self) -> None:
+        tree = build_form_tree(WithSecret)
+        result = tree.set_value("api_key", "new-secret")
+        assert result.ok
+        instance = tree.to_instance()
+        assert instance.api_key.get_secret_value() == "new-secret"
