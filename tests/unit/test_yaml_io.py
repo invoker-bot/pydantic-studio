@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pydantic_studio import load_yaml
+from pydantic_studio.tree.builder import build_form_tree
 from tests.fixtures.schemas import Server
 
 if TYPE_CHECKING:
@@ -77,3 +78,81 @@ class TestLoadYaml:
         )
         with pytest.raises(YAMLError):
             load_yaml(src, Server)
+
+
+class TestSaveYamlNewFile:
+    """save_yaml when no source file exists — must auto-generate
+    description comments from the schema."""
+
+    def test_save_creates_file_with_values(self, tmp_path: Path) -> None:
+        from pydantic_studio import save_yaml
+
+        tree = build_form_tree(Server)
+        out = tmp_path / "config.yaml"
+        save_yaml(tree, out)
+        assert out.exists()
+        content = out.read_text(encoding="utf-8")
+        # Default values appear.
+        assert "prod" in content
+        assert "8080" in content
+
+    def test_save_emits_description_comments(self, tmp_path: Path) -> None:
+        from pydantic_studio import save_yaml
+
+        tree = build_form_tree(Server)
+        out = tmp_path / "config.yaml"
+        save_yaml(tree, out)
+        content = out.read_text(encoding="utf-8")
+        # Each field's description should appear as a comment.
+        assert "Service identifier" in content
+        assert "Listening port" in content
+        assert "Enable debug logging" in content
+
+    def test_save_preserves_schema_field_order(self, tmp_path: Path) -> None:
+        from pydantic_studio import save_yaml
+
+        tree = build_form_tree(Server)
+        out = tmp_path / "config.yaml"
+        save_yaml(tree, out)
+        content = out.read_text(encoding="utf-8")
+        # Per spec §10.1 rule #1: schema definition order, not arbitrary.
+        # Server defines name → port → debug.
+        i_name = content.index("name:")
+        i_port = content.index("port:")
+        i_debug = content.index("debug:")
+        assert i_name < i_port < i_debug
+
+    def test_save_round_trip_load_back(self, tmp_path: Path) -> None:
+        """Save a tree, reload it, confirm the FormTree state matches."""
+        tree = build_form_tree(Server)
+        tree.set_value("port", 9999)
+        out = tmp_path / "config.yaml"
+        from pydantic_studio import save_yaml
+
+        save_yaml(tree, out)
+        reloaded = load_yaml(out, Server)
+        instance = reloaded.to_instance()
+        assert instance.port == 9999
+        assert instance.name == "prod"  # default unchanged
+
+    def test_save_atomic_temp_rename(self, tmp_path: Path) -> None:
+        """A failed write must not corrupt an existing file. We test the
+        atomicity by writing twice and checking no .tmp leftovers."""
+        from pydantic_studio import save_yaml
+
+        tree = build_form_tree(Server)
+        out = tmp_path / "config.yaml"
+        save_yaml(tree, out)
+        save_yaml(tree, out)
+        # No temp files left behind.
+        leftovers = [p for p in tmp_path.iterdir() if p.name.startswith(".tmp-")]
+        assert leftovers == []
+
+    def test_save_creates_parent_directory(self, tmp_path: Path) -> None:
+        """Like draft_save, save_yaml should create parent dirs as needed."""
+        from pydantic_studio import save_yaml
+
+        tree = build_form_tree(Server)
+        out = tmp_path / "nested" / "subdir" / "config.yaml"
+        save_yaml(tree, out)
+        assert out.exists()
