@@ -32,17 +32,32 @@ class StudioServer:
         self,
         tree: FormTree,
         save_path: str | Path | None = None,
+        heartbeat_timeout_seconds: float = 30.0,
     ) -> None:
         self.tree = tree
         self.save_path = Path(save_path) if save_path is not None else None
         self.app = FastAPI()
         self.templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
-        # Lifecycle state.
         self.submitted = False
         self.cancelled = False
         self.last_heartbeat_ts: float = 0.0
+        self.heartbeat_timeout_seconds = heartbeat_timeout_seconds
         self._mount_static()
         self._register_routes()
+
+    def _check_heartbeat_timeout(self) -> None:
+        """Mark cancelled if heartbeat is older than the timeout.
+
+        last_heartbeat_ts == 0.0 means no heartbeat received yet — don't
+        auto-cancel (user may still be loading the page).
+        """
+        import time
+
+        if self.last_heartbeat_ts == 0.0:
+            return
+        elapsed = time.time() - self.last_heartbeat_ts
+        if elapsed > self.heartbeat_timeout_seconds:
+            self.cancelled = True
 
     def _mount_static(self) -> None:
         if _STATIC_DIR.exists():
@@ -85,18 +100,47 @@ class StudioServer:
         )
 
 
-def run_html_app(tree: FormTree, save_path: str | Path | None = None) -> None:
-    """Launch the HTML renderer synchronously. Blocks until /submit or /cancel."""
+def run_html_app(
+    tree: FormTree,
+    save_path: str | Path | None = None,
+    heartbeat_timeout_seconds: float = 30.0,
+) -> None:
+    """Launch the HTML renderer. Blocks until /submit, /cancel, or heartbeat timeout."""
+    import asyncio
     import socket
     import webbrowser
 
     import uvicorn
 
-    studio_server = StudioServer(tree=tree, save_path=save_path)
+    studio_server = StudioServer(
+        tree=tree,
+        save_path=save_path,
+        heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+    )
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
     url = f"http://127.0.0.1:{port}/"
     webbrowser.open(url)
-    uvicorn.run(studio_server.app, host="127.0.0.1", port=port, log_level="warning")
+
+    config = uvicorn.Config(
+        studio_server.app, host="127.0.0.1", port=port, log_level="warning"
+    )
+    server = uvicorn.Server(config)
+
+    async def watcher() -> None:
+        while not server.should_exit:
+            await asyncio.sleep(1.0)
+            studio_server._check_heartbeat_timeout()
+            if studio_server.submitted or studio_server.cancelled:
+                server.should_exit = True
+
+    async def main() -> None:
+        watcher_task = asyncio.create_task(watcher())
+        try:
+            await server.serve()
+        finally:
+            watcher_task.cancel()
+
+    asyncio.run(main())

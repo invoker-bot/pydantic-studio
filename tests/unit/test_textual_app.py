@@ -222,3 +222,39 @@ async def test_smoke_edit_save_cycle_with_enum(tmp_path) -> None:
     reloaded = load_yaml(out, M)
     instance = reloaded.to_instance()
     assert instance.favorite == Color.RED
+
+
+@pytest.mark.asyncio
+async def test_quit_prompts_when_dirty(tmp_path) -> None:
+    """If the tree has been mutated, Ctrl+Q sets _quit_confirm_active."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    tree = build_form_tree(Server)
+    tree.set_value("port", 9999)  # dirty
+    app = StudioApp(tree=tree, save_path=tmp_path / "out.yaml")
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+q")
+        await pilot.pause()
+        screen = app.screen
+        # The first Ctrl+Q should NOT exit; instead it sets the confirm flag.
+        assert getattr(screen, "_quit_confirm_active", False) is True
+        # Second Ctrl+Q within the window confirms exit.
+        await pilot.press("ctrl+q")
+        await pilot.pause()
+
+
+@pytest.mark.asyncio
+async def test_quit_does_not_prompt_when_clean(tmp_path) -> None:
+    """Fresh tree with no mutations + Ctrl+Q exits cleanly without setting confirm."""
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    tree = build_form_tree(Server)
+    app = StudioApp(tree=tree, save_path=tmp_path / "out.yaml")
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        # Don't mutate; press Ctrl+Q.
+        await pilot.press("ctrl+q")
+        await pilot.pause()
