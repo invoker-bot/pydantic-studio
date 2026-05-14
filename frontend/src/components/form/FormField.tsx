@@ -16,6 +16,7 @@ import { PathField } from "@/components/form/fields/PathField";
 import { SequenceField } from "@/components/form/fields/SequenceField";
 import { StringField } from "@/components/form/fields/StringField";
 import { UnionField } from "@/components/form/fields/UnionField";
+import { URLField } from "@/components/form/fields/URLField";
 
 type NodeOfKind<K extends string> = Extract<FormNodeData, { kind: K }>;
 
@@ -36,6 +37,8 @@ export function FormField({
       return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
     case "path":
       return <PathField node={node as NodeOfKind<"path">} path={path} />;
+    case "url":
+      return <URLField node={node as NodeOfKind<"url">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
