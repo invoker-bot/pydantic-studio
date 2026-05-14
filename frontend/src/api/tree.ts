@@ -1,11 +1,10 @@
-// Shared fetch helper for GET /api/tree. Phase 3 will grow this
-// module with typed parsers (zod) once the FormField dispatcher
-// needs typed access to nodes.
+import { FormTreeSchema, type FormTree } from "@/api/schemas";
 
-export async function fetchTree(): Promise<unknown> {
+export async function fetchTree(): Promise<FormTree> {
   const response = await fetch("/api/tree");
   if (!response.ok) {
     throw new Error(`GET /api/tree failed: HTTP ${response.status}`);
   }
-  return response.json();
+  const raw = await response.json();
+  return FormTreeSchema.parse(raw);
 }

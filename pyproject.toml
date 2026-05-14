@@ -48,6 +48,7 @@ dev = [
   "pytest>=8",
   "pytest-asyncio>=0.24",
   "pytest-cov",
+  "pytest-playwright>=0.5",
   "email-validator>=2",
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
@@ -65,7 +66,12 @@ build-backend = "uv_build"
 testpaths = ["tests"]
 pythonpath = ["src"]
 python_files = ["test_*.py"]
-addopts = "-ra"
+# Default run excludes tests/e2e/ + disables the pytest-playwright
+# plugin because the latter's mere registration breaks Textual's
+# App.run_test() (which calls asyncio.run() internally) under
+# asyncio_mode="auto". To run the e2e suite explicitly:
+#   uv run python -m pytest tests/e2e -p playwright -o addopts=-ra
+addopts = "-ra --ignore=tests/e2e -p no:playwright"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
