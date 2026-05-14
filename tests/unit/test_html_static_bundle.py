@@ -51,10 +51,9 @@ def test_static_dist_assets_are_served() -> None:
     response = client.get(mounted_path)
     assert response.status_code == 200, (
         f"GET {mounted_path} returned {response.status_code}; "
-        f"the bundle's index.html points at {js_path} which is "
-        f"root-relative and won't work in-browser via the static "
-        f"mount alone. Phase 5/6 fixes this by either setting "
-        f"vite's base option OR by serving the SPA at /."
+        f"the static mount under /static/dist/ should serve every "
+        f"file under src/pydantic_studio/renderers/html/static/dist/. "
+        f"Re-run `pnpm build` from frontend/ to refresh the bundle."
     )
     # Bundled JS must be a non-trivial size.
     assert len(response.content) > 1000
