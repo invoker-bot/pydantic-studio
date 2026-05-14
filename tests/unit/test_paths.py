@@ -25,6 +25,17 @@ def test_parse_multiple_indices():
     assert p.segments == ("matrix", 0, 1)
 
 
+def test_parse_dotted_integer():
+    """Phase 4 added dotted-int support so the frontend's childPath
+    helper (which emits ``tags.0`` for sequence children) round-trips
+    cleanly through the same parser the backend uses to walk paths.
+    Bracket form ``tags[0]`` is still accepted (see other tests)."""
+    assert Path.parse("tags.0").segments == ("tags", 0)
+    assert Path.parse("env.2").segments == ("env", 2)
+    assert Path.parse("a.0.b").segments == ("a", 0, "b")
+    assert Path.parse("0").segments == (0,)
+
+
 def test_parse_root():
     p = Path.parse("")
     assert p.segments == ()

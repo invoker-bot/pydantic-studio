@@ -93,31 +93,120 @@ def _resolve(tree: FormTree, path: str) -> Any:
     return node
 
 
-def _maybe_coerce_enum(tree: FormTree, path: str, value: Any) -> Any:
-    """If the node at ``path`` is an EnumNode and ``value`` is a string
-    matching one of its choices' NAMES, return the corresponding enum
-    member. Otherwise return ``value`` unchanged.
+def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
+    """Translate the wire-format string for a typed FormNode into the Python
+    typed value its ``validate_value`` expects.
 
-    Phase 1's JSON API serializes EnumNode.value as the member's name
-    (see EnumNode._serialize_member). The reverse coercion belongs at
-    the route/dispatcher layer because EnumNode.validate_value
-    intentionally enforces the isinstance(value, Enum) invariant on
-    its own boundary.
+    Most primitive nodes accept the wire format directly: ``string``,
+    ``int``, ``bool``, ``path``, ``url``, ``email``, ``ip_address``,
+    ``ip_network``, ``pattern``, ``literal`` (Pydantic's Literal accepts
+    primitives), and ``secret`` (when ``secret_kind == "str"``) pass
+    through untouched.
+
+    The kinds that need coercion are those whose ``validate_value`` does
+    an exact-type check that the JSON wire format can't satisfy
+    directly:
+
+    - ``enum`` — wire value is the member's ``.name`` (str); look up the
+      matching Enum member by name.
+    - ``datetime`` / ``date`` / ``time`` — wire value is an ISO 8601
+      string; parse via ``fromisoformat`` (handles ``+00:00`` and ``Z``
+      on 3.11+).
+    - ``timedelta`` — wire value is an ISO 8601 duration string
+      (e.g. ``PT1H30M``); parse via ``TypeAdapter(timedelta)``.
+    - ``decimal`` — wire value is a string (JSON doesn't have a decimal
+      type); construct via ``Decimal(value)``.
+    - ``uuid`` — wire value is a UUID string; construct via ``UUID(value)``.
+    - ``bytes`` — wire value is hex (per BytesNode's JSON serializer);
+      decode via ``bytes.fromhex(value)``.
+    - ``secret`` with ``secret_kind == "bytes"`` — wire value is a UTF-8
+      string (per SecretNode's bytes-as-str round-trip); encode via
+      ``value.encode()``.
+
+    Contract: returns ``value`` unchanged when no coercion applies, or
+    when coercion raises. The node's ``validate_value`` still runs on
+    whatever this returns, so a malformed wire string surfaces as the
+    canonical "invalid X" error.
     """
-    from pydantic_studio.tree.nodes import EnumNode
+    from datetime import date, datetime, time, timedelta
+    from decimal import Decimal, InvalidOperation
+    from uuid import UUID
+
+    from pydantic import TypeAdapter
+
+    from pydantic_studio.tree.nodes import (
+        BytesNode,
+        DateNode,
+        DatetimeNode,
+        DecimalNode,
+        EnumNode,
+        SecretNode,
+        TimedeltaNode,
+        TimeNode,
+        UuidNode,
+    )
 
     if not isinstance(value, str):
         return value
     try:
         node = _resolve(tree, path)
     except Exception:
-        return value   # let set_value's own path-resolution fail clearly
-    if not isinstance(node, EnumNode):
-        return value
-    for name, member in node.choices:
-        if name == value:
-            return member
-    return value  # not a recognized name; let validate_value reject
+        return value  # let set_value's own path-resolution fail clearly
+
+    # Enum: look up the member by name (existing Phase 1 logic).
+    if isinstance(node, EnumNode):
+        for name, member in node.choices:
+            if name == value:
+                return member
+        return value  # not a recognized name; let validate_value reject
+
+    # Temporals: fromisoformat is forgiving on 3.11+ (accepts both
+    # 'YYYY-MM-DDTHH:MM' and 'YYYY-MM-DDTHH:MM:SS', with optional
+    # timezone). On parse failure, fall through to validate_value's
+    # error path.
+    if isinstance(node, DatetimeNode):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    if isinstance(node, DateNode):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return value
+    if isinstance(node, TimeNode):
+        try:
+            return time.fromisoformat(value)
+        except ValueError:
+            return value
+    if isinstance(node, TimedeltaNode):
+        # ISO 8601 duration strings (PT1H30M, P1DT2H, etc.). Pydantic's
+        # TypeAdapter handles the parse; a malformed string raises
+        # ValidationError which we swallow so validate_value owns the
+        # error surface.
+        try:
+            return TypeAdapter(timedelta).validate_python(value)
+        except Exception:
+            return value
+    if isinstance(node, DecimalNode):
+        try:
+            return Decimal(value)
+        except (InvalidOperation, ValueError):
+            return value
+    if isinstance(node, UuidNode):
+        try:
+            return UUID(value)
+        except ValueError:
+            return value
+    if isinstance(node, BytesNode):
+        try:
+            return bytes.fromhex(value)
+        except ValueError:
+            return value
+    if isinstance(node, SecretNode) and node.secret_kind == "bytes":
+        return value.encode()
+
+    return value
 
 
 def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
@@ -139,11 +228,7 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     try:
         if op == "set_value":
             value = mutation.get("value")
-            # If the target node is an EnumNode, the wire format is the
-            # member's NAME (per EnumNode._serialize_member); coerce it
-            # back to the actual enum member before validate_value sees
-            # it. (The HTMX route does the same at routes.py:198-202.)
-            value = _maybe_coerce_enum(tree, path, value)
+            value = _maybe_coerce_typed_value(tree, path, value)
             return tree.set_value(path, value)
         if op == "add_item":
             return tree.add_item(path)

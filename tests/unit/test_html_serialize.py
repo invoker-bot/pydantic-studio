@@ -319,3 +319,167 @@ def test_dispatch_set_value_bool() -> None:
     )
     assert result.ok is True
     assert tree.root.find("flag").value is True
+
+
+def test_dispatch_set_value_datetime_coerces_iso_string() -> None:
+    """DatetimeField sends an ISO 8601 string; dispatch must coerce
+    to a datetime instance before DatetimeNode.validate_value runs."""
+    from datetime import datetime
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        when: datetime = datetime(2020, 1, 1)
+
+    tree = build_form_tree(M, existing={"when": datetime(2020, 1, 1)})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "when", "value": "2025-01-15T10:30:00"}
+    )
+    assert result.ok is True
+    assert tree.root.find("when").value == datetime(2025, 1, 15, 10, 30, 0)
+
+
+def test_dispatch_set_value_date_coerces_iso_string() -> None:
+    from datetime import date
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        d: date = date(2020, 1, 1)
+
+    tree = build_form_tree(M, existing={"d": date(2020, 1, 1)})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "d", "value": "2025-06-09"}
+    )
+    assert result.ok is True
+    assert tree.root.find("d").value == date(2025, 6, 9)
+
+
+def test_dispatch_set_value_time_coerces_iso_string() -> None:
+    from datetime import time
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        t: time = time(0, 0)
+
+    tree = build_form_tree(M, existing={"t": time(0, 0)})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "t", "value": "14:30:00"}
+    )
+    assert result.ok is True
+    assert tree.root.find("t").value == time(14, 30, 0)
+
+
+def test_dispatch_set_value_timedelta_coerces_iso_duration() -> None:
+    from datetime import timedelta
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        ttl: timedelta = timedelta(seconds=0)
+
+    tree = build_form_tree(M, existing={"ttl": timedelta(seconds=0)})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "ttl", "value": "PT1H30M"}
+    )
+    assert result.ok is True
+    assert tree.root.find("ttl").value == timedelta(hours=1, minutes=30)
+
+
+def test_dispatch_set_value_decimal_coerces_string() -> None:
+    from decimal import Decimal
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        amount: Decimal = Decimal("0.00")
+
+    tree = build_form_tree(M, existing={"amount": Decimal("0.00")})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "amount", "value": "19.99"}
+    )
+    assert result.ok is True
+    assert tree.root.find("amount").value == Decimal("19.99")
+
+
+def test_dispatch_set_value_uuid_coerces_string() -> None:
+    from uuid import UUID
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        id: UUID = UUID("11111111-1111-1111-1111-111111111111")
+
+    tree = build_form_tree(
+        M, existing={"id": UUID("11111111-1111-1111-1111-111111111111")}
+    )
+    new_value = "22222222-2222-2222-2222-222222222222"
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "id", "value": new_value}
+    )
+    assert result.ok is True
+    assert tree.root.find("id").value == UUID(new_value)
+
+
+def test_dispatch_set_value_bytes_coerces_hex_string() -> None:
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        blob: bytes = b""
+
+    tree = build_form_tree(M, existing={"blob": b""})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "blob", "value": "deadbeef"}
+    )
+    assert result.ok is True
+    assert tree.root.find("blob").value == b"\xde\xad\xbe\xef"
+
+
+def test_dispatch_set_value_secret_bytes_coerces_utf8_string() -> None:
+    from pydantic import BaseModel, SecretBytes
+
+    class M(BaseModel):
+        key: SecretBytes = SecretBytes(b"")
+
+    tree = build_form_tree(M, existing={"key": SecretBytes(b"")})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "key", "value": "p4ssw0rd"}
+    )
+    assert result.ok is True
+    assert tree.root.find("key").value == b"p4ssw0rd"
+
+
+def test_dispatch_set_value_secret_str_passes_through_unchanged() -> None:
+    """SecretStr nodes accept str on the wire (secret_kind == 'str');
+    coercion must NOT encode to bytes."""
+    from pydantic import BaseModel, SecretStr
+
+    class M(BaseModel):
+        password: SecretStr = SecretStr("")
+
+    tree = build_form_tree(M, existing={"password": SecretStr("")})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "password", "value": "letmein"}
+    )
+    assert result.ok is True
+    assert tree.root.find("password").value == "letmein"
+
+
+def test_dispatch_set_value_malformed_iso_returns_validation_failure() -> None:
+    """If the wire string is unparseable, coercion swallows the error
+    and validate_value rejects via the canonical 'expected X' message —
+    not via a raised exception leaking out of dispatch_mutation."""
+    from datetime import date
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        d: date = date(2020, 1, 1)
+
+    tree = build_form_tree(M, existing={"d": date(2020, 1, 1)})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "d", "value": "not-a-date"}
+    )
+    assert result.ok is False
+    assert tree.root.find("d").value == date(2020, 1, 1)   # unchanged
