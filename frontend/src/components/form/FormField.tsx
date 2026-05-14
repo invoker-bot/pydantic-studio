@@ -14,6 +14,7 @@ import { FloatField } from "@/components/form/fields/FloatField";
 import { GroupField } from "@/components/form/fields/GroupField";
 import { IntField } from "@/components/form/fields/IntField";
 import { IPAddressField } from "@/components/form/fields/IPAddressField";
+import { IPNetworkField } from "@/components/form/fields/IPNetworkField";
 import { LiteralField } from "@/components/form/fields/LiteralField";
 import { MappingField } from "@/components/form/fields/MappingField";
 import { PathField } from "@/components/form/fields/PathField";
@@ -57,6 +58,8 @@ export function FormField({
       return <EmailField node={node as NodeOfKind<"email">} path={path} />;
     case "ip_address":
       return <IPAddressField node={node as NodeOfKind<"ip_address">} path={path} />;
+    case "ip_network":
+      return <IPNetworkField node={node as NodeOfKind<"ip_network">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
