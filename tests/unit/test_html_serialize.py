@@ -225,3 +225,26 @@ def test_dispatch_select_variant_switches_to_indexed_branch() -> None:
     val = tree.root.find("value")
     assert val.selected_index == 1
     assert val.selected.kind == "string"
+
+
+def test_dispatch_unknown_op_fails_without_mutating() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
+    result = dispatch_mutation(tree, {"op": "nuke", "path": "name"})
+    assert result.ok is False
+    assert any("nuke" in e for e in result.errors)
+    assert tree.root.find("name").value == "alpha"
+
+
+def test_dispatch_missing_op_fails_without_mutating() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha"})
+    result = dispatch_mutation(tree, {"path": "name", "value": "x"})
+    assert result.ok is False
+    assert tree.root.find("name").value == "alpha"
+
+
+def test_dispatch_bad_path_fails_without_mutating() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha"})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "nope.does.not.exist", "value": "x"}
+    )
+    assert result.ok is False

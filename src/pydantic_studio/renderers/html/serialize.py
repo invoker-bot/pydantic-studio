@@ -77,31 +77,38 @@ def _iter_failed_errors(e: Any) -> Any:
 def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
     """Apply one mutation from the JSON API onto the FormTree.
 
-    ``mutation`` is the parsed JSON body — exactly the discriminated union
-    described in spec §3.2. Handles ``set_value`` for scalars, the three
-    sequence ops (``add_item``, ``remove_item``, ``move_item``), the three
-    mapping ops (``add_entry``, ``remove_entry``, ``rename_key``), and the
-    union op (``select_variant``). Unknown ops return a failure
-    ValidationResult without touching the tree.
+    Translates the JSON op into the matching ``FormTree`` mutator. Returns
+    the mutator's ``ValidationResult`` on success or a failure result if:
+    - the ``op`` is unknown / missing
+    - the request is missing a required key (``index``, ``key``, etc.)
+    - a coercion fails (e.g., non-numeric ``index``)
+    - the path doesn't resolve to a node
+
+    Any of these surface to the client via the route layer's standard
+    200 response (with ``validation.ok = false``); the route only 500s
+    on a real server bug, never on a malformed request.
     """
     op = mutation.get("op")
     path = mutation.get("path", "")
-    if op == "set_value":
-        return tree.set_value(path, mutation.get("value"))
-    if op == "add_item":
-        return tree.add_item(path)
-    if op == "remove_item":
-        return tree.remove_item(path, int(mutation["index"]))
-    if op == "move_item":
-        return tree.move_item(path, int(mutation["from"]), int(mutation["to"]))
-    if op == "add_entry":
-        return tree.add_entry(path, key=str(mutation["key"]))
-    if op == "remove_entry":
-        return tree.remove_entry(path, int(mutation["index"]))
-    if op == "rename_key":
-        return tree.rename_key(
-            path, int(mutation["index"]), str(mutation["new_key"])
-        )
-    if op == "select_variant":
-        return tree.select_variant(path, int(mutation["variant_index"]))
+    try:
+        if op == "set_value":
+            return tree.set_value(path, mutation.get("value"))
+        if op == "add_item":
+            return tree.add_item(path)
+        if op == "remove_item":
+            return tree.remove_item(path, int(mutation["index"]))
+        if op == "move_item":
+            return tree.move_item(path, int(mutation["from"]), int(mutation["to"]))
+        if op == "add_entry":
+            return tree.add_entry(path, key=str(mutation["key"]))
+        if op == "remove_entry":
+            return tree.remove_entry(path, int(mutation["index"]))
+        if op == "rename_key":
+            return tree.rename_key(
+                path, int(mutation["index"]), str(mutation["new_key"])
+            )
+        if op == "select_variant":
+            return tree.select_variant(path, int(mutation["variant_index"]))
+    except (KeyError, ValueError, TypeError) as exc:
+        return ValidationResult.fail([f"mutation failed: {exc}"])
     return ValidationResult.fail([f"unknown op: {op!r}"])
