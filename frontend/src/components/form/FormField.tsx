@@ -17,6 +17,7 @@ import { MappingField } from "@/components/form/fields/MappingField";
 import { PathField } from "@/components/form/fields/PathField";
 import { SequenceField } from "@/components/form/fields/SequenceField";
 import { StringField } from "@/components/form/fields/StringField";
+import { TimeField } from "@/components/form/fields/TimeField";
 import { UnionField } from "@/components/form/fields/UnionField";
 import { URLField } from "@/components/form/fields/URLField";
 
@@ -37,6 +38,8 @@ export function FormField({
       return <BoolField node={node as NodeOfKind<"bool">} path={path} />;
     case "date":
       return <DateField node={node as NodeOfKind<"date">} path={path} />;
+    case "time":
+      return <TimeField node={node as NodeOfKind<"time">} path={path} />;
     case "decimal":
       return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
     case "path":
