@@ -6,6 +6,7 @@
 
 import type { GroupNodeData } from "@/api/schemas";
 import { FormField } from "@/components/form/FormField";
+import { childPath } from "@/components/form/path";
 
 export function GroupField({ node, path }: { node: GroupNodeData; path: string }) {
   return (
@@ -14,7 +15,7 @@ export function GroupField({ node, path }: { node: GroupNodeData; path: string }
         <FormField
           key={child.name}
           node={child}
-          path={path ? `${path}.${child.name}` : child.name}
+          path={childPath(path, child.name)}
         />
       ))}
     </div>
