@@ -67,13 +67,18 @@ def _find_free_port() -> int:
         return int(s.getsockname()[1])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def fastapi_url() -> "Iterator[str]":
-    """Spin up uvicorn on a free port in a background thread.
+    """Spin up uvicorn on a free port in a background thread, one per
+    test function.
 
-    Each test gets the same server (session-scoped) - tests that mutate
-    state are responsible for either resetting it or using values that
-    don't collide.
+    Function-scoped (NOT session-scoped) so each test gets a fresh
+    FormTree with the schema's defaults. Phase 4 added e2e tests that
+    mutate state (add_item / add_entry / select_variant) — session-
+    scoping caused order-dependent flakes (e.g., test_any_field leaving
+    a metadata entry behind that test_mapping_field's `.first` selector
+    then picked up by mistake). Adds ~50 ms of uvicorn-startup overhead
+    per test; cheap insurance for test isolation.
     """
     port = _find_free_port()
     tree = build_form_tree(_DemoSchema)
