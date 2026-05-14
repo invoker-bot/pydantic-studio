@@ -74,3 +74,36 @@ def test_api_mutations_unknown_op_returns_400() -> None:
     assert response.status_code == 400
     body = response.json()
     assert "nuke" in body["detail"]
+
+
+def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app)
+    response = client.post("/api/submit")
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert server.submitted is True
+
+
+def test_api_submit_validation_failure_returns_400_with_errors() -> None:
+    # Required field 'name' deliberately unset
+    tree = build_form_tree(_Demo)
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app)
+    response = client.post("/api/submit")
+    assert response.status_code == 400
+    body = response.json()
+    assert body["ok"] is False
+    assert body["errors"]
+    assert server.submitted is False
+
+
+def test_api_cancel_marks_server_cancelled() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "x"})
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app)
+    response = client.post("/api/cancel")
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert server.cancelled is True

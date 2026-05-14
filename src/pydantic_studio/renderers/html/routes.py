@@ -354,3 +354,30 @@ def register(app: FastAPI, server: StudioServer) -> None:
                 "mutation_result": {"ok": result.ok, "errors": list(result.errors)},
             }
         )
+
+    @app.post("/api/submit", response_class=JSONResponse)
+    async def api_submit() -> JSONResponse:
+        from pydantic import ValidationError
+
+        from pydantic_studio import save_yaml
+        from pydantic_studio.exceptions import ValidationFailedError
+
+        try:
+            server.tree.to_instance()
+        except (ValidationError, ValidationFailedError):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "ok": False,
+                    "errors": validation_envelope(server.tree)["errors"],
+                },
+            )
+        if server.save_path is not None:
+            save_yaml(server.tree, server.save_path)
+        server.submitted = True
+        return JSONResponse(content={"ok": True})
+
+    @app.post("/api/cancel", response_class=JSONResponse)
+    async def api_cancel() -> JSONResponse:
+        server.cancelled = True
+        return JSONResponse(content={"ok": True})
