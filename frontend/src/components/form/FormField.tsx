@@ -5,6 +5,7 @@
 import type { FormNodeData } from "@/api/schemas";
 import { AnyField } from "@/components/form/fields/AnyField";
 import { BoolField } from "@/components/form/fields/BoolField";
+import { BytesField } from "@/components/form/fields/BytesField";
 import { DateField } from "@/components/form/fields/DateField";
 import { DatetimeField } from "@/components/form/fields/DatetimeField";
 import { DecimalField } from "@/components/form/fields/DecimalField";
@@ -69,6 +70,8 @@ export function FormField({
       return <SecretField node={node as NodeOfKind<"secret">} path={path} />;
     case "pattern":
       return <PatternField node={node as NodeOfKind<"pattern">} path={path} />;
+    case "bytes":
+      return <BytesField node={node as NodeOfKind<"bytes">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
