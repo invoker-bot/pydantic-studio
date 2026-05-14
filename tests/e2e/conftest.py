@@ -22,6 +22,7 @@ import pytest
 import uvicorn
 from pydantic import (
     BaseModel,
+    EmailStr,
     Field,
     HttpUrl,
     SecretBytes,
@@ -80,7 +81,9 @@ class _DemoSchema(BaseModel):
     homepage: HttpUrl = Field(
         default="https://example.com", description="Phase 5 url field"
     )
-    contact: str = Field(default="ops@example.com", description="Phase 5 email field")
+    contact: EmailStr = Field(
+        default="ops@example.com", description="Phase 5 email field"
+    )
     starts_on: date = Field(
         default=date(2025, 1, 1), description="Phase 5 date field"
     )
