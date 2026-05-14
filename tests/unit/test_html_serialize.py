@@ -47,6 +47,10 @@ class _WithUnion(BaseModel):
     notifier: _Notifier
 
 
+class _WithList(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+
+
 def test_tree_to_json_returns_schema_name_and_root() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
     data = tree_to_json(tree)
@@ -143,3 +147,30 @@ def test_dispatch_set_value_validation_failure_leaves_tree_untouched() -> None:
     )
     assert result.ok is False
     assert tree.root.find("workers").value == 4
+
+
+def test_dispatch_add_item_appends_to_sequence() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a"]})
+    result = dispatch_mutation(tree, {"op": "add_item", "path": "tags"})
+    assert result.ok is True
+    assert len(tree.root.find("tags").items) == 2
+
+
+def test_dispatch_remove_item_pops_indexed_entry() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
+    result = dispatch_mutation(
+        tree, {"op": "remove_item", "path": "tags", "index": 1}
+    )
+    assert result.ok is True
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["a", "c"]
+
+
+def test_dispatch_move_item_reorders_sequence() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
+    result = dispatch_mutation(
+        tree, {"op": "move_item", "path": "tags", "from": 0, "to": 2}
+    )
+    assert result.ok is True
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["b", "c", "a"]
