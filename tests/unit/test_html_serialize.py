@@ -248,3 +248,78 @@ def test_dispatch_bad_path_fails_without_mutating() -> None:
         tree, {"op": "set_value", "path": "nope.does.not.exist", "value": "x"}
     )
     assert result.ok is False
+
+
+def test_dispatch_set_value_enum_coerces_name_string_to_member() -> None:
+    """EnumField sends {op: 'set_value', value: <member_name>} since
+    EnumNode._serialize_member emits the name. dispatch_mutation must
+    coerce name -> member before validate_value sees it."""
+    from enum import Enum
+
+    from pydantic import BaseModel
+
+    class Color(Enum):
+        RED = "red"
+        GREEN = "green"
+
+    class M(BaseModel):
+        color: Color = Color.RED
+
+    tree = build_form_tree(M, existing={"color": Color.RED})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "color", "value": "GREEN"}
+    )
+    assert result.ok is True
+    color_node = tree.root.find("color")
+    assert color_node.value == Color.GREEN
+
+
+def test_dispatch_set_value_literal_str() -> None:
+    """LiteralField sends raw choice values; for str literals this is
+    a plain string, which Literal[...] accepts directly."""
+    from typing import Literal
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        choice: Literal["a", "b"] = "a"
+
+    tree = build_form_tree(M, existing={"choice": "a"})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "choice", "value": "b"}
+    )
+    assert result.ok is True
+    assert tree.root.find("choice").value == "b"
+
+
+def test_dispatch_set_value_literal_int() -> None:
+    """LiteralField preserves the choice type via matchedChoice
+    lookup; for int literals the wire value is a number."""
+    from typing import Literal
+
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        level: Literal[1, 2, 3] = 1
+
+    tree = build_form_tree(M, existing={"level": 1})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "level", "value": 2}
+    )
+    assert result.ok is True
+    assert tree.root.find("level").value == 2
+
+
+def test_dispatch_set_value_bool() -> None:
+    """BoolField sends raw true/false; trivial round-trip."""
+    from pydantic import BaseModel
+
+    class M(BaseModel):
+        flag: bool = False
+
+    tree = build_form_tree(M, existing={"flag": False})
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "flag", "value": True}
+    )
+    assert result.ok is True
+    assert tree.root.find("flag").value is True

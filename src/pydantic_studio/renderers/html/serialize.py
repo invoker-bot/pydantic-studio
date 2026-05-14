@@ -92,7 +92,13 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     path = mutation.get("path", "")
     try:
         if op == "set_value":
-            return tree.set_value(path, mutation.get("value"))
+            value = mutation.get("value")
+            # If the target node is an EnumNode, the wire format is the
+            # member's NAME (per EnumNode._serialize_member); coerce it
+            # back to the actual enum member before validate_value sees
+            # it. (The HTMX route does the same at routes.py:198-202.)
+            value = _maybe_coerce_enum(tree, path, value)
+            return tree.set_value(path, value)
         if op == "add_item":
             return tree.add_item(path)
         if op == "remove_item":
@@ -112,3 +118,49 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     except (KeyError, ValueError, TypeError) as exc:
         return ValidationResult.fail([f"mutation failed: {exc}"])
     return ValidationResult.fail([f"unknown op: {op!r}"])
+
+
+def _maybe_coerce_enum(tree: FormTree, path: str, value: Any) -> Any:
+    """If the node at ``path`` is an EnumNode and ``value`` is a string
+    matching one of its choices' NAMES, return the corresponding enum
+    member. Otherwise return ``value`` unchanged.
+
+    Phase 1's JSON API serializes EnumNode.value as the member's name
+    (see EnumNode._serialize_member). The reverse coercion belongs at
+    the route/dispatcher layer because EnumNode.validate_value
+    intentionally enforces the isinstance(value, Enum) invariant on
+    its own boundary.
+    """
+    from pydantic_studio.tree.nodes import EnumNode
+
+    if not isinstance(value, str):
+        return value
+    try:
+        node = _resolve(tree, path)
+    except Exception:
+        return value   # let set_value's own path-resolution fail clearly
+    if not isinstance(node, EnumNode):
+        return value
+    for name, member in node.choices:
+        if name == value:
+            return member
+    return value  # not a recognized name; let validate_value reject
+
+
+def _resolve(tree: FormTree, path: str) -> Any:
+    """Walk path segments to find the target node. Returns the node
+    or raises if the path doesn't resolve."""
+    from pydantic_studio.tree.nodes import GroupNode
+
+    if not path:
+        return tree.root
+    node: Any = tree.root
+    for seg in path.split("."):
+        if isinstance(node, GroupNode):
+            child = node.find(seg)
+            if child is None:
+                raise KeyError(seg)
+            node = child
+        else:
+            raise KeyError(seg)
+    return node
