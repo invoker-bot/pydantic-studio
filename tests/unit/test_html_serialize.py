@@ -51,6 +51,10 @@ class _WithList(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class _WithDict(BaseModel):
+    env: dict[str, str] = Field(default_factory=dict)
+
+
 def test_tree_to_json_returns_schema_name_and_root() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
     data = tree_to_json(tree)
@@ -174,3 +178,34 @@ def test_dispatch_move_item_reorders_sequence() -> None:
     assert result.ok is True
     values = [it.value for it in tree.root.find("tags").items]
     assert values == ["b", "c", "a"]
+
+
+def test_dispatch_add_entry_appends_new_key() -> None:
+    tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC"}})
+    result = dispatch_mutation(
+        tree, {"op": "add_entry", "path": "env", "key": "LOG"}
+    )
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
+    assert pairs == [("TZ", "UTC"), ("LOG", None)]
+
+
+def test_dispatch_remove_entry_drops_indexed_pair() -> None:
+    tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC", "LOG": "info"}})
+    result = dispatch_mutation(
+        tree, {"op": "remove_entry", "path": "env", "index": 0}
+    )
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
+    assert pairs == [("LOG", "info")]
+
+
+def test_dispatch_rename_key_changes_key_at_index() -> None:
+    tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC"}})
+    result = dispatch_mutation(
+        tree,
+        {"op": "rename_key", "path": "env", "index": 0, "new_key": "TIMEZONE"},
+    )
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
+    assert pairs == [("TIMEZONE", "UTC")]
