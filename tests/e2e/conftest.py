@@ -9,7 +9,7 @@ import socket
 import threading
 import time
 from contextlib import closing
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import pytest
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-class _LogLevel(str, Enum):
+class _LogLevel(StrEnum):
     DEBUG = "debug"
     INFO = "info"
     WARN = "warn"
@@ -68,7 +68,7 @@ def _find_free_port() -> int:
 
 
 @pytest.fixture
-def fastapi_url() -> "Iterator[str]":
+def fastapi_url() -> Iterator[str]:
     """Spin up uvicorn on a free port in a background thread, one per
     test function.
 
