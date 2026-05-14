@@ -20,10 +20,11 @@ import {
 
 type EnumNode = z.infer<typeof EnumNodeSchema>;
 
-// EnumNode.value is the enum member instance; the API serializes it
-// as either the enum's NAME (e.g., "INFO") or its raw VALUE (e.g.,
-// "info" for a string enum). The choices array is
-// [(name, member), ...]. We use the NAME as the canonical wire key.
+// EnumNode.value and each choices[i][1] are serialized as the
+// member's `.name` by EnumNode._serialize_member (canonical wire
+// format). currentName looks up the matching choice; the
+// `String(member) === valStr` branch is defensive (kept against a
+// future serializer change) but doesn't fire today.
 
 function currentName(node: EnumNode): string {
   // value may be undefined / null / serialized as either name or value

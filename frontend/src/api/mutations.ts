@@ -44,11 +44,26 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
   // The tree field always needs zod parsing; the rest is shape-stable
   // enough that we trust it. Future polish could add a full envelope
   // schema if we ever want stronger guarantees.
-  return {
+  const parsed: MutationResponse = {
     tree: FormTreeSchema.parse(raw.tree),
     validation: raw.validation,
     mutation_result: raw.mutation_result,
   };
+  // The server returns 200 even when the mutation is REJECTED by
+  // validate-first (the tree is intact; mutation_result.ok=false flags
+  // the rejection). Surface that as a thrown Error so useMutation's
+  // onError fires and the field component can show the error - rather
+  // than leaving the per-field onError handlers as dead code.
+  if (!parsed.mutation_result.ok) {
+    const msg = parsed.mutation_result.errors.join("; ") || "mutation rejected";
+    const err = new Error(msg);
+    // Stash the tree on the error so onError handlers in TanStack
+    // Query's onSuccess - which won't fire because we threw - can
+    // still update the cache. (See useApplyMutation below.)
+    (err as Error & { tree?: FormTree }).tree = parsed.tree;
+    throw err;
+  }
+  return parsed;
 }
 
 export function useApplyMutation() {
@@ -60,6 +75,15 @@ export function useApplyMutation() {
       // server returned. Every component using useQuery(['tree']) will
       // re-render with the new state on the next React tick.
       queryClient.setQueryData(["tree"], response.tree);
+    },
+    onError: (error) => {
+      // applyMutation throws when mutation_result.ok=false, but the
+      // server still returns the (un-mutated) tree. Update the cache
+      // anyway so node.error stamps surface via useEffect re-sync.
+      const errWithTree = error as Error & { tree?: FormTree };
+      if (errWithTree.tree) {
+        queryClient.setQueryData(["tree"], errWithTree.tree);
+      }
     },
   });
 }
