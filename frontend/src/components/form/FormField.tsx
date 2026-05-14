@@ -18,6 +18,7 @@ import { IPNetworkField } from "@/components/form/fields/IPNetworkField";
 import { LiteralField } from "@/components/form/fields/LiteralField";
 import { MappingField } from "@/components/form/fields/MappingField";
 import { PathField } from "@/components/form/fields/PathField";
+import { PatternField } from "@/components/form/fields/PatternField";
 import { SecretField } from "@/components/form/fields/SecretField";
 import { SequenceField } from "@/components/form/fields/SequenceField";
 import { StringField } from "@/components/form/fields/StringField";
@@ -66,6 +67,8 @@ export function FormField({
       return <UUIDField node={node as NodeOfKind<"uuid">} path={path} />;
     case "secret":
       return <SecretField node={node as NodeOfKind<"secret">} path={path} />;
+    case "pattern":
+      return <PatternField node={node as NodeOfKind<"pattern">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
