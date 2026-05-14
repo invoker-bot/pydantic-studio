@@ -261,9 +261,14 @@ cd frontend
 corepack enable && corepack prepare pnpm@9 --activate   # one-time
 pnpm install
 pnpm dev              # Vite dev server with HMR; proxies /api/* to FastAPI on :8000
-# in another terminal:
-uv run python examples/02_server_config.py web
-# then open http://localhost:5173 (Vite's port; not the FastAPI port)
+
+# in another terminal - dev-backend pins port 8000 to match Vite's proxy.
+# (The packaged `examples/*.py web` flow binds an ephemeral port; great
+# for end users, useless for a fixed-port dev proxy.)
+uv run python frontend/scripts/dev-backend.py
+
+# then open http://localhost:5173 (Vite's port; the proxy forwards
+# /api/* to FastAPI on :8000).
 
 # To refresh the committed bundle:
 pnpm build            # or frontend/scripts/build.sh
