@@ -381,3 +381,10 @@ def register(app: FastAPI, server: StudioServer) -> None:
     async def api_cancel() -> JSONResponse:
         server.cancelled = True
         return JSONResponse(content={"ok": True})
+
+    @app.get("/api/heartbeat", response_class=JSONResponse)
+    async def api_heartbeat() -> JSONResponse:
+        import time as _t
+
+        server.last_heartbeat_ts = _t.time()
+        return JSONResponse(content={"ok": True})

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time as _time
+
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
@@ -18,6 +20,18 @@ def _client(existing: dict | None = None) -> TestClient:
     tree = build_form_tree(_Demo, existing=existing)
     server = StudioServer(tree=tree, save_path=None)
     return TestClient(server.app)
+
+
+def _server_and_client(
+    existing: dict | None = None,
+) -> tuple[StudioServer, TestClient]:
+    """Like ``_client``, but also returns the StudioServer so tests can
+    assert side-effects on ``server.submitted`` / ``server.cancelled`` /
+    ``server.last_heartbeat_ts``.
+    """
+    tree = build_form_tree(_Demo, existing=existing)
+    server = StudioServer(tree=tree, save_path=None)
+    return server, TestClient(server.app)
 
 
 def test_api_tree_returns_json_with_schema_and_root() -> None:
@@ -77,9 +91,7 @@ def test_api_mutations_unknown_op_returns_400() -> None:
 
 
 def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
-    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
-    server = StudioServer(tree=tree, save_path=None)
-    client = TestClient(server.app)
+    server, client = _server_and_client({"name": "alpha", "workers": 4})
     response = client.post("/api/submit")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
@@ -88,9 +100,7 @@ def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
 
 def test_api_submit_validation_failure_returns_400_with_errors() -> None:
     # Required field 'name' deliberately unset
-    tree = build_form_tree(_Demo)
-    server = StudioServer(tree=tree, save_path=None)
-    client = TestClient(server.app)
+    server, client = _server_and_client()
     response = client.post("/api/submit")
     assert response.status_code == 400
     body = response.json()
@@ -100,10 +110,18 @@ def test_api_submit_validation_failure_returns_400_with_errors() -> None:
 
 
 def test_api_cancel_marks_server_cancelled() -> None:
-    tree = build_form_tree(_Demo, existing={"name": "x"})
-    server = StudioServer(tree=tree, save_path=None)
-    client = TestClient(server.app)
+    server, client = _server_and_client({"name": "x"})
     response = client.post("/api/cancel")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
     assert server.cancelled is True
+
+
+def test_api_heartbeat_returns_ok_and_records_timestamp() -> None:
+    server, client = _server_and_client({"name": "x"})
+    before = _time.time()
+    response = client.get("/api/heartbeat")
+    after = _time.time()
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert before <= server.last_heartbeat_ts <= after
