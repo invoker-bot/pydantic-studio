@@ -36,18 +36,19 @@ def test_static_dist_assets_are_served() -> None:
     server = StudioServer(tree=tree, save_path=None)
     client = TestClient(server.app)
 
-    # Find the bundled JS file via the HTML to avoid hard-coding the hash.
+    # After Phase 3's base-path fix the built HTML references the
+    # asset at its full mounted path /static/dist/assets/<hash>.js;
+    # no further path-rewriting is needed.
     html = client.get("/static/dist/index.html").text
-    # crude scrape: pull the first /assets/...js path from the HTML
     import re
 
-    js_match = re.search(r'/assets/[A-Za-z0-9_-]+\.js', html)
-    assert js_match is not None, f"no /assets/*.js found in built index.html:\n{html}"
-    js_path = js_match.group(0)
+    js_match = re.search(r'/static/dist/assets/[A-Za-z0-9_-]+\.js', html)
+    assert js_match is not None, (
+        f"no /static/dist/assets/*.js found in built index.html "
+        f"(expected after vite.config base fix from T1):\n{html}"
+    )
+    mounted_path = js_match.group(0)
 
-    # The HTML references it as /assets/<hash>.js (root-relative),
-    # but the static mount serves it at /static/dist/assets/<hash>.js.
-    mounted_path = f"/static/dist{js_path}"
     response = client.get(mounted_path)
     assert response.status_code == 200, (
         f"GET {mounted_path} returned {response.status_code}; "
@@ -55,5 +56,34 @@ def test_static_dist_assets_are_served() -> None:
         f"file under src/pydantic_studio/renderers/html/static/dist/. "
         f"Re-run `pnpm build` from frontend/ to refresh the bundle."
     )
-    # Bundled JS must be a non-trivial size.
     assert len(response.content) > 1000
+
+
+def test_static_dist_asset_uses_static_prefixed_path() -> None:
+    """After Phase 3's base-path fix, the built index.html should
+    reference assets with the /static/dist/ prefix - meaning a browser
+    loading /static/dist/index.html will fetch /static/dist/assets/<hash>.js
+    (which the existing static mount serves), not the previously-stale
+    root-relative /assets/<hash>.js.
+    """
+    tree = build_form_tree(_Demo)
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app)
+
+    html = client.get("/static/dist/index.html").text
+    import re
+
+    # The base="/static/dist/" rewriting must produce prefixed asset URLs.
+    js_match = re.search(r'/static/dist/assets/[A-Za-z0-9_-]+\.js', html)
+    assert js_match is not None, (
+        f"built index.html should reference /static/dist/assets/*.js "
+        f"after Phase 3's base-path fix (vite.config.ts base='/static/dist/'); "
+        f"current HTML:\n{html}"
+    )
+
+    # The bare /assets/<hash>.js form (Phase 2 default) should NOT appear -
+    # all asset references must carry the /static/dist/ prefix.
+    assert not re.search(r'(?<!/static/dist)/assets/[A-Za-z0-9_-]+\.js', html), (
+        f"found a non-prefixed /assets/*.js reference in built HTML; "
+        f"base path may not have taken effect:\n{html}"
+    )
