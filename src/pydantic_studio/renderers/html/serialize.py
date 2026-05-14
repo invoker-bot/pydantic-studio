@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydantic_studio.tree.validation import ValidationResult
+
 if TYPE_CHECKING:
     from pydantic_studio.tree.nodes import FormTree
 
@@ -70,3 +72,19 @@ def _iter_failed_errors(e: Any) -> Any:
             yield {"path": path, "message": message}
         else:
             yield {"path": "", "message": text}
+
+
+def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
+    """Apply one mutation from the JSON API onto the FormTree.
+
+    ``mutation`` is the parsed JSON body — exactly the discriminated union
+    described in spec §3.2. This function only handles the ``set_value``
+    op for now; sequence / mapping / union ops land in later tasks.
+    Unknown ops return a failure ValidationResult without touching the
+    tree.
+    """
+    op = mutation.get("op")
+    path = mutation.get("path", "")
+    if op == "set_value":
+        return tree.set_value(path, mutation.get("value"))
+    return ValidationResult.fail([f"unknown op: {op!r}"])

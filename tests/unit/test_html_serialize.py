@@ -7,7 +7,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.renderers.html.serialize import tree_to_json, validation_envelope
+from pydantic_studio.renderers.html.serialize import (
+    dispatch_mutation,
+    tree_to_json,
+    validation_envelope,
+)
 
 
 class _Primitive(BaseModel):
@@ -122,3 +126,20 @@ def test_validation_envelope_collects_per_field_errors() -> None:
     assert any("name" in e["path"] for e in env["errors"])
     for err in env["errors"]:
         assert set(err.keys()) >= {"path", "message"}
+
+
+def test_dispatch_set_value_updates_tree_and_returns_ok() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "before", "workers": 4})
+    result = dispatch_mutation(tree, {"op": "set_value", "path": "name", "value": "after"})
+    assert result.ok is True
+    assert tree.root.find("name").value == "after"
+
+
+def test_dispatch_set_value_validation_failure_leaves_tree_untouched() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
+    # workers is int; setting a non-int should fail validation
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "workers", "value": "not-an-int"}
+    )
+    assert result.ok is False
+    assert tree.root.find("workers").value == 4
