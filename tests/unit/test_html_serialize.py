@@ -277,8 +277,6 @@ def test_dispatch_set_value_enum_coerces_name_string_to_member() -> None:
 def test_dispatch_set_value_literal_str() -> None:
     """LiteralField sends raw choice values; for str literals this is
     a plain string, which Literal[...] accepts directly."""
-    from typing import Literal
-
     from pydantic import BaseModel
 
     class M(BaseModel):
@@ -295,8 +293,6 @@ def test_dispatch_set_value_literal_str() -> None:
 def test_dispatch_set_value_literal_int() -> None:
     """LiteralField preserves the choice type via matchedChoice
     lookup; for int literals the wire value is a number."""
-    from typing import Literal
-
     from pydantic import BaseModel
 
     class M(BaseModel):
