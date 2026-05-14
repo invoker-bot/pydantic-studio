@@ -5,10 +5,14 @@ __pycache__/
 *.so
 .Python
 build/
-dist/
+/dist/
 *.egg-info/
 .venv/
 .eggs/
+
+# Frontend (Vite + pnpm) - frontend/.gitignore is authoritative,
+# this is just a guard against tools accidentally writing to the root.
+/frontend/node_modules/
 
 # Environments
 .env

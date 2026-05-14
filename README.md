@@ -250,6 +250,33 @@ Project conventions are documented in [`CLAUDE.md`](CLAUDE.md) — the
 guide for AI-assisted development sessions, but useful for any
 contributor.
 
+## Frontend development (Phase 2+)
+
+The Textual TUI and CLI are pure Python — `uv sync && uv run python examples/02_server_config.py tui` is enough.
+
+The web renderer is a React SPA built with Vite, source under `frontend/`. End users do NOT need Node — `pip install pydantic-studio` ships the pre-built bundle. To modify the SPA:
+
+```bash
+cd frontend
+corepack enable && corepack prepare pnpm@9 --activate   # one-time
+pnpm install
+pnpm dev              # Vite dev server with HMR; proxies /api/* to FastAPI on :8000
+
+# in another terminal - dev-backend pins port 8000 to match Vite's proxy.
+# (The packaged `examples/*.py web` flow binds an ephemeral port; great
+# for end users, useless for a fixed-port dev proxy.)
+uv run python frontend/scripts/dev-backend.py
+
+# then open http://localhost:5173 (Vite's port; the proxy forwards
+# /api/* to FastAPI on :8000).
+
+# To refresh the committed bundle:
+pnpm build            # or frontend/scripts/build.sh
+git add ../src/pydantic_studio/renderers/html/static/dist
+```
+
+The bundled output (`src/pydantic_studio/renderers/html/static/dist/`) is committed to the repo so CI and downstream users don't need a Node toolchain.
+
 ## License
 
 MIT.

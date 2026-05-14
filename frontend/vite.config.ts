@@ -1,0 +1,33 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import path from "node:path";
+
+// Vite builds output INTO the Python package's static/ tree so the
+// existing StudioServer._mount_static at "/static" serves it without
+// any new route. Phase 6 will swap "/" to serve dist/index.html
+// directly; Phase 2 reaches the SPA via /static/dist/index.html.
+const PYTHON_DIST = path.resolve(
+  __dirname,
+  "../src/pydantic_studio/renderers/html/static/dist",
+);
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    outDir: PYTHON_DIST,
+    emptyOutDir: true,
+  },
+  server: {
+    proxy: {
+      // pnpm dev proxies /api/* to the local FastAPI process so the
+      // dev SPA can hit the real backend during development.
+      "/api": "http://127.0.0.1:8000",
+    },
+  },
+});

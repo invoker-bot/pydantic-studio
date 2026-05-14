@@ -1,0 +1,6 @@
+# pnpm + Vite + TypeScript artifacts
+node_modules/
+.vite/
+.cache/
+.tscache/
+*.tsbuildinfo
