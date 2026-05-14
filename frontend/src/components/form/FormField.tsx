@@ -12,6 +12,7 @@ import { GroupField } from "@/components/form/fields/GroupField";
 import { IntField } from "@/components/form/fields/IntField";
 import { LiteralField } from "@/components/form/fields/LiteralField";
 import { MappingField } from "@/components/form/fields/MappingField";
+import { PathField } from "@/components/form/fields/PathField";
 import { SequenceField } from "@/components/form/fields/SequenceField";
 import { StringField } from "@/components/form/fields/StringField";
 import { UnionField } from "@/components/form/fields/UnionField";
@@ -33,6 +34,8 @@ export function FormField({
       return <BoolField node={node as NodeOfKind<"bool">} path={path} />;
     case "decimal":
       return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
+    case "path":
+      return <PathField node={node as NodeOfKind<"path">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
