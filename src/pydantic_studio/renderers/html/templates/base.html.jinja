@@ -7,6 +7,12 @@
   <script src="/static/htmx.min.js"></script>
 </head>
 <body>
+  <!-- Heartbeat poll: pings /heartbeat on load and every 10s thereafter.
+       When the tab closes, pings stop and the server's watchdog flips
+       ``cancelled`` after ``heartbeat_timeout_seconds`` of silence so
+       ``run_html_app`` doesn't run forever. -->
+  <div hx-get="/heartbeat" hx-trigger="load, every 10s" hx-swap="none"
+       style="display:none" aria-hidden="true"></div>
   <header>
     <h1>{{ schema_name }}</h1>
   </header>

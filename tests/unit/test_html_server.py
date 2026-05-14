@@ -38,6 +38,26 @@ def test_static_htmx_serves() -> None:
     assert len(response.content) > 1000
 
 
+def test_index_includes_heartbeat_poll() -> None:
+    """The base template emits an HTMX heartbeat trigger so the server
+    can detect a closed tab. Without this, run_html_app's watchdog never
+    fires and the process runs forever when the browser is dismissed.
+    """
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(studio_server.app)
+    response = client.get("/")
+    assert response.status_code == 200
+    text = response.text
+    assert 'hx-get="/heartbeat"' in text
+    # The trigger must include both load (first hit) and a recurring
+    # interval — load alone wouldn't refresh; interval alone would let
+    # a fast tab-close before the first interval slip past unnoticed.
+    assert 'hx-trigger="load, every' in text
+
+
 def test_index_renders_form_fields() -> None:
     from pydantic_studio.renderers.html import StudioServer
 

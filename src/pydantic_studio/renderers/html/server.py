@@ -105,9 +105,16 @@ def run_html_app(
     save_path: str | Path | None = None,
     heartbeat_timeout_seconds: float = 30.0,
 ) -> None:
-    """Launch the HTML renderer. Blocks until /submit, /cancel, or heartbeat timeout."""
+    """Launch the HTML renderer. Blocks until /submit, /cancel, or heartbeat timeout.
+
+    Prints the editor URL to stdout before opening the browser so the user
+    can copy/paste it (e.g. when the auto-open fails or the terminal lives
+    on a different host than the desktop). When the server exits, prints
+    a one-line summary indicating whether the form was saved or cancelled.
+    """
     import asyncio
     import socket
+    import sys
     import webbrowser
 
     import uvicorn
@@ -122,6 +129,24 @@ def run_html_app(
     port = sock.getsockname()[1]
     sock.close()
     url = f"http://127.0.0.1:{port}/"
+
+    print(f"\npydantic-studio editor: {url}", file=sys.stdout)
+    if save_path is not None:
+        print(
+            f"  edit in the browser and click Save; output will be written to {save_path}",
+            file=sys.stdout,
+        )
+    else:
+        print(
+            "  edit in the browser and click Save to commit your changes",
+            file=sys.stdout,
+        )
+    print(
+        "  the terminal will return automatically when you save or cancel.\n",
+        file=sys.stdout,
+        flush=True,
+    )
+
     webbrowser.open(url)
 
     config = uvicorn.Config(
@@ -144,3 +169,11 @@ def run_html_app(
             watcher_task.cancel()
 
     asyncio.run(main())
+
+    if studio_server.submitted:
+        if save_path is not None:
+            print(f"saved to {save_path}", file=sys.stdout)
+        else:
+            print("submitted (no save path configured)", file=sys.stdout)
+    elif studio_server.cancelled:
+        print("cancelled", file=sys.stdout)
