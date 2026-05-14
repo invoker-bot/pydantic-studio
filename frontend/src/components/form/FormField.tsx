@@ -6,6 +6,7 @@ import type { FormNodeData } from "@/api/schemas";
 import { AnyField } from "@/components/form/fields/AnyField";
 import { BoolField } from "@/components/form/fields/BoolField";
 import { DecimalField } from "@/components/form/fields/DecimalField";
+import { EmailField } from "@/components/form/fields/EmailField";
 import { EnumField } from "@/components/form/fields/EnumField";
 import { FloatField } from "@/components/form/fields/FloatField";
 import { GroupField } from "@/components/form/fields/GroupField";
@@ -39,6 +40,8 @@ export function FormField({
       return <PathField node={node as NodeOfKind<"path">} path={path} />;
     case "url":
       return <URLField node={node as NodeOfKind<"url">} path={path} />;
+    case "email":
+      return <EmailField node={node as NodeOfKind<"email">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
