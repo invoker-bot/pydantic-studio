@@ -24,6 +24,7 @@ import { TimedeltaField } from "@/components/form/fields/TimedeltaField";
 import { TimeField } from "@/components/form/fields/TimeField";
 import { UnionField } from "@/components/form/fields/UnionField";
 import { URLField } from "@/components/form/fields/URLField";
+import { UUIDField } from "@/components/form/fields/UUIDField";
 
 type NodeOfKind<K extends string> = Extract<FormNodeData, { kind: K }>;
 
@@ -60,6 +61,8 @@ export function FormField({
       return <IPAddressField node={node as NodeOfKind<"ip_address">} path={path} />;
     case "ip_network":
       return <IPNetworkField node={node as NodeOfKind<"ip_network">} path={path} />;
+    case "uuid":
+      return <UUIDField node={node as NodeOfKind<"uuid">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
