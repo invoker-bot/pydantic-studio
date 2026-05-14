@@ -9,7 +9,8 @@ import socket
 import threading
 import time
 from contextlib import closing
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import pytest
 import uvicorn
@@ -21,6 +22,27 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
+class _LogLevel(str, Enum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+
+
+class _EmailNotifier(BaseModel):
+    kind: Literal["email"] = "email"
+    address: str = ""
+
+
+class _SlackNotifier(BaseModel):
+    kind: Literal["slack"] = "slack"
+    channel: str = ""
+
+
+_Notifier = Annotated[
+    _EmailNotifier | _SlackNotifier, Field(discriminator="kind")
+]
+
+
 class _DemoSchema(BaseModel):
     """Schema the e2e tests drive. Edit cautiously - test assertions
     pin specific field names and values."""
@@ -28,6 +50,15 @@ class _DemoSchema(BaseModel):
     name: str = Field(default="demo-service", description="Service identifier")
     workers: int = Field(default=4, ge=1, le=64, description="Worker count")
     debug: bool = Field(default=False, description="Verbose logging")
+    level: _LogLevel = Field(default=_LogLevel.INFO, description="Log level")
+    tags: list[str] = Field(default_factory=list, description="Free labels")
+    env: dict[str, str] = Field(default_factory=dict, description="Env vars")
+    notifier: _Notifier = Field(
+        default_factory=_EmailNotifier, description="Where to alert"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Arbitrary metadata"
+    )
 
 
 def _find_free_port() -> int:
@@ -37,7 +68,7 @@ def _find_free_port() -> int:
 
 
 @pytest.fixture(scope="session")
-def fastapi_url() -> Iterator[str]:
+def fastapi_url() -> "Iterator[str]":
     """Spin up uvicorn on a free port in a background thread.
 
     Each test gets the same server (session-scoped) - tests that mutate
@@ -46,13 +77,14 @@ def fastapi_url() -> Iterator[str]:
     """
     port = _find_free_port()
     tree = build_form_tree(_DemoSchema)
-    # Seed each field with its declared default. ``build_form_tree`` leaves
-    # ``value`` as ``None`` (default-seeding was removed in Phase 6 house-
-    # keeping); we set the values here so the rendered form mirrors what a
-    # user sees after opening a config file with all defaults.
+    # Seed defaults so the SPA renders with values (Phase 6 housekeeping
+    # removed default-seeding from build_form_tree). tags/env/metadata
+    # start at default_factory empties; notifier is preselected by
+    # UnionBuilder via isinstance against the EmailNotifier default.
     tree.set_value("name", "demo-service")
     tree.set_value("workers", 4)
     tree.set_value("debug", False)
+    tree.set_value("level", _LogLevel.INFO)
     server = StudioServer(tree=tree, save_path=None)
     config = uvicorn.Config(
         server.app,
