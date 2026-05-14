@@ -5,6 +5,7 @@
 import type { FormNodeData } from "@/api/schemas";
 import { AnyField } from "@/components/form/fields/AnyField";
 import { BoolField } from "@/components/form/fields/BoolField";
+import { DecimalField } from "@/components/form/fields/DecimalField";
 import { EnumField } from "@/components/form/fields/EnumField";
 import { FloatField } from "@/components/form/fields/FloatField";
 import { GroupField } from "@/components/form/fields/GroupField";
@@ -30,6 +31,8 @@ export function FormField({
       return <FloatField node={node as NodeOfKind<"float">} path={path} />;
     case "bool":
       return <BoolField node={node as NodeOfKind<"bool">} path={path} />;
+    case "decimal":
+      return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":
