@@ -6,6 +6,7 @@ import type { FormNodeData } from "@/api/schemas";
 import { AnyField } from "@/components/form/fields/AnyField";
 import { BoolField } from "@/components/form/fields/BoolField";
 import { DateField } from "@/components/form/fields/DateField";
+import { DatetimeField } from "@/components/form/fields/DatetimeField";
 import { DecimalField } from "@/components/form/fields/DecimalField";
 import { EmailField } from "@/components/form/fields/EmailField";
 import { EnumField } from "@/components/form/fields/EnumField";
@@ -40,6 +41,8 @@ export function FormField({
       return <DateField node={node as NodeOfKind<"date">} path={path} />;
     case "time":
       return <TimeField node={node as NodeOfKind<"time">} path={path} />;
+    case "datetime":
+      return <DatetimeField node={node as NodeOfKind<"datetime">} path={path} />;
     case "decimal":
       return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
     case "path":
