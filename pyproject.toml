@@ -48,6 +48,7 @@ dev = [
   "pytest>=8",
   "pytest-asyncio>=0.24",
   "pytest-cov",
+  "pytest-playwright>=0.5",
   "email-validator>=2",
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
