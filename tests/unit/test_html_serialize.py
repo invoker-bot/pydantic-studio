@@ -55,6 +55,10 @@ class _WithDict(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
 
 
+class _UnionHolder(BaseModel):
+    value: int | str
+
+
 def test_tree_to_json_returns_schema_name_and_root() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
     data = tree_to_json(tree)
@@ -209,3 +213,15 @@ def test_dispatch_rename_key_changes_key_at_index() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
     assert pairs == [("TIMEZONE", "UTC")]
+
+
+def test_dispatch_select_variant_switches_to_indexed_branch() -> None:
+    tree = build_form_tree(_UnionHolder, existing={"value": 42})
+    # variant 0 is int; switch to str (variant 1)
+    result = dispatch_mutation(
+        tree, {"op": "select_variant", "path": "value", "variant_index": 1}
+    )
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert val.selected_index == 1
+    assert val.selected.kind == "string"

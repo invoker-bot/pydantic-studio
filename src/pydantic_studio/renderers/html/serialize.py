@@ -79,9 +79,9 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
 
     ``mutation`` is the parsed JSON body — exactly the discriminated union
     described in spec §3.2. Handles ``set_value`` for scalars, the three
-    sequence ops (``add_item``, ``remove_item``, ``move_item``), and the
-    three mapping ops (``add_entry``, ``remove_entry``, ``rename_key``);
-    union ops land in later tasks. Unknown ops return a failure
+    sequence ops (``add_item``, ``remove_item``, ``move_item``), the three
+    mapping ops (``add_entry``, ``remove_entry``, ``rename_key``), and the
+    union op (``select_variant``). Unknown ops return a failure
     ValidationResult without touching the tree.
     """
     op = mutation.get("op")
@@ -102,4 +102,6 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
         return tree.rename_key(
             path, int(mutation["index"]), str(mutation["new_key"])
         )
+    if op == "select_variant":
+        return tree.select_variant(path, int(mutation["variant_index"]))
     return ValidationResult.fail([f"unknown op: {op!r}"])
