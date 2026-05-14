@@ -301,3 +301,12 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
         server.last_heartbeat_ts = time.time()
         return PlainTextResponse(content="ok")
+
+    # ----- JSON API (Phase 1 of the shadcn web redesign) -----
+    from fastapi.responses import JSONResponse
+
+    from pydantic_studio.renderers.html.serialize import tree_to_json
+
+    @app.get("/api/tree", response_class=JSONResponse)
+    async def api_tree() -> JSONResponse:
+        return JSONResponse(content=tree_to_json(server.tree))
