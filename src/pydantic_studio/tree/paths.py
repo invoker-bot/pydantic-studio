@@ -22,6 +22,12 @@ from typing import TypeAlias
 PathSegment: TypeAlias = str | int
 
 _FIELD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# Dotted-integer segments (e.g., ``tags.0`` / ``env.2``) — the bracket
+# form ``tags[0]`` remains supported, but the SPA renderer emits the
+# dotted form for nested container children to keep its ``childPath``
+# helper trivial. Field names can never start with a digit (Python
+# identifier rules), so dotted-digit segments are unambiguous.
+_DIGIT_RE = re.compile(r"[0-9]+")
 # Reserved for callers that need to locate bracket spans (e.g., for
 # highlighting in error messages); ``parse`` scans manually rather than
 # using this regex.
@@ -73,6 +79,16 @@ class Path:
                     raise ValueError(msg)
             elif raw[i] == ".":
                 i += 1  # separator between two field-name segments
+            elif raw[i].isdigit():
+                # Dotted-integer segment (``tags.0`` / ``env.2``). The
+                # SPA renderer emits dotted indices for nested container
+                # children via the ``childPath`` helper; supporting it
+                # here keeps bracket-form ``tags[0]`` and dotted-form
+                # ``tags.0`` interchangeable.
+                m = _DIGIT_RE.match(raw, i)
+                assert m is not None  # raw[i].isdigit() guarantees a match
+                segments.append(int(m.group(0)))
+                i = m.end()
             else:
                 m = _FIELD_RE.match(raw, i)
                 if not m:

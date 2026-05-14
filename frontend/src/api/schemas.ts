@@ -77,6 +77,92 @@ export const GroupNodeSchema: z.ZodType<GroupNodeData> = z.lazy(() =>
   }),
 );
 
+// SequenceNode: list[T] / set[T] / tuple[T,...]. items is a recursive
+// list of FormNodes (each item gets its own sub-tree).
+export interface SequenceNodeData {
+  kind: "sequence";
+  name: string;
+  description: string | null;
+  required: boolean;
+  error: string | null;
+  origin: "list" | "set" | "tuple" | "tuple_fixed";
+  items: FormNodeData[];
+  item_type_name: string | null;        // null for tuple_fixed; FQ name otherwise
+  slot_type_names: string[] | null;     // populated for tuple_fixed
+  min_length: number | null;
+  max_length: number | null;
+}
+
+export const SequenceNodeSchema: z.ZodType<SequenceNodeData> = z.lazy(() =>
+  NodeBase.extend({
+    kind: z.literal("sequence"),
+    origin: z.enum(["list", "set", "tuple", "tuple_fixed"]),
+    items: z.array(FormNodeSchema),
+    item_type_name: z.string().nullable(),
+    slot_type_names: z.array(z.string()).nullable(),
+    min_length: z.number().nullable(),
+    max_length: z.number().nullable(),
+  }),
+);
+
+// MappingNode: dict[K, V]. entries is a list of (key_node, value_node)
+// tuples - 2-element arrays in JSON. Backend uses index-based removal
+// and rename so the client doesn't have to worry about key uniqueness.
+export interface MappingNodeData {
+  kind: "mapping";
+  name: string;
+  description: string | null;
+  required: boolean;
+  error: string | null;
+  entries: Array<[FormNodeData, FormNodeData]>;
+  key_type_name: string;
+  value_type_name: string;
+  min_length: number | null;
+  max_length: number | null;
+}
+
+export const MappingNodeSchema: z.ZodType<MappingNodeData> = z.lazy(() =>
+  NodeBase.extend({
+    kind: z.literal("mapping"),
+    entries: z.array(z.tuple([FormNodeSchema, FormNodeSchema])),
+    key_type_name: z.string(),
+    value_type_name: z.string(),
+    min_length: z.number().nullable(),
+    max_length: z.number().nullable(),
+  }),
+);
+
+// UnionNode: T1 | T2 | ... (with optional discriminator). selected is the
+// active variant node (matching one of variant_type_names). variant_index
+// is the index into variant_type_names.
+export interface UnionNodeData {
+  kind: "union";
+  name: string;
+  description: string | null;
+  required: boolean;
+  error: string | null;
+  variant_type_names: string[];
+  selected_index: number | null;
+  selected: FormNodeData | null;
+}
+
+export const UnionNodeSchema: z.ZodType<UnionNodeData> = z.lazy(() =>
+  NodeBase.extend({
+    kind: z.literal("union"),
+    variant_type_names: z.array(z.string()),
+    selected_index: z.number().nullable(),
+    selected: FormNodeSchema.nullable(),
+  }),
+);
+
+// AnyValueNode: typing.Any. mode auto-syncs to value's runtime shape
+// (null/str/int/float/bool/list/dict). The wire value is the raw JSON.
+export const AnyValueNodeSchema = NodeBase.extend({
+  kind: z.literal("any"),
+  mode: z.enum(["null", "str", "int", "float", "bool", "list", "dict"]),
+  value: z.unknown(),
+});
+
 // Phase 3 dispatcher covers these 6 kinds. Phase 4 adds sequence,
 // mapping, union, any (and the rest of the spec's 20+ node kinds).
 // For now, unknown kinds parse loosely as a passthrough so the
@@ -105,6 +191,10 @@ export const FormNodeSchema: z.ZodType<FormNodeData> = z.union([
   EnumNodeSchema,
   LiteralNodeSchema,
   GroupNodeSchema,
+  SequenceNodeSchema,
+  MappingNodeSchema,
+  UnionNodeSchema,
+  AnyValueNodeSchema,
   UnknownNodeSchema,
 ]);
 
@@ -115,6 +205,10 @@ export type FormNodeData =
   | z.infer<typeof EnumNodeSchema>
   | z.infer<typeof LiteralNodeSchema>
   | GroupNodeData
+  | SequenceNodeData
+  | MappingNodeData
+  | UnionNodeData
+  | z.infer<typeof AnyValueNodeSchema>
   | { kind: string; name: string; [extra: string]: unknown };
 
 export const FormTreeSchema = z.object({
