@@ -305,8 +305,52 @@ def register(app: FastAPI, server: StudioServer) -> None:
     # ----- JSON API (Phase 1 of the shadcn web redesign) -----
     from fastapi.responses import JSONResponse
 
-    from pydantic_studio.renderers.html.serialize import tree_to_json
+    from pydantic_studio.renderers.html.serialize import (
+        dispatch_mutation,
+        tree_to_json,
+        validation_envelope,
+    )
 
     @app.get("/api/tree", response_class=JSONResponse)
     async def api_tree() -> JSONResponse:
         return JSONResponse(content=tree_to_json(server.tree))
+
+    @app.post("/api/mutations", response_class=JSONResponse)
+    async def api_mutations(request: Request) -> JSONResponse:
+        mutation = await request.json()
+        result = dispatch_mutation(server.tree, mutation)
+        # Unknown / malformed op -> 400 so the client knows it's a request
+        # bug, not a state issue. Validation failures of valid ops keep
+        # 200 (the tree is untouched, ``validation`` reports what failed).
+        # T8 introduced a second error family with prefix "mutation failed: "
+        # for malformed-request exceptions (KeyError/ValueError/TypeError);
+        # only the "unknown op" family promotes to 400.
+        if not result.ok and any("unknown op" in err for err in result.errors):
+            return JSONResponse(
+                status_code=400, content={"detail": "; ".join(result.errors)}
+            )
+        # Spec §5.2: a rejected mutation surfaces in ``validation.errors``.
+        # The static envelope from ``validation_envelope`` reports whether
+        # ``to_instance()`` would succeed — but a failed ``set_value`` leaves
+        # the prior valid value in place, so the envelope alone would miss
+        # the rejection. Fold the mutation errors back in so the client sees
+        # ``validation.ok = false`` after any failed op (matching the
+        # ``dispatch_mutation`` docstring's contract).
+        validation = validation_envelope(server.tree)
+        if not result.ok:
+            mutation_path = str(mutation.get("path", ""))
+            validation = {
+                "ok": False,
+                "errors": [
+                    {"path": mutation_path, "message": err}
+                    for err in result.errors
+                ]
+                + list(validation["errors"]),
+            }
+        return JSONResponse(
+            content={
+                "tree": tree_to_json(server.tree),
+                "validation": validation,
+                "mutation_result": {"ok": result.ok, "errors": list(result.errors)},
+            }
+        )

@@ -36,3 +36,41 @@ def test_api_tree_includes_unsaved_count() -> None:
     client = _client({"name": "alpha"})
     body = client.get("/api/tree").json()
     assert body["unsaved_count"] == 0
+
+
+def test_api_mutations_set_value_returns_updated_tree() -> None:
+    client = _client({"name": "before", "workers": 4})
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "name", "value": "after"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["validation"] == {"ok": True, "errors": []}
+    name_field = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "name")
+    assert name_field["value"] == "after"
+
+
+def test_api_mutations_validation_failure_returns_unchanged_tree() -> None:
+    client = _client({"name": "alpha", "workers": 4})
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "workers", "value": "not-an-int"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["validation"]["ok"] is False
+    workers_field = next(
+        f for f in body["tree"]["root"]["fields"] if f["name"] == "workers"
+    )
+    assert workers_field["value"] == 4
+
+
+def test_api_mutations_unknown_op_returns_400() -> None:
+    client = _client({"name": "alpha"})
+    response = client.post(
+        "/api/mutations", json={"op": "nuke", "path": "name"}
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert "nuke" in body["detail"]
