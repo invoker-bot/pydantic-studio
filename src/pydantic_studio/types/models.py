@@ -29,7 +29,19 @@ class GroupBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> GroupNode:
         assert issubclass(type_, BaseModel)
-        existing_dict: dict[str, Any] = existing if isinstance(existing, dict) else {}
+        # ``UnionBuilder._preselect`` validates dict-shaped seeds against
+        # BaseModel variants and passes the resulting instance through to
+        # the inner builder. Accept that form by dumping back to the
+        # plain Python dict the per-field child builders expect — without
+        # this branch, seeded ``list[DiscriminatedUnion]`` data would lose
+        # every inner field value and ``to_instance()`` would fail with
+        # ``union_tag_not_found``.
+        if isinstance(existing, BaseModel):
+            existing_dict: dict[str, Any] = existing.model_dump(mode="python")
+        elif isinstance(existing, dict):
+            existing_dict = existing
+        else:
+            existing_dict = {}
 
         children: list[Any] = []
         for fname, finfo in type_.model_fields.items():

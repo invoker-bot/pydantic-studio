@@ -2,9 +2,36 @@
 
 from __future__ import annotations
 
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, Field
+
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import IntNode, StringNode, UnionNode
 from tests.fixtures.schemas import WithOptional, WithUnion
+
+
+class _DUEmail(BaseModel):
+    """Discriminated-union variant: email channel."""
+
+    kind: Literal["email"] = "email"
+    address: str
+
+
+class _DUSlack(BaseModel):
+    """Discriminated-union variant: slack channel."""
+
+    kind: Literal["slack"] = "slack"
+    channel: str
+
+
+_DUNotifier = Annotated[_DUEmail | _DUSlack, Field(discriminator="kind")]
+
+
+class _DUJob(BaseModel):
+    """Holder model for the seeded discriminated-union regression test."""
+
+    notifiers: list[_DUNotifier] = Field(default_factory=list)
 
 
 def test_optional_demotes_to_inner_type_node() -> None:
@@ -93,3 +120,27 @@ def test_select_variant_with_seed_value() -> None:
     val = tree.root.find("value")
     assert isinstance(val, UnionNode)
     assert val.selected.value == "seeded"
+
+
+def test_discriminated_union_in_list_preserves_inner_field_values() -> None:
+    """Regression: ``UnionBuilder._preselect`` validates a dict seed into
+    a BaseModel instance and passes that instance to the inner builder.
+    Previously ``GroupBuilder.build`` only accepted dict-shaped ``existing``,
+    so the validated instance got dropped and every inner field was None —
+    ``to_instance()`` then failed with ``union_tag_not_found``.
+    """
+    tree = build_form_tree(
+        _DUJob,
+        existing={
+            "notifiers": [
+                {"kind": "email", "address": "ops@example.com"},
+                {"kind": "slack", "channel": "#ops"},
+            ],
+        },
+    )
+    instance = tree.to_instance()
+    assert len(instance.notifiers) == 2
+    assert isinstance(instance.notifiers[0], _DUEmail)
+    assert instance.notifiers[0].address == "ops@example.com"
+    assert isinstance(instance.notifiers[1], _DUSlack)
+    assert instance.notifiers[1].channel == "#ops"
