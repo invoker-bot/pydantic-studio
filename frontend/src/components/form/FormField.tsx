@@ -18,6 +18,7 @@ import { MappingField } from "@/components/form/fields/MappingField";
 import { PathField } from "@/components/form/fields/PathField";
 import { SequenceField } from "@/components/form/fields/SequenceField";
 import { StringField } from "@/components/form/fields/StringField";
+import { TimedeltaField } from "@/components/form/fields/TimedeltaField";
 import { TimeField } from "@/components/form/fields/TimeField";
 import { UnionField } from "@/components/form/fields/UnionField";
 import { URLField } from "@/components/form/fields/URLField";
@@ -43,6 +44,8 @@ export function FormField({
       return <TimeField node={node as NodeOfKind<"time">} path={path} />;
     case "datetime":
       return <DatetimeField node={node as NodeOfKind<"datetime">} path={path} />;
+    case "timedelta":
+      return <TimedeltaField node={node as NodeOfKind<"timedelta">} path={path} />;
     case "decimal":
       return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
     case "path":
