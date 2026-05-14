@@ -47,3 +47,6 @@ verify_spec.py
 
 # mkdocs build output (root-level only; docs/site/ holds the docs source)
 /site/
+
+# Superpowers brainstorming mockups
+.superpowers/
