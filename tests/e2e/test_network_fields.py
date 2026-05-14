@@ -27,7 +27,7 @@ def test_edit_url_field_updates_tree(page: Page, fastapi_url: str) -> None:
     assert field["value"].startswith("https://pydantic.dev")
     # The component shows a short type chip; verify the target_type_name
     # carries through the API so the chip renders.
-    assert field["target_type_name"].endswith("HttpUrl") or field["target_type_name"].endswith("Url")
+    assert field["target_type_name"].endswith(("HttpUrl", "Url"))
 
 
 def test_edit_email_field_updates_tree(page: Page, fastapi_url: str) -> None:
