@@ -32,3 +32,41 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     data = tree.model_dump(mode="json", exclude=_TREE_EXCLUDE)
     data["unsaved_count"] = len(tree.snapshots)
     return data
+
+
+def validation_envelope(tree: FormTree) -> dict[str, Any]:
+    """Aggregate the tree's current validation status as the API envelope.
+
+    The envelope is returned alongside every tree-shaped response so the
+    client can flag invalid fields without re-walking the tree. ``path``
+    is the dotted form-tree path; ``message`` is the human-readable error.
+    """
+    from pydantic import ValidationError
+
+    from pydantic_studio.exceptions import ValidationFailedError
+
+    try:
+        tree.to_instance()
+    except ValidationFailedError as e:
+        return {"ok": False, "errors": list(_iter_failed_errors(e))}
+    except ValidationError as e:
+        return {
+            "ok": False,
+            "errors": [
+                {"path": ".".join(str(p) for p in err["loc"]), "message": err["msg"]}
+                for err in e.errors()
+            ],
+        }
+    return {"ok": True, "errors": []}
+
+
+def _iter_failed_errors(e: Any) -> Any:
+    """ValidationFailedError stores a list[str] of pre-formatted messages
+    shaped ``"<path>: <message>"``. Split each back into structured form."""
+    for raw in getattr(e, "errors", []) or []:
+        text = str(raw)
+        if ": " in text:
+            path, _, message = text.partition(": ")
+            yield {"path": path, "message": message}
+        else:
+            yield {"path": "", "message": text}

@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.renderers.html.serialize import tree_to_json
+from pydantic_studio.renderers.html.serialize import tree_to_json, validation_envelope
 
 
 class _Primitive(BaseModel):
@@ -106,3 +106,19 @@ def test_tree_to_json_union_renders_with_selected_variant() -> None:
     assert notifier["selected"]["kind"] == "group"
     address = next(f for f in notifier["selected"]["fields"] if f["name"] == "address")
     assert address["value"] == "a@x"
+
+
+def test_validation_envelope_ok_for_complete_tree() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
+    env = validation_envelope(tree)
+    assert env == {"ok": True, "errors": []}
+
+
+def test_validation_envelope_collects_per_field_errors() -> None:
+    # Required field 'name' deliberately unset
+    tree = build_form_tree(_Primitive)
+    env = validation_envelope(tree)
+    assert env["ok"] is False
+    assert any("name" in e["path"] for e in env["errors"])
+    for err in env["errors"]:
+        assert set(err.keys()) >= {"path", "message"}
