@@ -9,13 +9,16 @@ import socket
 import threading
 import time
 from contextlib import closing
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 import uvicorn
 from pydantic import BaseModel, Field
 
 from pydantic_studio import StudioServer, build_form_tree
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class _DemoSchema(BaseModel):

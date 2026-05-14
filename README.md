@@ -277,6 +277,15 @@ git add ../src/pydantic_studio/renderers/html/static/dist
 
 The bundled output (`src/pydantic_studio/renderers/html/static/dist/`) is committed to the repo so CI and downstream users don't need a Node toolchain.
 
+### Running the Playwright e2e suite (Phase 3+)
+
+The unit-test default skips `tests/e2e/` and disables the `pytest-playwright` plugin (its mere presence interferes with Textual's `App.run_test()` under `asyncio_mode="auto"`). To run the e2e suite explicitly:
+
+```bash
+uv run playwright install chromium                                  # one-time, ~150 MB
+uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
+```
+
 ## License
 
 MIT.
