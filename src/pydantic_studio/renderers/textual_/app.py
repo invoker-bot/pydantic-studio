@@ -125,7 +125,7 @@ class StudioApp(App):
             )
             self.push_screen(ErrorsScreen(errors=exc.errors))
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self.notify(
                 f"{type(exc).__name__}: {exc}",
                 severity="error",

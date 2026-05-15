@@ -150,7 +150,7 @@ class FieldListView(VerticalScroll):
 
         parent = self.screen
         parent_parts = list(getattr(parent, "_breadcrumb_parts", []))
-        parts = parent_parts + [group.name]
+        parts = [*parent_parts, group.name]
         self.app.push_screen(
             ConfigScreen(
                 group=group,
