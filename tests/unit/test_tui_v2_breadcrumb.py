@@ -32,7 +32,7 @@ async def test_breadcrumb_joins_parts_with_chevron() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         bc = app.screen.query_one(Breadcrumb)
-        assert bc.label_text == "AppSettings › database"
+        assert bc.label_text == "AppSettings › database"  # noqa: RUF001
 
 
 @pytest.mark.asyncio
@@ -41,7 +41,7 @@ async def test_breadcrumb_full_depth_three_no_truncation() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         bc = app.screen.query_one(Breadcrumb)
-        assert bc.label_text == "a › b › c"
+        assert bc.label_text == "a › b › c"  # noqa: RUF001
 
 
 @pytest.mark.asyncio
@@ -51,7 +51,7 @@ async def test_breadcrumb_truncates_middle_at_depth_four() -> None:
         await pilot.pause()
         bc = app.screen.query_one(Breadcrumb)
         # Middle parts (b, c) collapse to ellipsis; first and last preserved.
-        assert bc.label_text == "a › … › d"
+        assert bc.label_text == "a › … › d"  # noqa: RUF001
 
 
 @pytest.mark.asyncio
@@ -60,7 +60,7 @@ async def test_breadcrumb_truncates_middle_at_depth_five() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         bc = app.screen.query_one(Breadcrumb)
-        assert bc.label_text == "a › … › e"
+        assert bc.label_text == "a › … › e"  # noqa: RUF001
 
 
 @pytest.mark.asyncio

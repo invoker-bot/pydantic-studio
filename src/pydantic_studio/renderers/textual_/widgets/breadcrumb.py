@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from textual.widgets import Static
 
-_SEP = " › "          # ' > ' with thin spaces
+_SEP = " › "          # noqa: RUF001 — U+203A separator, intentional UI glyph
 _ELLIPSIS = "…"       # ' ... '
 
 
