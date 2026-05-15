@@ -9,11 +9,7 @@ import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { FormField } from "@/components/form/FormField";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-
-function shortName(fq: string): string {
-  // "examples.04.EmailNotifier" -> "EmailNotifier"
-  return fq.split(".").pop() ?? fq;
-}
+import { shortTypeName } from "@/lib/typeName";
 
 export function UnionField({
   node,
@@ -43,7 +39,7 @@ export function UnionField({
               size="sm"
               onClick={() => onSelect(index)}
             >
-              {shortName(variantName)}
+              {shortTypeName(variantName)}
               {active && " v"}
             </Button>
           );

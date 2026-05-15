@@ -10,6 +10,7 @@ import { FormField } from "@/components/form/FormField";
 import { childPath } from "@/components/form/path";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { shortTypeName } from "@/lib/typeName";
 
 export function SequenceField({
   node,
@@ -26,7 +27,7 @@ export function SequenceField({
   // item_type_name is null for tuple_fixed (heterogeneous slots); fall
   // back to a generic "item" label for the +Add button.
   const itemLabel = node.item_type_name
-    ? node.item_type_name.split(".").pop() ?? "item"
+    ? shortTypeName(node.item_type_name, "item")
     : "item";
 
   return (

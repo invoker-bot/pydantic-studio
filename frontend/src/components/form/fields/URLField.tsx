@@ -11,13 +11,9 @@ import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { shortTypeName } from "@/lib/typeName";
 
 type URLNode = z.infer<typeof URLNodeSchema>;
-
-function shortTypeName(fq: string): string {
-  // "pydantic.HttpUrl" -> "HttpUrl"; "module.sub.AnyUrl" -> "AnyUrl"
-  return fq.split(".").pop() ?? fq;
-}
 
 export function URLField({ node, path }: { node: URLNode; path: string }) {
   const mutation = useApplyMutation();

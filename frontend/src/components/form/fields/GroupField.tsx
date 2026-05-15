@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { GroupNodeData } from "@/api/schemas";
 import { FormField } from "@/components/form/FormField";
 import { childPath } from "@/components/form/path";
+import { shortTypeName } from "@/lib/typeName";
 
 export function GroupField({
   node,
@@ -45,7 +46,7 @@ function NestedGroup({
           <span className="font-medium">{node.name}</span>
           {node.schema_class && (
             <span className="text-xs text-zinc-400">
-              {node.schema_class.split(".").pop()}
+              {shortTypeName(node.schema_class)}
             </span>
           )}
         </span>
