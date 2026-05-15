@@ -13,7 +13,15 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_index_route_returns_html() -> None:
+def test_index_route_serves_spa_shell() -> None:
+    """`/` must serve the React SPA's index.html, not the legacy Jinja page.
+
+    Regression for the incomplete cutover discovered after Phase 5: the
+    SPA bundle was committed to static/dist/ but `/` was still routed to
+    ``server.render_index`` (Jinja2 + HTMX), so users running
+    ``run_html_app`` landed on the pre-redesign page even though all 25
+    field components had shipped.
+    """
     from pydantic_studio.renderers.html import StudioServer
 
     tree = build_form_tree(Server)
@@ -22,8 +30,33 @@ def test_index_route_returns_html() -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Page should reference the schema's class name somewhere.
-    assert "Server" in response.text or "name" in response.text
+    text = response.text
+    assert '<div id="root">' in text
+    assert 'src="/static/dist/assets/index-' in text
+    assert ".js" in text
+    assert "hx-post" not in text
+    assert "hx-get" not in text
+
+
+def test_spa_bundle_referenced_by_index_is_reachable() -> None:
+    """The Vite-emitted script tag in /'s index.html must resolve.
+
+    Guards against bundle/index version skew — e.g., if `/` somehow
+    serves an older index.html that references a deleted asset hash.
+    """
+    import re
+
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(studio_server.app)
+    index_text = client.get("/").text
+    match = re.search(r'src="(/static/dist/assets/index-[^"]+\.js)"', index_text)
+    assert match is not None, "SPA bundle script tag missing from index.html"
+    bundle_response = client.get(match.group(1))
+    assert bundle_response.status_code == 200
+    assert len(bundle_response.content) > 10000
 
 
 def test_static_htmx_serves() -> None:
@@ -34,46 +67,7 @@ def test_static_htmx_serves() -> None:
     client = TestClient(studio_server.app)
     response = client.get("/static/htmx.min.js")
     assert response.status_code == 200
-    # Real htmx is at least a few KB; the stub was a single line.
     assert len(response.content) > 1000
-
-
-def test_index_includes_heartbeat_poll() -> None:
-    """The base template emits an HTMX heartbeat trigger so the server
-    can detect a closed tab. Without this, run_html_app's watchdog never
-    fires and the process runs forever when the browser is dismissed.
-    """
-    from pydantic_studio.renderers.html import StudioServer
-
-    tree = build_form_tree(Server)
-    studio_server = StudioServer(tree=tree, save_path=None)
-    client = TestClient(studio_server.app)
-    response = client.get("/")
-    assert response.status_code == 200
-    text = response.text
-    assert 'hx-get="/heartbeat"' in text
-    # The trigger must include both load (first hit) and a recurring
-    # interval — load alone wouldn't refresh; interval alone would let
-    # a fast tab-close before the first interval slip past unnoticed.
-    assert 'hx-trigger="load, every' in text
-
-
-def test_index_renders_form_fields() -> None:
-    from pydantic_studio.renderers.html import StudioServer
-
-    tree = build_form_tree(Server)
-    studio_server = StudioServer(tree=tree, save_path=None)
-    client = TestClient(studio_server.app)
-    response = client.get("/")
-    assert response.status_code == 200
-    text = response.text
-    # Each Server field should appear with an htmx-bound input.
-    assert 'name="value"' in text
-    assert "hx-post" in text
-    # The field names appear as labels.
-    assert "name:" in text
-    assert "port:" in text
-    assert "debug:" in text
 
 
 class TestFieldRoute:
