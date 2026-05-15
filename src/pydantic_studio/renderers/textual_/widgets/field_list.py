@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from textual.app import ComposeResult
 
-    from pydantic_studio.tree.nodes import GroupNode
+    from pydantic_studio.tree.nodes import FormTree, GroupNode
 
 
 class FieldListView(VerticalScroll):
@@ -33,9 +33,15 @@ class FieldListView(VerticalScroll):
         Binding("down", "cursor_down", "down", show=False),
     ]
 
-    def __init__(self, group: GroupNode, base_path: str = "") -> None:
+    def __init__(
+        self,
+        group: GroupNode,
+        form_tree: FormTree,
+        base_path: str = "",
+    ) -> None:
         super().__init__()
         self._group = group
+        self._form_tree = form_tree
         self._base_path = base_path
         self._cursor: int = 0
 
@@ -48,7 +54,12 @@ class FieldListView(VerticalScroll):
             path = (
                 f"{self._base_path}.{child.name}" if self._base_path else child.name
             )
-            yield FieldRow(node=child, path=path, focused=(idx == 0))
+            yield FieldRow(
+                node=child,
+                path=path,
+                form_tree=self._form_tree,
+                focused=(idx == 0),
+            )
 
     def action_cursor_up(self) -> None:
         if self._cursor <= 0:

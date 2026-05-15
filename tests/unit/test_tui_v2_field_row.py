@@ -1,4 +1,4 @@
-"""Unit tests for FieldRow shell + PlaceholderCell."""
+"""Unit tests for FieldRow shell + kind-based cell dispatch."""
 
 from __future__ import annotations
 
@@ -7,10 +7,7 @@ from pydantic import BaseModel
 from textual.app import App
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.renderers.textual_.widgets.field_row import (
-    FieldRow,
-    PlaceholderCell,
-)
+from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 
 
 class _Schema(BaseModel):
@@ -19,7 +16,7 @@ class _Schema(BaseModel):
     tags: list[str] = []
 
 
-def _node(field_name: str):
+def _tree_and_node(field_name: str):
     # Default-seeding was removed in Phase 6 housekeeping (see CLAUDE.md),
     # so build_form_tree leaves node.value=None even when the field has a
     # default. Seed the value here so the helper matches what users see
@@ -30,7 +27,7 @@ def _node(field_name: str):
     assert n is not None
     if getattr(n, "default", None) is not None and getattr(n, "value", None) is None:
         tree.set_value(field_name, n.default)
-    return n
+    return tree, n
 
 
 class _Host(App):
@@ -44,18 +41,18 @@ class _Host(App):
 
 @pytest.mark.asyncio
 async def test_field_row_renders_label_and_value() -> None:
-    row = FieldRow(node=_node("name"), path="name", focused=False)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
-        # Label and value are accessible via row API for tests.
+        # Label is accessible via row API for tests.
         assert row.label_text == "name"
-        # PlaceholderCell renders str(node.value); name was seeded "alpha".
-        assert row.value_text == "alpha"
 
 
 @pytest.mark.asyncio
 async def test_field_row_focused_shows_marker() -> None:
-    row = FieldRow(node=_node("name"), path="name", focused=True)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=True)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         assert row.marker_text == "▸"  # U+25B8 focus indicator
@@ -63,7 +60,8 @@ async def test_field_row_focused_shows_marker() -> None:
 
 @pytest.mark.asyncio
 async def test_field_row_unfocused_marker_is_blank() -> None:
-    row = FieldRow(node=_node("name"), path="name", focused=False)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         assert row.marker_text == " "
@@ -72,7 +70,8 @@ async def test_field_row_unfocused_marker_is_blank() -> None:
 @pytest.mark.asyncio
 async def test_field_row_container_kind_renders_drill_marker() -> None:
     # tags is a SequenceNode -> drillable -> drill marker visible.
-    row = FieldRow(node=_node("tags"), path="tags", focused=False)
+    tree, node = _tree_and_node("tags")
+    row = FieldRow(node=node, path="tags", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         assert row.drill_marker_text == ">"
@@ -81,7 +80,8 @@ async def test_field_row_container_kind_renders_drill_marker() -> None:
 @pytest.mark.asyncio
 async def test_field_row_leaf_kind_hides_drill_marker() -> None:
     # name is a StringNode -> not drillable -> blank drill marker.
-    row = FieldRow(node=_node("name"), path="name", focused=False)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         assert row.drill_marker_text == ""
@@ -89,7 +89,8 @@ async def test_field_row_leaf_kind_hides_drill_marker() -> None:
 
 @pytest.mark.asyncio
 async def test_field_row_error_helper_hidden_by_default() -> None:
-    row = FieldRow(node=_node("name"), path="name", focused=False)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         assert row.helper_text == ""
@@ -97,7 +98,8 @@ async def test_field_row_error_helper_hidden_by_default() -> None:
 
 @pytest.mark.asyncio
 async def test_field_row_set_error_shows_helper() -> None:
-    row = FieldRow(node=_node("name"), path="name", focused=False)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         row.set_error("pattern requires ^[a-z]+$")
@@ -107,7 +109,8 @@ async def test_field_row_set_error_shows_helper() -> None:
 
 @pytest.mark.asyncio
 async def test_field_row_clear_error_hides_helper() -> None:
-    row = FieldRow(node=_node("name"), path="name", focused=False)
+    tree, node = _tree_and_node("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
         row.set_error("oops")
@@ -118,24 +121,29 @@ async def test_field_row_clear_error_hides_helper() -> None:
 
 
 @pytest.mark.asyncio
-async def test_placeholder_cell_renders_str_value() -> None:
-    cell = PlaceholderCell(node=_node("count"))
-    async with _Host(cell).run_test() as pilot:
+async def test_field_row_dispatches_string_to_text_cell() -> None:
+    from pydantic_studio.renderers.textual_.widgets.cells import TextCell
+
+    tree = build_form_tree(_Schema)
+    tree.set_value("name", "alpha")
+    node = tree.root.find("name")
+    row = FieldRow(node=node, path="name", form_tree=tree, focused=False)
+    async with _Host(row).run_test() as pilot:
         await pilot.pause()
-        # count is seeded 5 -> stringified.
-        assert cell.value_text == "5"
+        assert isinstance(row.query_one(TextCell), TextCell)
 
 
 @pytest.mark.asyncio
-async def test_placeholder_cell_renders_empty_when_value_none() -> None:
-    # Build a tree without seeding -> value is None.
-    tree = build_form_tree(_Schema)
-    # Don't set anything; default-seeding was removed in Phase 6
-    # housekeeping, so freshly built nodes have value=None.
-    node = tree.root.find("name")
-    assert node is not None
-    cell = PlaceholderCell(node=node)
-    async with _Host(cell).run_test() as pilot:
+async def test_field_row_dispatches_bool_to_bool_cell() -> None:
+    from pydantic_studio.renderers.textual_.widgets.cells import BoolCell
+
+    class _BS(BaseModel):
+        debug: bool = False
+
+    tree = build_form_tree(_BS)
+    tree.set_value("debug", True)
+    node = tree.root.find("debug")
+    row = FieldRow(node=node, path="debug", form_tree=tree, focused=False)
+    async with _Host(row).run_test() as pilot:
         await pilot.pause()
-        # None renders as the empty string, not "None".
-        assert cell.value_text == ""
+        assert isinstance(row.query_one(BoolCell), BoolCell)

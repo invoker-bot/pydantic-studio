@@ -63,7 +63,7 @@ class _Host(App):
 @pytest.mark.asyncio
 async def test_field_list_mounts_one_row_per_child() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         rows = list(view.query(FieldRow))
@@ -75,7 +75,7 @@ async def test_field_list_mounts_one_row_per_child() -> None:
 @pytest.mark.asyncio
 async def test_field_list_initial_cursor_is_zero() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         assert view.cursor == 0
@@ -87,7 +87,7 @@ async def test_field_list_initial_cursor_is_zero() -> None:
 @pytest.mark.asyncio
 async def test_field_list_down_advances_cursor() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         await pilot.press("down")
@@ -101,7 +101,7 @@ async def test_field_list_down_advances_cursor() -> None:
 @pytest.mark.asyncio
 async def test_field_list_up_at_top_clamps_to_zero() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         await pilot.press("up")
@@ -112,7 +112,7 @@ async def test_field_list_up_at_top_clamps_to_zero() -> None:
 @pytest.mark.asyncio
 async def test_field_list_down_at_bottom_clamps() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         await pilot.press("down")
@@ -129,7 +129,7 @@ async def test_field_list_empty_group_mounts_zero_rows() -> None:
         pass
 
     tree = build_form_tree(_Empty)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         assert list(view.query(FieldRow)) == []
@@ -140,7 +140,7 @@ async def test_field_list_empty_group_mounts_zero_rows() -> None:
 @pytest.mark.asyncio
 async def test_field_list_focused_row_path_is_dotted() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="root")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="root")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         rows = list(view.query(FieldRow))
@@ -153,7 +153,7 @@ async def test_field_list_focused_row_path_is_dotted() -> None:
 @pytest.mark.asyncio
 async def test_field_list_blank_base_path_uses_name_only() -> None:
     tree = build_form_tree(_Schema)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         rows = list(view.query(FieldRow))
@@ -164,7 +164,7 @@ async def test_field_list_blank_base_path_uses_name_only() -> None:
 async def test_field_list_thirty_rows_mount_without_crash() -> None:
     """Smoke: scroll container handles 30 rows. Detail visual check is manual."""
     tree = build_form_tree(_Big)
-    view = FieldListView(group=tree.root, base_path="")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
         rows = list(view.query(FieldRow))

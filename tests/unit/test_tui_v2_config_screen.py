@@ -33,7 +33,7 @@ class _Host(App):
 @pytest.mark.asyncio
 async def test_config_screen_composes_three_regions() -> None:
     tree = build_form_tree(_Schema)
-    screen = ConfigScreen(group=tree.root, breadcrumb_parts=["AppSettings"])
+    screen = ConfigScreen(group=tree.root, form_tree=tree, breadcrumb_parts=["AppSettings"])
     app = _Host(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -45,7 +45,7 @@ async def test_config_screen_composes_three_regions() -> None:
 @pytest.mark.asyncio
 async def test_config_screen_breadcrumb_shows_provided_parts() -> None:
     tree = build_form_tree(_Schema)
-    screen = ConfigScreen(group=tree.root, breadcrumb_parts=["a", "b"])
+    screen = ConfigScreen(group=tree.root, form_tree=tree, breadcrumb_parts=["a", "b"])
     app = _Host(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -56,7 +56,7 @@ async def test_config_screen_breadcrumb_shows_provided_parts() -> None:
 @pytest.mark.asyncio
 async def test_config_screen_footer_starts_in_idle_mode() -> None:
     tree = build_form_tree(_Schema)
-    screen = ConfigScreen(group=tree.root, breadcrumb_parts=["AppSettings"])
+    screen = ConfigScreen(group=tree.root, form_tree=tree, breadcrumb_parts=["AppSettings"])
     app = _Host(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -67,7 +67,7 @@ async def test_config_screen_footer_starts_in_idle_mode() -> None:
 @pytest.mark.asyncio
 async def test_config_screen_field_list_carries_group() -> None:
     tree = build_form_tree(_Schema)
-    screen = ConfigScreen(group=tree.root, breadcrumb_parts=["AppSettings"])
+    screen = ConfigScreen(group=tree.root, form_tree=tree, breadcrumb_parts=["AppSettings"])
     app = _Host(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -78,7 +78,7 @@ async def test_config_screen_field_list_carries_group() -> None:
 @pytest.mark.asyncio
 async def test_config_screen_loads_theme_tcss() -> None:
     tree = build_form_tree(_Schema)
-    screen = ConfigScreen(group=tree.root, breadcrumb_parts=["AppSettings"])
+    screen = ConfigScreen(group=tree.root, form_tree=tree, breadcrumb_parts=["AppSettings"])
     # CSS_PATH should point at theme.tcss (one of the values may be a list).
     css = screen.CSS_PATH
     paths = css if isinstance(css, list) else [css]
