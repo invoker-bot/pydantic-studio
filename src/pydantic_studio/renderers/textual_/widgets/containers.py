@@ -14,6 +14,11 @@ if TYPE_CHECKING:
     from textual.app import ComposeResult
 
 
+_SELECT_BLANK = getattr(Select, "NULL", None)
+if _SELECT_BLANK is None:
+    _SELECT_BLANK = Select.BLANK
+
+
 class SequenceEditor(NodeEditor):
     """Editor for SequenceNode (list/set/tuple).
 
@@ -192,7 +197,7 @@ class UnionEditor(NodeEditor):
         initial_value = (
             self.node.variant_type_names[self.node.selected_index]
             if self.node.selected_index is not None
-            else Select.NULL
+            else _SELECT_BLANK
         )
         with Vertical(id=f"union-{sanitized}"):
             with Horizontal():
@@ -211,7 +216,7 @@ class UnionEditor(NodeEditor):
                 yield inner_editor
 
     async def on_select_changed(self, event: Select.Changed) -> None:
-        if event.value == Select.NULL:
+        if event.value == _SELECT_BLANK:
             return
         for i, name in enumerate(self.node.variant_type_names):
             if name == event.value:

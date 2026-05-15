@@ -18,6 +18,11 @@ if TYPE_CHECKING:
     from textual.app import ComposeResult
 
 
+_SELECT_BLANK = getattr(Select, "NULL", None)
+if _SELECT_BLANK is None:
+    _SELECT_BLANK = Select.BLANK
+
+
 def _parse_for_kind(kind: str, raw: str) -> tuple[bool, Any]:
     """Convert a raw string to the type the node expects.
 
@@ -180,7 +185,7 @@ class ChoiceEditor(NodeEditor):
             yield Label(f"{self.node.name}: ", classes="field-label")
             yield Select(
                 options=options,
-                value=initial if initial is not None else Select.NULL,
+                value=initial if initial is not None else _SELECT_BLANK,
                 id=f"select-{TextInputEditor._sanitize_id(self.field_path)}",
                 allow_blank=True,
             )
@@ -209,7 +214,7 @@ class ChoiceEditor(NodeEditor):
         return repr(v)
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        if event.value == Select.NULL:
+        if event.value == _SELECT_BLANK:
             return
         # Map back from the Select's value id to the actual node value.
         value: Any
