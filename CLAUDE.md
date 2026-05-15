@@ -231,8 +231,18 @@ ruff knows the rule and won't complain.
   override it on `StudioApp` with a writable property — see
   `renderers/textual_/app.py`. If you need the DOM-debug tree, use
   `super().tree` or rename our attribute.
-- `Select.NULL` is the sentinel for "no selection" in 8.x (older docs
-  say `Select.BLANK` — that's a different attribute on `Widget`).
+- `Select.NULL` is the no-selection sentinel in **textual 8.x** (a
+  `NoSelection` instance). In **textual ≤7.x** the same sentinel was
+  named `Select.BLANK` and `NULL` did not exist. In textual 8.x
+  `Select.BLANK` still exists but is `False` (inherited from `Widget`,
+  unrelated to selection state) — do **not** use it as a sentinel.
+  Both `widgets/scalars.py` and `widgets/containers.py` define a
+  module-level `_SELECT_BLANK` shim (`getattr(Select, "NULL", None)`,
+  falling back to `Select.BLANK` if the attribute is absent) that
+  picks the right value across versions; use it instead of
+  `Select.NULL` directly (issue #4 regressed when an implementer
+  "fixed" the plan's `BLANK` → `NULL` against 8.x without noticing
+  7.x users would crash).
 - `BINDINGS: ClassVar[list[BindingType]] = [...]` — the `ClassVar`
   annotation satisfies ruff's `RUF012` rule.
 - `await self.recompose()` is the idiomatic way to re-render a widget
