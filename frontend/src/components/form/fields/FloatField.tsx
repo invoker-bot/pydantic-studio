@@ -17,8 +17,9 @@ type FloatNode = z.infer<typeof FloatNodeSchema>;
 
 export function FloatField({ node, path }: { node: FloatNode; path: string }) {
   const mutation = useApplyMutation();
-  const initial = node.value !== null ? String(node.value) : "";
-  const [local, setLocal] = useState<string>(initial);
+  const [local, setLocal] = useState<string>(
+    node.value !== null ? String(node.value) : "",
+  );
   const [error, setError] = useState<string | null>(node.error);
 
   useEffect(() => {
@@ -45,7 +46,13 @@ export function FloatField({ node, path }: { node: FloatNode; path: string }) {
         value={local}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => {
-          if (local === initial) return;
+          if (
+            local ===
+            (node.value === null || node.value === undefined
+              ? ""
+              : String(node.value))
+          )
+            return;
           const parsed = local.trim() === "" ? null : Number(local);
           if (parsed !== null && Number.isNaN(parsed)) {
             setError(`'${local}' is not a number`);

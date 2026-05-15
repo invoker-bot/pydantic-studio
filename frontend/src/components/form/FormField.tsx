@@ -1,6 +1,4 @@
-// Dispatcher: switch on node.kind to render the right component.
-// Phase 3 covered string/int/bool/enum/literal/group. Phase 4 adds
-// sequence/mapping/union/any.
+// Dispatcher: switch on node.kind to render the right field component.
 
 import type { FormNodeData } from "@/api/schemas";
 import { AnyField } from "@/components/form/fields/AnyField";

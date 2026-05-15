@@ -17,8 +17,7 @@ type DecimalNode = z.infer<typeof DecimalNodeSchema>;
 
 export function DecimalField({ node, path }: { node: DecimalNode; path: string }) {
   const mutation = useApplyMutation();
-  const initial = node.value ?? "";
-  const [local, setLocal] = useState<string>(initial);
+  const [local, setLocal] = useState<string>(node.value ?? "");
   const [error, setError] = useState<string | null>(node.error);
 
   useEffect(() => {
@@ -45,7 +44,7 @@ export function DecimalField({ node, path }: { node: DecimalNode; path: string }
         value={local}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => {
-          if (local === initial) return;
+          if (local === (node.value ?? "")) return;
           // Wire format is a string; backend coerces via Decimal(value).
           // Empty string -> null (lets DecimalNode.validate_value enforce
           // required-ness).
