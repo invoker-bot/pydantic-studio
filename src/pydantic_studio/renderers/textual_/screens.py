@@ -8,13 +8,18 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
+from pydantic_studio.renderers.textual_.widgets.breadcrumb import Breadcrumb
 from pydantic_studio.renderers.textual_.widgets.editor import EditorPane
+from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
+from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
 from pydantic_studio.renderers.textual_.widgets.preview import PreviewPane
 from pydantic_studio.renderers.textual_.widgets.sidebar import Sidebar
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
+
+    from pydantic_studio.tree.nodes import GroupNode
 
 
 class EditorScreen(Screen):
@@ -147,3 +152,30 @@ class EditorScreen(Screen):
         if isinstance(node, GroupNode):
             return node
         return None
+
+
+class ConfigScreen(Screen):
+    """TUI v2 single-panel screen: Breadcrumb + FieldListView + FooterHints.
+
+    M1 ships the chrome with PlaceholderCell value rendering. Editing
+    cells, container drill-down, sequence/mapping management, union
+    cycling, and the errors screen land in M2-M5. Opt in via env var
+    PYDANTIC_STUDIO_TUI_V2=1; otherwise StudioApp pushes EditorScreen
+    as before.
+    """
+
+    CSS_PATH = "theme.tcss"
+
+    def __init__(
+        self,
+        group: GroupNode,
+        breadcrumb_parts: list[str],
+    ) -> None:
+        super().__init__()
+        self._group = group
+        self._breadcrumb_parts = breadcrumb_parts
+
+    def compose(self) -> ComposeResult:
+        yield Breadcrumb(parts=self._breadcrumb_parts)
+        yield FieldListView(group=self._group, base_path="")
+        yield FooterHints(mode="idle")

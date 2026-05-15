@@ -30,7 +30,11 @@ FooterHints {
     background: $surface;
     color: $text-muted;
     padding: 0 1;
-    border-top: hkey $text-muted;
+    /* Note: literal hex (not $text-muted) — textual 8.x's built-in
+       $text-muted resolves to `auto 60%` which is not a valid color
+       for the border-top property even when the user variable shadows
+       it. Mirror $text-muted's hex from line 7 here. */
+    border-top: hkey #6e6e6e;
 }
 
 FooterHints .footer-hints--key {
