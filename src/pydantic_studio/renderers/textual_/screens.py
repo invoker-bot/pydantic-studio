@@ -19,9 +19,11 @@ from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
 from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from textual.app import ComposeResult
 
-    from pydantic_studio.tree.nodes import GroupNode
+    from pydantic_studio.tree.nodes import AnyNode, FormTree, GroupNode
 
 
 class ConfigScreen(Screen):
@@ -47,3 +49,43 @@ class ConfigScreen(Screen):
         yield Breadcrumb(parts=self._breadcrumb_parts)
         yield FieldListView(group=self._group, base_path="")
         yield FooterHints(mode="idle")
+
+
+class ChooserScreen(Screen):
+    """Push-screen presenter for ChoiceCell large-choice fields.
+
+    Lists all options; up/down to navigate, Enter to commit + pop.
+    """
+
+    CSS_PATH = "theme.tcss"
+
+    def __init__(
+        self,
+        node: AnyNode,
+        path: str,
+        form_tree: FormTree,
+    ) -> None:
+        super().__init__()
+        self._node = node
+        self._path = path
+        self._form_tree = form_tree
+
+    @property
+    def options(self) -> list[tuple[str, Any]]:
+        if self._node.kind == "enum":
+            return list(self._node.choices)
+        return [(str(c), c) for c in self._node.choices]
+
+    def select(self, idx: int) -> None:
+        if not (0 <= idx < len(self.options)):
+            return
+        _, value = self.options[idx]
+        self._form_tree.set_value(self._path, value)
+        self.app.pop_screen()
+
+    def compose(self) -> ComposeResult:
+        from textual.widgets import Label, ListItem, ListView
+
+        with ListView(id="chooser-list"):
+            for label, _ in self.options:
+                yield ListItem(Label(label))
