@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { useApplyMutation } from "@/api/mutations";
 import type { URLNodeSchema } from "@/api/schemas";
+import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -33,9 +34,7 @@ export function URLField({ node, path }: { node: URLNode; path: string }) {
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
-        <span className="rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600">
-          {shortTypeName(node.target_type_name)}
-        </span>
+        <Chip>{shortTypeName(node.target_type_name)}</Chip>
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <Input

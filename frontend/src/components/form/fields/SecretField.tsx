@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { useApplyMutation } from "@/api/mutations";
 import type { SecretNodeSchema } from "@/api/schemas";
+import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -34,9 +35,7 @@ export function SecretField({ node, path }: { node: SecretNodeT; path: string })
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
-        <span className="rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600">
-          Secret{node.secret_kind === "bytes" ? "Bytes" : "Str"}
-        </span>
+        <Chip>Secret{node.secret_kind === "bytes" ? "Bytes" : "Str"}</Chip>
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <div className="flex gap-2">

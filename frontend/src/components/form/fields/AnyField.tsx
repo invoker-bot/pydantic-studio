@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { useApplyMutation } from "@/api/mutations";
 import type { AnyValueNodeSchema } from "@/api/schemas";
+import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -60,9 +61,7 @@ export function AnyField({
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
-        <span className="rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600">
-          {node.mode}
-        </span>
+        <Chip>{node.mode}</Chip>
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <Input

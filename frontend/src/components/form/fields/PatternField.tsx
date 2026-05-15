@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { useApplyMutation } from "@/api/mutations";
 import type { PatternNodeSchema } from "@/api/schemas";
+import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -48,13 +49,9 @@ export function PatternField({ node, path }: { node: PatternNodeT; path: string 
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
         {activeFlagChips(node.flags).map((chip) => (
-          <span
-            key={chip.bit}
-            title={chip.tooltip}
-            className="rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600"
-          >
+          <Chip key={chip.bit} title={chip.tooltip}>
             {chip.label}
-          </span>
+          </Chip>
         ))}
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}

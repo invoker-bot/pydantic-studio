@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { useApplyMutation } from "@/api/mutations";
 import type { DecimalNodeSchema } from "@/api/schemas";
+import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -33,11 +34,7 @@ export function DecimalField({ node, path }: { node: DecimalNode; path: string }
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
-        {node.max_digits !== null && (
-          <span className="rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600">
-            {node.max_digits} digits
-          </span>
-        )}
+        {node.max_digits !== null && <Chip>{node.max_digits} digits</Chip>}
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <Input
