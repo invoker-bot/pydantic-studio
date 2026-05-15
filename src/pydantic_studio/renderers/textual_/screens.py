@@ -1,17 +1,19 @@
 """Textual screens for pydantic-studio.
 
-After the M1 cutover, the only screen is ``ConfigScreen`` — the
-single-panel Claude Code /config-style editor. The legacy three-pane
-``EditorScreen`` (sidebar + editor pane + preview) was retired along
-with its supporting widgets in `widgets/scalars.py`, `containers.py`,
-`editor.py`, `sidebar.py`, `preview.py`. M2-M5 build editing /
-drill-down / save flow on top of ConfigScreen.
+After the M1 cutover, the primary screen is ``ConfigScreen`` — the
+single-panel Claude Code /config-style editor. ``ChooserScreen``
+handles ChoiceCell large-choice fields. ``ErrorsScreen`` lists
+validation failures when a Ctrl+S save is rejected. The legacy
+three-pane ``EditorScreen`` (sidebar + editor pane + preview) was
+retired along with its supporting widgets in `widgets/scalars.py`,
+`containers.py`, `editor.py`, `sidebar.py`, `preview.py`.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
+from textual.binding import Binding, BindingType
 from textual.screen import Screen
 
 from pydantic_studio.renderers.textual_.widgets.breadcrumb import Breadcrumb
@@ -113,3 +115,47 @@ class ChooserScreen(Screen):
         with ListView(id="chooser-list"):
             for label, _ in self.options:
                 yield ListItem(Label(label))
+
+
+class ErrorsScreen(Screen):
+    """Modal listing validation errors after a failed save.
+
+    Pushed by :meth:`StudioApp.action_save` when ``save_yaml`` raises
+    :exc:`ValidationFailedError`. The body shows one line per error;
+    Esc dismisses and returns control to the underlying ConfigScreen
+    so the user can fix things and retry.
+    """
+
+    CSS_PATH = "theme.tcss"
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("escape", "dismiss", "back", show=False),
+        Binding("enter", "dismiss", "back", show=False),
+    ]
+
+    def __init__(self, errors: list[str]) -> None:
+        super().__init__()
+        self._errors = list(errors)
+
+    @property
+    def error_text(self) -> str:
+        """Concatenated error lines — used by tests to assert content."""
+        return "\n".join(self._errors)
+
+    def compose(self) -> ComposeResult:
+        from textual.containers import VerticalScroll
+        from textual.widgets import Static
+
+        header = "Validation failed — fix these before saving:"
+        yield Static(header, classes="errors-screen--header")
+        with VerticalScroll(id="errors-list"):
+            for err in self._errors:
+                yield Static(f"  - {err}", classes="errors-screen--item")
+        yield Static(
+            "Esc / Enter: back to editor",
+            classes="errors-screen--footer",
+        )
+
+    def action_dismiss(self) -> None:  # type: ignore[override]
+        """Pop this screen, returning to the underlying ConfigScreen."""
+        self.app.pop_screen()
