@@ -59,7 +59,24 @@ class FieldRow(Widget):
 
     @property
     def label_text(self) -> str:
+        if self._is_required_and_missing():
+            return f"*{self._node.name}"
         return self._node.name
+
+    def _is_required_and_missing(self) -> bool:
+        """True iff this row's node is required and has no value yet.
+
+        Only leaf nodes (those with a ``value`` attribute) participate
+        — Group / Sequence / Mapping / Union containers never show a
+        missing-marker on themselves, because drilling into them
+        surfaces their own required children's markers.
+        """
+        node = self._node
+        if not getattr(node, "required", False):
+            return False
+        if not hasattr(node, "value"):
+            return False
+        return getattr(node, "value", None) is None
 
     @property
     def marker_text(self) -> str:
