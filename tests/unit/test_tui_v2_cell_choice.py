@@ -162,3 +162,28 @@ async def test_chooser_screen_lists_all_options_and_commits_on_select() -> None:
         screen.select(4)
         await pilot.pause()
         assert tree.root.find("letter").value == _BigEnum.E
+
+
+@pytest.mark.asyncio
+async def test_chooser_screen_labels_match_cell_labels() -> None:
+    """ChooserScreen option labels must match what ChoiceCell would
+    display inline (both use enum_label - prefer .value over .name).
+    Regression: before the fix, ChooserScreen showed .name (uppercase)
+    while ChoiceCell showed .value (lowercase)."""
+    from pydantic_studio.renderers.textual_.screens import ChooserScreen
+
+    tree = build_form_tree(_Large)
+    tree.set_value("letter", _BigEnum.A)
+    node = tree.root.find("letter")
+    screen = ChooserScreen(node=node, path="letter", form_tree=tree)
+
+    class _AppHost(App):
+        def on_mount(self) -> None:
+            self.push_screen(screen)
+
+    async with _AppHost().run_test() as pilot:
+        await pilot.pause()
+        labels = [label for label, _ in screen.options]
+        # _BigEnum values are lowercase ("a", "b", ...) so the screen
+        # labels must also be lowercase (not the uppercase .name).
+        assert labels == ["a", "b", "c", "d", "e", "f", "g", "h"]

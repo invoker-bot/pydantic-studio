@@ -73,7 +73,9 @@ class ChooserScreen(Screen):
     @property
     def options(self) -> list[tuple[str, Any]]:
         if self._node.kind == "enum":
-            return list(self._node.choices)
+            from pydantic_studio.renderers.textual_.widgets.cells.labels import enum_label
+
+            return [(enum_label(member), member) for _, member in self._node.choices]
         return [(str(c), c) for c in self._node.choices]
 
     def select(self, idx: int) -> None:

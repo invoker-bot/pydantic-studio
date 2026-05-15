@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from textual.widgets import Static
 
 from pydantic_studio.renderers.textual_.widgets.cells.base import Cell
+from pydantic_studio.renderers.textual_.widgets.cells.labels import enum_label
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -36,21 +37,9 @@ class ChoiceCell(Cell):
         """
         node = self._node
         if node.kind == "enum":
-            return [(self._enum_label(member), member) for _, member in node.choices]
+            return [(enum_label(member), member) for _, member in node.choices]
         # literal: each choice is the literal value itself.
         return [(str(c), c) for c in node.choices]
-
-    @staticmethod
-    def _enum_label(member: Any) -> str:
-        """Prefer ``member.value`` (typical user-facing string) but fall
-        back to ``member.name`` if the value isn't string-friendly.
-        """
-        value = getattr(member, "value", None)
-        if isinstance(value, str):
-            return value
-        if value is not None:
-            return str(value)
-        return getattr(member, "name", str(member))
 
     @property
     def large_choice(self) -> bool:
