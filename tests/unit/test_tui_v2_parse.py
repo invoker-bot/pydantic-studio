@@ -23,6 +23,7 @@ from pydantic_studio.renderers.textual_.widgets.cells.parse import parse_for_kin
         ("datetime", "2025-01-01T12:00:00", datetime(2025, 1, 1, 12, 0, 0)),
         ("date", "2025-01-01", date(2025, 1, 1)),
         ("time", "02:30:00", time(2, 30, 0)),
+        ("timedelta", "PT1H", __import__("datetime").timedelta(hours=1)),
         ("ip_address", "10.0.0.1", "10.0.0.1"),  # stored as str; node validates
         ("ip_network", "10.0.0.0/24", "10.0.0.0/24"),
         ("url", "https://example.com", "https://example.com"),
@@ -92,5 +93,14 @@ def test_parse_for_kind_unknown_kind_returns_failure() -> None:
     surprise raise. Defensive — the dispatcher in FieldRow ensures we
     never reach here in practice."""
     ok, value = parse_for_kind("not-a-kind", "anything")
+    assert ok is False
+    assert value is None
+
+
+def test_parse_for_kind_timedelta_bad_input_returns_failure() -> None:
+    """timedelta uses pydantic.TypeAdapter which raises
+    pydantic.ValidationError on malformed input - the helper must
+    catch it like every other parse failure."""
+    ok, value = parse_for_kind("timedelta", "not-a-duration")
     assert ok is False
     assert value is None

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import ValidationError
+
 
 def parse_for_kind(kind: str, raw: str) -> tuple[bool, Any]:
     """Convert ``raw`` to the type ``kind`` expects.
@@ -69,7 +71,8 @@ def parse_for_kind(kind: str, raw: str) -> tuple[bool, Any]:
         if kind == "bytes":
             # Hex by default — matches BytesNode.field_serializer convention.
             return True, bytes.fromhex(raw)
-    except (ValueError, TypeError, ArithmeticError):
+    except (ValueError, TypeError, ArithmeticError, ValidationError):
         # ArithmeticError covers decimal.InvalidOperation for bad Decimal inputs.
+        # ValidationError covers pydantic.TypeAdapter failures (e.g., timedelta).
         return False, None
     return False, None
