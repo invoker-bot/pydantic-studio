@@ -6,8 +6,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual.app import App
+from textual.binding import Binding
 
 if TYPE_CHECKING:
+    from typing import ClassVar
+
+    from textual.binding import BindingType
+
     from pydantic_studio.tree.nodes import FormTree
 
 
@@ -30,6 +35,10 @@ class StudioApp(App):
     """
 
     CSS = ""  # custom theme CSS lands in Plan 8
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("ctrl+s", "save", "save", priority=True),
+    ]
 
     def __init__(
         self,
@@ -80,6 +89,52 @@ class StudioApp(App):
             screen_quit()
             return
         self.exit()
+
+    def action_save(self) -> None:
+        """Persist ``self.tree`` to ``self.save_path``.
+
+        - No ``save_path`` configured: emit a warning notification.
+        - Tree is invalid: emit an error notification with the count of
+          validation errors and leave the on-disk file untouched.
+        - Tree is valid: write the YAML and emit a confirmation.
+
+        Splitting "valid" from "invalid" via :exc:`ValidationFailedError`
+        keeps the contract that ``save_yaml`` is strict and never writes
+        a partial tree (CLAUDE.md "core invariants" §5). Mid-edit drafts
+        are a separate concern handled at quit time, not Ctrl+S time.
+        """
+        if self.save_path is None:
+            self.notify(
+                "No save path configured", severity="warning", title="Save"
+            )
+            return
+
+        from pydantic_studio import save_yaml
+        from pydantic_studio.exceptions import ValidationFailedError
+
+        try:
+            save_yaml(self.tree, self.save_path)
+        except ValidationFailedError as exc:
+            n = len(exc.errors)
+            self.notify(
+                f"{n} validation error{'s' if n != 1 else ''} — fix before saving",
+                severity="error",
+                title="Save failed",
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            self.notify(
+                f"{type(exc).__name__}: {exc}",
+                severity="error",
+                title="Save failed",
+            )
+            return
+
+        self.notify(
+            f"Saved to {self.save_path}",
+            severity="information",
+            title="Save",
+        )
 
 
 def run_app(tree: FormTree, save_path: str | Path | None = None) -> None:
