@@ -62,7 +62,11 @@ class StudioApp(App):
             else self.tree.schema_name
         )
         self.push_screen(
-            ConfigScreen(group=self.tree.root, breadcrumb_parts=[short_name])
+            ConfigScreen(
+                group=self.tree.root,
+                form_tree=self.tree,
+                breadcrumb_parts=[short_name],
+            )
         )
 
     async def action_quit(self) -> None:  # type: ignore[override]

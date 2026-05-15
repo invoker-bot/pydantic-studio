@@ -9,10 +9,7 @@ from __future__ import annotations
 
 from pydantic_studio.renderers.textual_.widgets.breadcrumb import Breadcrumb
 from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
-from pydantic_studio.renderers.textual_.widgets.field_row import (
-    FieldRow,
-    PlaceholderCell,
-)
+from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
 
 __all__ = [
@@ -20,5 +17,4 @@ __all__ = [
     "FieldListView",
     "FieldRow",
     "FooterHints",
-    "PlaceholderCell",
 ]
