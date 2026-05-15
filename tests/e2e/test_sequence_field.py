@@ -22,21 +22,29 @@ def test_add_remove_and_edit_sequence_item(
     # Click +Add. A new card appears at index 0 with a string input.
     add_button.click()
 
-    # After the mutation round-trips, the preview should reflect that
-    # tags has one item (initially empty string).
-    preview = page.get_by_test_id("tree-preview")
-    expect(preview).to_contain_text('"tags"', timeout=5000)
-
-    # The new item is the only StringNode-shaped child of tags. There
-    # are several other string fields on the page (name), so locate
-    # by the "[0]" header text that SequenceField renders.
+    # The new item is the only StringNode-shaped child of tags. Locate
+    # the [0] header that SequenceField renders.
     item_header = page.get_by_text("[0]").first
     expect(item_header).to_be_visible(timeout=5000)
 
-    # Independent check: fetch /api/tree and confirm tags has 1 item.
+    # Fill the new item with a recognisable value so we can pin the
+    # YAML preview's output deterministically (empty None items render
+    # as just "- " which is fragile to assert on).
+    new_tag_input = page.locator('input[id="field-tags.0"]')
+    new_tag_input.fill("alpha-tag")
+    new_tag_input.blur()
+
+    # After the mutation round-trips, the YAML preview should show the
+    # filled value as a list item under `tags:`.
+    preview = page.get_by_test_id("tree-preview")
+    expect(preview).to_contain_text("- alpha-tag", timeout=5000)
+
+    # Independent check: fetch /api/tree and confirm tags has 1 item
+    # with the filled value.
     response = page.context.request.get(f"{fastapi_url}/api/tree")
     body = response.json()
     tags_field = next(
         f for f in body["root"]["fields"] if f["name"] == "tags"
     )
     assert len(tags_field["items"]) == 1
+    assert tags_field["items"][0]["value"] == "alpha-tag"

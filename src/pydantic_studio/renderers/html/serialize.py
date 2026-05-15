@@ -28,11 +28,16 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     """Serialize a FormTree to a JSON-ready dict.
 
     The output shape mirrors §5.1 of the design spec: ``schema_name``,
-    ``root`` (the root GroupNode), and a top-level ``unsaved_count``
-    (derived from the snapshot ring) for the header badge.
+    ``root`` (the root GroupNode), a top-level ``unsaved_count``
+    (derived from the snapshot ring) for the header badge, and
+    ``preview`` (YAML rendering of the effective config values via
+    ``render_yaml_preview``) for the SPA's live-preview pane.
     """
+    from pydantic_studio.renderers.html.render import render_yaml_preview
+
     data = tree.model_dump(mode="json", exclude=_TREE_EXCLUDE)
     data["unsaved_count"] = len(tree.snapshots)
+    data["preview"] = render_yaml_preview(tree)
     return data
 
 

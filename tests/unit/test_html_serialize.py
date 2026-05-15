@@ -77,6 +77,35 @@ def test_tree_to_json_excludes_schema_class_and_snapshots() -> None:
     assert "snapshots" not in data
 
 
+def test_tree_to_json_includes_yaml_preview_of_values() -> None:
+    """The envelope must carry a `preview` field that renders the
+    *effective config values* as YAML, so the SPA can show users what
+    will actually be saved instead of the raw FormTree structure.
+    """
+    tree = build_form_tree(
+        _Primitive, existing={"name": "demo-service", "workers": 8}
+    )
+    data = tree_to_json(tree)
+    assert "preview" in data
+    preview = data["preview"]
+    assert isinstance(preview, str)
+    # Real values, YAML-formatted (key: value)
+    assert "name: demo-service" in preview
+    assert "workers: 8" in preview
+    # Metadata MUST NOT leak in
+    assert '"kind"' not in preview
+    assert '"required"' not in preview
+    assert "fields:" not in preview
+
+
+def test_tree_to_json_preview_reflects_post_mutation_state() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "before", "workers": 1})
+    tree.set_value("name", "after")
+    data = tree_to_json(tree)
+    assert "name: after" in data["preview"]
+    assert "name: before" not in data["preview"]
+
+
 def test_tree_to_json_nested_group_renders_as_group_node() -> None:
     tree = build_form_tree(
         _Outer,

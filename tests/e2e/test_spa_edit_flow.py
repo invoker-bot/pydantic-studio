@@ -40,3 +40,23 @@ def test_edit_string_field_updates_tree_and_preview(
         f for f in body["root"]["fields"] if f["name"] == "name"
     )
     assert name_field["value"] == "edited-via-playwright"
+
+
+def test_live_preview_renders_yaml_not_formtree_dump(
+    page: Page, fastapi_url: str
+) -> None:
+    """The preview pane must show the effective config values as YAML
+    (``key: value`` lines), NOT a JSON dump of the FormTree's internal
+    metadata (kind/required/error/fields/value/default). Regression for
+    a Phase-5 gap where App.tsx was JSON.stringify(data) of the raw
+    FormTree response.
+    """
+    page.goto(f"{fastapi_url}/static/dist/index.html")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+    preview = page.get_by_test_id("tree-preview")
+    text = preview.inner_text()
+    assert "name: demo-service" in text
+    assert "workers: 4" in text
+    assert '"kind"' not in text
+    assert '"required"' not in text
+    assert '"fields"' not in text
