@@ -115,12 +115,15 @@ class StudioApp(App):
         try:
             save_yaml(self.tree, self.save_path)
         except ValidationFailedError as exc:
+            from pydantic_studio.renderers.textual_.screens import ErrorsScreen
+
             n = len(exc.errors)
             self.notify(
                 f"{n} validation error{'s' if n != 1 else ''} — fix before saving",
                 severity="error",
                 title="Save failed",
             )
+            self.push_screen(ErrorsScreen(errors=exc.errors))
             return
         except Exception as exc:  # noqa: BLE001
             self.notify(
