@@ -127,13 +127,13 @@ export default function App() {
       </section>
       <section className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          Live preview
+          Live YAML preview
         </h2>
         <pre
           data-testid="tree-preview"
-          className="bg-zinc-100 p-4 rounded text-xs overflow-auto max-h-[80vh]"
+          className="bg-zinc-100 p-4 rounded text-xs overflow-auto max-h-[80vh] font-mono"
         >
-          {JSON.stringify(data, null, 2)}
+          {data.preview}
         </pre>
       </section>
     </div>

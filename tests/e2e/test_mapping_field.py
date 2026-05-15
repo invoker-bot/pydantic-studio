@@ -37,6 +37,6 @@ def test_add_entry_rename_key(page: Page, fastapi_url: str) -> None:
     k_node, _v_node = env_field["entries"][0]
     assert k_node["value"] == "TZ"
 
-    # Preview should also show "TZ" somewhere
+    # Preview is YAML; the new key surfaces as "  TZ:" under env.
     preview = page.get_by_test_id("tree-preview")
-    expect(preview).to_contain_text('"TZ"', timeout=5000)
+    expect(preview).to_contain_text("TZ:", timeout=5000)

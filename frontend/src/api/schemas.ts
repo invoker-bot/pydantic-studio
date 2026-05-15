@@ -368,6 +368,7 @@ export const FormTreeSchema = z.object({
   schema_name: z.string(),
   root: GroupNodeSchema,
   unsaved_count: z.number(),
+  preview: z.string(),
 }).passthrough();   // tolerate extra top-level fields (created_at, cursor, etc.)
 
 export type FormTree = z.infer<typeof FormTreeSchema>;
