@@ -100,12 +100,32 @@ class FieldListView(VerticalScroll):
         except Exception:
             return None
 
+    def _focused_row(self) -> FieldRow | None:
+        """Return the cursor-focused FieldRow, or None."""
+        rows = list(self.query(FieldRow))
+        if not (0 <= self._cursor < len(rows)):
+            return None
+        return rows[self._cursor]
+
     def action_activate_focused(self) -> None:
-        """Enter on the focused row -> primary action of its cell."""
+        """Enter on the focused row -> drill-down (container) or edit (leaf).
+
+        Drill-down takes priority over cell editing: Enter on a Group
+        row pushes a child ConfigScreen scoped to that group's fields.
+        Sequence / Mapping / Union containers are deferred to a later
+        milestone (their cell stub falls through to enter_edit, which
+        is a no-op for non-text kinds).
+        """
         from pydantic_studio.renderers.textual_.widgets.cells import (
             BoolCell,
             ChoiceCell,
         )
+        from pydantic_studio.tree.nodes import GroupNode
+
+        row = self._focused_row()
+        if row is not None and isinstance(row.node, GroupNode):
+            self._push_child_screen(row.node)
+            return
 
         cell = self._focused_cell()
         if cell is None:
@@ -117,6 +137,27 @@ class FieldListView(VerticalScroll):
             cell.open_chooser()
             return
         cell.enter_edit()
+
+    def _push_child_screen(self, group) -> None:
+        """Push a child ConfigScreen scoped to ``group``.
+
+        Inherits the parent screen's breadcrumb parts and appends the
+        group's name. Uses late imports to break the screens <-> widgets
+        cycle (screens.py imports FieldListView; FieldListView pushing
+        a screen needs ConfigScreen).
+        """
+        from pydantic_studio.renderers.textual_.screens import ConfigScreen
+
+        parent = self.screen
+        parent_parts = list(getattr(parent, "_breadcrumb_parts", []))
+        parts = parent_parts + [group.name]
+        self.app.push_screen(
+            ConfigScreen(
+                group=group,
+                form_tree=self._form_tree,
+                breadcrumb_parts=parts,
+            )
+        )
 
     def action_toggle_focused(self) -> None:
         """Space on the focused row -> toggle (BoolCell only)."""
@@ -143,9 +184,21 @@ class FieldListView(VerticalScroll):
             cell.cycle_prev()
 
     def action_cancel_focused(self) -> None:
-        """Esc on the focused row -> cancel_edit if editing."""
+        """Esc on the focused row.
+
+        - If a cell is in edit mode → cancel the edit (in-place).
+        - Else if the active screen is a drilled-in child (more than
+          one ConfigScreen on the stack) → pop one level.
+        - Else (root screen, no edit) → no-op.
+        """
+        from pydantic_studio.renderers.textual_.screens import ConfigScreen
+
         cell = self._focused_cell()
-        if cell is None:
-            return
-        if cell.editing:
+        if cell is not None and cell.editing:
             cell.cancel_edit()
+            return
+        config_screens = [
+            s for s in self.app.screen_stack if isinstance(s, ConfigScreen)
+        ]
+        if len(config_screens) > 1:
+            self.app.pop_screen()
