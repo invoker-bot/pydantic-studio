@@ -1,18 +1,31 @@
-// Dispatcher: switch on node.kind to render the right component.
-// Phase 3 covered string/int/bool/enum/literal/group. Phase 4 adds
-// sequence/mapping/union/any.
+// Dispatcher: switch on node.kind to render the right field component.
 
 import type { FormNodeData } from "@/api/schemas";
 import { AnyField } from "@/components/form/fields/AnyField";
 import { BoolField } from "@/components/form/fields/BoolField";
+import { BytesField } from "@/components/form/fields/BytesField";
+import { DateField } from "@/components/form/fields/DateField";
+import { DatetimeField } from "@/components/form/fields/DatetimeField";
+import { DecimalField } from "@/components/form/fields/DecimalField";
+import { EmailField } from "@/components/form/fields/EmailField";
 import { EnumField } from "@/components/form/fields/EnumField";
+import { FloatField } from "@/components/form/fields/FloatField";
 import { GroupField } from "@/components/form/fields/GroupField";
 import { IntField } from "@/components/form/fields/IntField";
+import { IPAddressField } from "@/components/form/fields/IPAddressField";
+import { IPNetworkField } from "@/components/form/fields/IPNetworkField";
 import { LiteralField } from "@/components/form/fields/LiteralField";
 import { MappingField } from "@/components/form/fields/MappingField";
+import { PathField } from "@/components/form/fields/PathField";
+import { PatternField } from "@/components/form/fields/PatternField";
+import { SecretField } from "@/components/form/fields/SecretField";
 import { SequenceField } from "@/components/form/fields/SequenceField";
 import { StringField } from "@/components/form/fields/StringField";
+import { TimedeltaField } from "@/components/form/fields/TimedeltaField";
+import { TimeField } from "@/components/form/fields/TimeField";
 import { UnionField } from "@/components/form/fields/UnionField";
+import { URLField } from "@/components/form/fields/URLField";
+import { UUIDField } from "@/components/form/fields/UUIDField";
 
 type NodeOfKind<K extends string> = Extract<FormNodeData, { kind: K }>;
 
@@ -25,8 +38,38 @@ export function FormField({
       return <StringField node={node as NodeOfKind<"string">} path={path} />;
     case "int":
       return <IntField node={node as NodeOfKind<"int">} path={path} />;
+    case "float":
+      return <FloatField node={node as NodeOfKind<"float">} path={path} />;
     case "bool":
       return <BoolField node={node as NodeOfKind<"bool">} path={path} />;
+    case "date":
+      return <DateField node={node as NodeOfKind<"date">} path={path} />;
+    case "time":
+      return <TimeField node={node as NodeOfKind<"time">} path={path} />;
+    case "datetime":
+      return <DatetimeField node={node as NodeOfKind<"datetime">} path={path} />;
+    case "timedelta":
+      return <TimedeltaField node={node as NodeOfKind<"timedelta">} path={path} />;
+    case "decimal":
+      return <DecimalField node={node as NodeOfKind<"decimal">} path={path} />;
+    case "path":
+      return <PathField node={node as NodeOfKind<"path">} path={path} />;
+    case "url":
+      return <URLField node={node as NodeOfKind<"url">} path={path} />;
+    case "email":
+      return <EmailField node={node as NodeOfKind<"email">} path={path} />;
+    case "ip_address":
+      return <IPAddressField node={node as NodeOfKind<"ip_address">} path={path} />;
+    case "ip_network":
+      return <IPNetworkField node={node as NodeOfKind<"ip_network">} path={path} />;
+    case "uuid":
+      return <UUIDField node={node as NodeOfKind<"uuid">} path={path} />;
+    case "secret":
+      return <SecretField node={node as NodeOfKind<"secret">} path={path} />;
+    case "pattern":
+      return <PatternField node={node as NodeOfKind<"pattern">} path={path} />;
+    case "bytes":
+      return <BytesField node={node as NodeOfKind<"bytes">} path={path} />;
     case "enum":
       return <EnumField node={node as NodeOfKind<"enum">} path={path} />;
     case "literal":

@@ -5,16 +5,29 @@ mutate.
 
 from __future__ import annotations
 
+import re
 import socket
 import threading
-import time
+import time as _time
 from contextlib import closing
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from enum import StrEnum
+from ipaddress import IPv4Address, IPv4Network
+from pathlib import Path as FsPath
 from typing import TYPE_CHECKING, Annotated, Any, Literal
+from uuid import UUID
 
 import pytest
 import uvicorn
-from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    HttpUrl,
+    SecretBytes,
+    SecretStr,
+)
 
 from pydantic_studio import StudioServer, build_form_tree
 
@@ -47,6 +60,7 @@ class _DemoSchema(BaseModel):
     """Schema the e2e tests drive. Edit cautiously - test assertions
     pin specific field names and values."""
 
+    # Phase 3/4 fields
     name: str = Field(default="demo-service", description="Service identifier")
     workers: int = Field(default=4, ge=1, le=64, description="Worker count")
     debug: bool = Field(default=False, description="Verbose logging")
@@ -59,6 +73,51 @@ class _DemoSchema(BaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Arbitrary metadata"
     )
+
+    # Phase 5 fields - one per remaining primitive kind, in plan order
+    ratio: float = Field(default=1.0, description="Phase 5 float field")
+    price: Decimal = Field(default=Decimal("0.00"), description="Phase 5 decimal field")
+    log_dir: FsPath = Field(default=FsPath("/tmp"), description="Phase 5 path field")
+    homepage: HttpUrl = Field(
+        default="https://example.com", description="Phase 5 url field"
+    )
+    contact: EmailStr = Field(
+        default="ops@example.com", description="Phase 5 email field"
+    )
+    starts_on: date = Field(
+        default=date(2025, 1, 1), description="Phase 5 date field"
+    )
+    cron_at: time = Field(
+        default=time(2, 30, 0), description="Phase 5 time field"
+    )
+    last_run: datetime = Field(
+        default=datetime(2025, 1, 1, 12, 0, 0),
+        description="Phase 5 datetime field",
+    )
+    ttl: timedelta = Field(
+        default=timedelta(hours=1), description="Phase 5 timedelta field"
+    )
+    bind_ip: IPv4Address = Field(
+        default=IPv4Address("127.0.0.1"), description="Phase 5 ip_address field"
+    )
+    subnet: IPv4Network = Field(
+        default=IPv4Network("10.0.0.0/24"), description="Phase 5 ip_network field"
+    )
+    request_id: UUID = Field(
+        default=UUID("00000000-0000-0000-0000-000000000000"),
+        description="Phase 5 uuid field",
+    )
+    api_key: SecretStr = Field(
+        default=SecretStr("placeholder"), description="Phase 5 secret str field"
+    )
+    api_key_bytes: SecretBytes = Field(
+        default=SecretBytes(b"placeholder"), description="Phase 5 secret bytes field"
+    )
+    pattern_field: re.Pattern[str] = Field(
+        default=re.compile(r"^[a-z]+$", re.IGNORECASE),
+        description="Phase 5 pattern field",
+    )
+    salt: bytes = Field(default=b"\xde\xad\xbe\xef", description="Phase 5 bytes field")
 
 
 def _find_free_port() -> int:
@@ -90,6 +149,25 @@ def fastapi_url() -> Iterator[str]:
     tree.set_value("workers", 4)
     tree.set_value("debug", False)
     tree.set_value("level", _LogLevel.INFO)
+    tree.set_value("ratio", 1.0)
+    tree.set_value("price", Decimal("0.00"))
+    tree.set_value("log_dir", "/tmp")
+    tree.set_value("homepage", "https://example.com")
+    tree.set_value("contact", "ops@example.com")
+    tree.set_value("starts_on", date(2025, 1, 1))
+    tree.set_value("cron_at", time(2, 30, 0))
+    tree.set_value("last_run", datetime(2025, 1, 1, 12, 0, 0))
+    tree.set_value("ttl", timedelta(hours=1))
+    tree.set_value("bind_ip", "127.0.0.1")
+    tree.set_value("subnet", "10.0.0.0/24")
+    tree.set_value("request_id", UUID("00000000-0000-0000-0000-000000000000"))
+    tree.set_value("api_key", "placeholder")
+    tree.set_value("api_key_bytes", b"placeholder")
+    # PatternNode.validate_value accepts the regex source string; flags
+    # carry through from the field's default (re.IGNORECASE) via the
+    # builder.
+    tree.set_value("pattern_field", "^[a-z]+$")
+    tree.set_value("salt", b"\xde\xad\xbe\xef")
     server = StudioServer(tree=tree, save_path=None)
     config = uvicorn.Config(
         server.app,
@@ -102,13 +180,13 @@ def fastapi_url() -> Iterator[str]:
     thread.start()
 
     # Wait for the server to bind. Cap at ~5s.
-    deadline = time.time() + 5.0
-    while time.time() < deadline:
+    deadline = _time.time() + 5.0
+    while _time.time() < deadline:
         try:
             with closing(socket.create_connection(("127.0.0.1", port), timeout=0.2)):
                 break
         except OSError:
-            time.sleep(0.05)
+            _time.sleep(0.05)
     else:
         raise RuntimeError(f"uvicorn never bound to :{port}")
 

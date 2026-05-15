@@ -58,6 +58,129 @@ export const LiteralNodeSchema = NodeBase.extend({
   choices: z.array(z.unknown()),
 });
 
+export const FloatNodeSchema = NodeBase.extend({
+  kind: z.literal("float"),
+  value: z.number().nullable(),
+  default: z.number().nullable(),
+  ge: z.number().nullable(),
+  le: z.number().nullable(),
+  gt: z.number().nullable(),
+  lt: z.number().nullable(),
+  multiple_of: z.number().nullable(),
+  allow_inf_nan: z.boolean(),
+});
+
+export const DecimalNodeSchema = NodeBase.extend({
+  kind: z.literal("decimal"),
+  // Decimal round-trips as a string via Pydantic JSON; preserves
+  // precision (1e-30, etc.) that z.number() would lose.
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+  max_digits: z.number().nullable(),
+  decimal_places: z.number().nullable(),
+  ge: z.string().nullable(),
+  le: z.string().nullable(),
+  gt: z.string().nullable(),
+  lt: z.string().nullable(),
+});
+
+export const DatetimeNodeSchema = NodeBase.extend({
+  kind: z.literal("datetime"),
+  // ISO 8601 datetime: "2025-01-15T10:30:00" or with tz "2025-01-15T10:30:00+00:00"
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const DateNodeSchema = NodeBase.extend({
+  kind: z.literal("date"),
+  // ISO 8601 date: "2025-01-15"
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const TimeNodeSchema = NodeBase.extend({
+  kind: z.literal("time"),
+  // ISO 8601 time: "14:30:00" or "14:30"
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const TimedeltaNodeSchema = NodeBase.extend({
+  kind: z.literal("timedelta"),
+  // ISO 8601 duration: "PT1H30M", "P1DT2H", etc.
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const IPAddressNodeSchema = NodeBase.extend({
+  kind: z.literal("ip_address"),
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+  version: z.union([z.literal(4), z.literal(6)]),
+});
+
+export const IPNetworkNodeSchema = NodeBase.extend({
+  kind: z.literal("ip_network"),
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+  version: z.union([z.literal(4), z.literal(6)]),
+});
+
+export const URLNodeSchema = NodeBase.extend({
+  kind: z.literal("url"),
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+  // Fully qualified name of the URL type, e.g. "pydantic.HttpUrl".
+  target_type_name: z.string(),
+});
+
+export const EmailNodeSchema = NodeBase.extend({
+  kind: z.literal("email"),
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const PathNodeSchema = NodeBase.extend({
+  kind: z.literal("path"),
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const UUIDNodeSchema = NodeBase.extend({
+  kind: z.literal("uuid"),
+  // Pydantic JSON-dumps UUID as string.
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
+export const SecretNodeSchema = NodeBase.extend({
+  kind: z.literal("secret"),
+  // SecretStr value is a plain str; SecretBytes value is bytes that
+  // Pydantic JSON-encodes as a UTF-8 string. Both arrive as str on
+  // the wire; secret_kind discriminates how to render and how the
+  // backend dispatcher's _maybe_coerce_typed_value re-encodes.
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+  secret_kind: z.union([z.literal("str"), z.literal("bytes")]),
+});
+
+export const PatternNodeSchema = NodeBase.extend({
+  kind: z.literal("pattern"),
+  // Regex source string (the pattern itself).
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+  // Python re flag bitmask; renderer derives single-char chips
+  // (i/m/s/x/a/u) read-only for Phase 5 (no in-UI editing yet).
+  flags: z.number(),
+});
+
+export const BytesNodeSchema = NodeBase.extend({
+  kind: z.literal("bytes"),
+  // BytesNode._serialize_value emits hex (lossless on round-trip).
+  value: z.string().nullable(),
+  default: z.string().nullable(),
+});
+
 // GroupNode is recursive — define it before adding it to the union.
 export interface GroupNodeData {
   kind: "group";
@@ -187,7 +310,22 @@ const UnknownNodeSchema = z.object({
 export const FormNodeSchema: z.ZodType<FormNodeData> = z.union([
   StringNodeSchema,
   IntNodeSchema,
+  FloatNodeSchema,
   BoolNodeSchema,
+  DecimalNodeSchema,
+  DatetimeNodeSchema,
+  DateNodeSchema,
+  TimeNodeSchema,
+  TimedeltaNodeSchema,
+  IPAddressNodeSchema,
+  IPNetworkNodeSchema,
+  URLNodeSchema,
+  EmailNodeSchema,
+  PathNodeSchema,
+  UUIDNodeSchema,
+  SecretNodeSchema,
+  PatternNodeSchema,
+  BytesNodeSchema,
   EnumNodeSchema,
   LiteralNodeSchema,
   GroupNodeSchema,
@@ -201,7 +339,22 @@ export const FormNodeSchema: z.ZodType<FormNodeData> = z.union([
 export type FormNodeData =
   | z.infer<typeof StringNodeSchema>
   | z.infer<typeof IntNodeSchema>
+  | z.infer<typeof FloatNodeSchema>
   | z.infer<typeof BoolNodeSchema>
+  | z.infer<typeof DecimalNodeSchema>
+  | z.infer<typeof DatetimeNodeSchema>
+  | z.infer<typeof DateNodeSchema>
+  | z.infer<typeof TimeNodeSchema>
+  | z.infer<typeof TimedeltaNodeSchema>
+  | z.infer<typeof IPAddressNodeSchema>
+  | z.infer<typeof IPNetworkNodeSchema>
+  | z.infer<typeof URLNodeSchema>
+  | z.infer<typeof EmailNodeSchema>
+  | z.infer<typeof PathNodeSchema>
+  | z.infer<typeof UUIDNodeSchema>
+  | z.infer<typeof SecretNodeSchema>
+  | z.infer<typeof PatternNodeSchema>
+  | z.infer<typeof BytesNodeSchema>
   | z.infer<typeof EnumNodeSchema>
   | z.infer<typeof LiteralNodeSchema>
   | GroupNodeData

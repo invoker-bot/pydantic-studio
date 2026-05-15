@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { z } from "zod";
 
 import { useApplyMutation } from "@/api/mutations";
-import type { AnyValueNodeSchema } from "@/api/schemas";
+import type { BytesNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
@@ -13,43 +13,23 @@ import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type AnyValueNode = z.infer<typeof AnyValueNodeSchema>;
+type BytesNodeT = z.infer<typeof BytesNodeSchema>;
 
-// Display + parse the Any value as a JSON string. Mirrors the HTMX
-// route (routes.py:64-74): try JSON.parse first (covers numbers,
-// booleans, null, arrays, objects); fall back to raw string. The
-// node.mode discriminator on the server tracks the inferred shape.
+const HEX_RE = /^[0-9a-fA-F]*$/;
 
-function stringifyAny(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
+function byteCount(hex: string): number {
+  // Whitespace-tolerant: strip spaces before counting (Phase 5 doesn't
+  // enforce a strict pattern; users can paste "de ad be ef").
+  return Math.floor(hex.replace(/\s+/g, "").length / 2);
 }
 
-function parseAny(raw: string): unknown {
-  const trimmed = raw.trim();
-  if (trimmed === "") return null;
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return raw;
-  }
-}
-
-export function AnyField({
-  node,
-  path,
-}: { node: AnyValueNode; path: string }) {
+export function BytesField({ node, path }: { node: BytesNodeT; path: string }) {
   const mutation = useApplyMutation();
-  const [local, setLocal] = useState<string>(stringifyAny(node.value));
+  const [local, setLocal] = useState<string>(node.value ?? "");
   const [error, setError] = useState<string | null>(node.error);
 
   useEffect(() => {
-    setLocal(stringifyAny(node.value));
+    setLocal(node.value ?? "");
     setError(node.error);
   }, [node.value, node.error]);
 
@@ -61,25 +41,38 @@ export function AnyField({
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
-        <Chip>{node.mode}</Chip>
+        <Chip>hex</Chip>
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <Input
         id={`field-${path}`}
         name={node.name}
+        type="text"
+        className="font-mono text-sm"
+        placeholder="deadbeef (hex)"
         value={local}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => {
-          const original = stringifyAny(node.value);
-          if (local === original) return;
+          if (local === (node.value ?? "")) return;
+          const stripped = local.replace(/\s+/g, "");
+          // Soft-reject obviously-bad hex BEFORE the round-trip. The
+          // backend's bytes.fromhex would also reject, but the local
+          // check yields a clearer message.
+          if (stripped !== "" && !HEX_RE.test(stripped)) {
+            setError(`'${local}' is not valid hex`);
+            return;
+          }
+          if (stripped.length % 2 !== 0) {
+            setError(`hex must have an even number of digits (got ${stripped.length})`);
+            return;
+          }
           mutation.mutate(
-            { op: "set_value", path, value: parseAny(local) },
+            { op: "set_value", path, value: stripped },
             { onError: (e) => setError(e instanceof Error ? e.message : String(e)) },
           );
         }}
-        placeholder="any value (JSON or raw string)"
-        className="font-mono text-xs"
       />
+      <p className="text-xs text-zinc-500">{byteCount(local)} bytes</p>
       <FieldError message={error} />
     </FieldRow>
   );
