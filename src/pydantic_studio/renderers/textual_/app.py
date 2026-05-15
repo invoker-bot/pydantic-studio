@@ -7,8 +7,6 @@ from typing import TYPE_CHECKING
 
 from textual.app import App
 
-from pydantic_studio.renderers.textual_.screens import EditorScreen
-
 if TYPE_CHECKING:
     from pydantic_studio.tree.nodes import FormTree
 
@@ -56,6 +54,25 @@ class StudioApp(App):
         self._tree = value
 
     def on_mount(self) -> None:
+        import os
+
+        if os.environ.get("PYDANTIC_STUDIO_TUI_V2") == "1":
+            # M1+ chrome path; cells / drill / save land in M2-M5.
+            from pydantic_studio.renderers.textual_.screens import ConfigScreen
+
+            short_name = (
+                self.tree.schema_name.split(":")[-1]
+                if ":" in self.tree.schema_name
+                else self.tree.schema_name
+            )
+            self.push_screen(
+                ConfigScreen(group=self.tree.root, breadcrumb_parts=[short_name])
+            )
+            return
+
+        # Legacy default — unchanged.
+        from pydantic_studio.renderers.textual_.screens import EditorScreen
+
         self.push_screen(EditorScreen())
 
     async def action_quit(self) -> None:  # type: ignore[override]

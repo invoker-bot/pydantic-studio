@@ -1,0 +1,92 @@
+/* TUI v2 palette - warm muted, matching Claude Code /config aesthetic.
+   See docs/superpowers/specs/2026-05-15-tui-config-aesthetic-redesign-design.md §6. */
+
+$surface: #0f0f10;
+$surface-lighten-1: #1a1a1c;
+$text: #e8e6e3;
+$text-muted: #6e6e6e;
+$accent: #d18b40;
+$error: #cc6666;
+
+Screen {
+    background: $surface;
+    color: $text;
+}
+
+Breadcrumb {
+    height: 1;
+    background: $surface;
+    color: $text-muted;
+    padding: 0 1;
+}
+
+Breadcrumb .breadcrumb--current {
+    color: $accent;
+    text-style: bold;
+}
+
+FooterHints {
+    height: 2;
+    background: $surface;
+    color: $text-muted;
+    padding: 0 1;
+    /* Note: literal hex (not $text-muted) — textual 8.x's built-in
+       $text-muted resolves to `auto 60%` which is not a valid color
+       for the border-top property even when the user variable shadows
+       it. Mirror $text-muted's hex from line 7 here. */
+    border-top: hkey #6e6e6e;
+}
+
+FooterHints .footer-hints--key {
+    color: $accent;
+}
+
+FieldListView {
+    height: 1fr;
+    padding: 0 1;
+    background: $surface;
+}
+
+FieldRow {
+    height: auto;
+    padding: 0 1;
+    color: $text;
+}
+
+FieldRow.-focused {
+    background: $surface-lighten-1;
+}
+
+FieldRow .field-row--marker {
+    width: 2;
+    color: $text-muted;
+}
+
+FieldRow.-focused .field-row--marker {
+    color: $accent;
+    text-style: bold;
+}
+
+FieldRow .field-row--label {
+    width: 22;
+    color: $text;
+}
+
+FieldRow .field-row--leader {
+    color: $text-muted;
+}
+
+FieldRow .field-row--value {
+    color: $text;
+}
+
+FieldRow .field-row--drill {
+    width: 3;
+    color: $text-muted;
+    content-align: right top;
+}
+
+FieldRow .field-row--helper {
+    color: $error;
+    padding-left: 24;
+}
