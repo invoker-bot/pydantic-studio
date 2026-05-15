@@ -169,3 +169,80 @@ async def test_field_list_thirty_rows_mount_without_crash() -> None:
         await pilot.pause()
         rows = list(view.query(FieldRow))
         assert len(rows) == 30
+
+
+@pytest.mark.asyncio
+async def test_field_list_enter_on_bool_row_toggles() -> None:
+    from pydantic import BaseModel
+
+    class _BoolOnly(BaseModel):
+        debug: bool = False
+
+    tree = build_form_tree(_BoolOnly)
+    tree.set_value("debug", False)
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert tree.root.find("debug").value is True
+
+
+@pytest.mark.asyncio
+async def test_field_list_space_on_bool_row_toggles() -> None:
+    from pydantic import BaseModel
+
+    class _BoolOnly(BaseModel):
+        debug: bool = False
+
+    tree = build_form_tree(_BoolOnly)
+    tree.set_value("debug", False)
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("space")
+        await pilot.pause()
+        assert tree.root.find("debug").value is True
+
+
+@pytest.mark.asyncio
+async def test_field_list_tab_on_small_choice_cycles() -> None:
+    from enum import StrEnum
+
+    from pydantic import BaseModel
+
+    class _Lvl(StrEnum):
+        DEBUG = "debug"
+        INFO = "info"
+        WARN = "warn"
+
+    class _S(BaseModel):
+        level: _Lvl = _Lvl.INFO
+
+    tree = build_form_tree(_S)
+    tree.set_value("level", _Lvl.INFO)
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("tab")
+        await pilot.pause()
+        # info -> warn
+        assert tree.root.find("level").value == _Lvl.WARN
+
+
+@pytest.mark.asyncio
+async def test_field_list_enter_on_string_row_enters_edit() -> None:
+    """String field: Enter should put the TextCell into edit mode."""
+    from pydantic_studio.renderers.textual_.widgets.cells import TextCell
+
+    tree = build_form_tree(_Schema)
+    tree.set_value("name", "alpha")
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        # The focused row's TextCell should now be in edit mode.
+        rows = list(view.query(FieldRow))
+        cell = rows[0].query_one(TextCell)
+        assert cell.editing is True
