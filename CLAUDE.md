@@ -9,7 +9,7 @@ immediately.
 
 - **What**: Interactive editor for Pydantic models. Generate and edit
   YAML / TOML / JSON config files against a strongly-typed schema.
-- **Status**: v0.1.0 alpha — all 9 implementation phases shipped on
+- **Status**: v0.1.1 alpha — all 9 implementation phases shipped on
   master. 416 tests passing. ruff clean. `mkdocs build --strict` clean.
 - **Three frontends**: Textual TUI, FastAPI+HTMX browser app, CLI
   (`fill`/`run`/`check`/`edit`/`show`/`version`).

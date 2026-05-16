@@ -20,7 +20,7 @@ your hand-written comments.
 
 ## Status
 
-**v0.1.0 — Alpha.** All 9 implementation phases are merged on master.
+**v0.1.1 — Alpha.** All 9 implementation phases are merged on master.
 Production code paths are exercised by 416 tests (unit + integration +
 TUI/HTMX smoke). API is stable enough for early adopters; expect
 v0.2 to add polish (Tailwind pipeline, theme toggle, status-bar UI)

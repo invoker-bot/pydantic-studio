@@ -67,7 +67,7 @@ the schema's defaults. On save, the tree is materialized via
 
 ```bash
 $ pydantic-studio version
-pydantic-studio 0.1.0
+pydantic-studio 0.1.1
 ```
 
 ## Exit codes
