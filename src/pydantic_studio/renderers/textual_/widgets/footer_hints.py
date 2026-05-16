@@ -1,6 +1,5 @@
-"""FooterHints widget — context-sensitive 2-line keybind bar at the bottom
-of the ConfigScreen. Line 1 changes with the active mode; line 2 is the
-always-visible save/quit reminder.
+"""FooterHints widget — context-sensitive keybind bar at the bottom
+of the ConfigScreen.
 """
 
 from __future__ import annotations
@@ -9,20 +8,29 @@ from typing import Literal
 
 from textual.widgets import Static
 
-Mode = Literal["idle", "editing", "sequence", "mapping", "errors"]
+Mode = Literal["idle", "editing", "sequence", "mapping", "union", "errors"]
 
 _LINE1: dict[str, str] = {
-    "idle": "↑↓ navigate · Enter edit · Tab cycle · Esc back",
-    "editing": "Type to edit · Enter commit · Esc cancel",
-    "sequence": "↑↓ navigate · Enter edit · D delete · Esc back",
-    "mapping": "↑↓ navigate · Enter edit · R rename · D delete · Esc back",
-    "errors": "Esc back to edit · Enter jump to first error",
+    "idle": (
+        "Ctrl+C quit | Ctrl+S save | Up/Down navigate | Enter edit | Tab cycle | Esc back"
+    ),
+    "editing": "Ctrl+C quit | Enter commit | Esc cancel",
+    "sequence": (
+        "Ctrl+C quit | Ctrl+S save | Up/Down navigate | Enter edit | "
+        "A add | D delete | Ctrl+Up/Down move | Esc back"
+    ),
+    "mapping": (
+        "Ctrl+C quit | Ctrl+S save | Up/Down navigate | Enter edit | "
+        "A add | R rename | D delete | Esc back"
+    ),
+    "union": "Ctrl+C quit | Ctrl+S save | Enter edit | Tab variant | Esc back",
+    "errors": "Ctrl+C quit | Esc back to edit | Enter jump to first error",
 }
-_LINE2 = "Ctrl+S save · Ctrl+Q quit"
+_LINE2 = ""
 
 
 class FooterHints(Static):
-    """2-line keybind bar. Read ``line1`` / ``line2`` for the raw strings."""
+    """Keybind bar. Read ``line1`` / ``line2`` for the raw strings."""
 
     DEFAULT_CSS = ""  # styled via theme.tcss
 
@@ -45,4 +53,6 @@ class FooterHints(Static):
         self.update(self._compute_text())
 
     def _compute_text(self) -> str:
+        if not self.line2:
+            return self.line1
         return f"{self.line1}\n{self.line2}"

@@ -9,8 +9,10 @@ from textual.app import App
 from textual.binding import Binding
 
 if TYPE_CHECKING:
+    from asyncio import AbstractEventLoop
     from typing import ClassVar
 
+    from textual.app import AutopilotCallbackType
     from textual.binding import BindingType
 
     from pydantic_studio.tree.nodes import FormTree
@@ -38,6 +40,7 @@ class StudioApp(App):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("ctrl+s", "save", "save", priority=True),
+        Binding("ctrl+c", "quit", "quit", priority=True),
     ]
 
     def __init__(
@@ -76,6 +79,28 @@ class StudioApp(App):
                 form_tree=self.tree,
                 breadcrumb_parts=[short_name],
             )
+        )
+
+    def run(
+        self,
+        *,
+        headless: bool = False,
+        inline: bool = False,
+        inline_no_clear: bool = False,
+        mouse: bool = False,
+        size: tuple[int, int] | None = None,
+        auto_pilot: AutopilotCallbackType | None = None,
+        loop: AbstractEventLoop | None = None,
+    ):
+        """Run with mouse reporting off so terminals keep native copy behavior."""
+        return super().run(
+            headless=headless,
+            inline=inline,
+            inline_no_clear=inline_no_clear,
+            mouse=mouse,
+            size=size,
+            auto_pilot=auto_pilot,
+            loop=loop,
         )
 
     async def action_quit(self) -> None:  # type: ignore[override]

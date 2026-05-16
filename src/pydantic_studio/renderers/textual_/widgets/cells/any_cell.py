@@ -1,14 +1,9 @@
-"""SecretCell — masked display + password Input on edit.
-
-Idle always renders ``**********`` (never reveal in display mode).
-Editing swaps to a Textual Input with ``password=True`` so the
-keystrokes show as bullets while the user types. Empty value shows
-as empty (no mask) so the user knows the field is unset.
-"""
+"""AnyCell -- JSON-aware inline editor for ``typing.Any`` nodes."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, Any
 
 from textual.widgets import Input, Static
 
@@ -18,11 +13,8 @@ if TYPE_CHECKING:
     from textual.app import ComposeResult
 
 
-_MASK = "**********"
-
-
-class SecretCell(Cell):
-    """Masked editor for SecretNode."""
+class AnyCell(Cell):
+    """Edit arbitrary values as JSON when possible, plain text otherwise."""
 
     DEFAULT_CSS = ""
 
@@ -35,29 +27,13 @@ class SecretCell(Cell):
         return self._last_error
 
     @property
-    def _underlying_value(self) -> str:
-        """Read node.value, unwrapping SecretStr if needed.
-
-        The form tree stores either a plain str/bytes or a Pydantic
-        SecretStr/SecretBytes depending on schema annotation. We need
-        the plaintext for pre-filling the edit Input.
-        """
-        v = getattr(self._node, "value", None)
-        if v is None:
-            return ""
-        if hasattr(v, "get_secret_value"):
-            inner = v.get_secret_value()
-            if isinstance(inner, bytes):
-                return inner.decode("utf-8", errors="replace")
-            return str(inner)
-        if isinstance(v, bytes):
-            return v.decode("utf-8", errors="replace")
-        return str(v)
-
-    @property
     def value_text(self) -> str:
-        # Never show the actual value at idle.
-        return _MASK if self._underlying_value else ""
+        value = getattr(self._node, "value", None)
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False)
 
     def compose(self) -> ComposeResult:
         yield Static(self.value_text, classes="field-row--value", markup=False)
@@ -71,11 +47,7 @@ class SecretCell(Cell):
             static = self.query_one(Static)
         except Exception:
             static = None
-        new_input = Input(
-            value=self._underlying_value,
-            password=True,
-            classes="field-row--value",
-        )
+        new_input = Input(value=self.value_text, classes="field-row--value")
         self.mount(new_input)
         if static is not None:
             static.remove()
@@ -87,16 +59,23 @@ class SecretCell(Cell):
         self._exit_to_idle()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        value: str | bytes = event.value
-        if getattr(self._node, "secret_kind", None) == "bytes":
-            value = event.value.encode()
-        result = self.commit(value)
+        parsed = self._parse_any(event.value)
+        result = self.commit(parsed)
         if not result.ok:
             self._last_error = "; ".join(result.errors) or "invalid"
             self._exit_to_idle()
             return
         self._last_error = None
         self._exit_to_idle()
+
+    def _parse_any(self, raw: str) -> Any:
+        stripped = raw.strip()
+        if stripped == "":
+            return None
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            return raw
 
     def _exit_to_idle(self) -> None:
         try:

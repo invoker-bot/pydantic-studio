@@ -1216,16 +1216,28 @@ class FormTree(BaseModel):
         # Resolve the terminal segment to a target node.
         last = path_obj.segments[-1]
         target = self._descend(node, last)
+        write_target = target
+        if isinstance(target, UnionNode):
+            if target.selected is None:
+                return ValidationResult.fail(["union has no selected variant"])
+            write_target = target.selected
+            if not hasattr(write_target, "value"):
+                return ValidationResult.fail(
+                    ["selected union variant is not directly editable"]
+                )
 
-        errors = target.validate_value(value)
+        errors = write_target.validate_value(value)
         if errors:
+            write_target.error = errors[0]
             target.error = errors[0]
             return ValidationResult.fail(list(errors))
 
         # Validation passed: snapshot before mutating so undo can revert.
         self._push_snapshot(_snap.take(self.root))
-        target.value = value
-        target.error = None
+        write_target.value = value
+        write_target.error = None
+        if isinstance(target, UnionNode):
+            target.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -1259,31 +1271,33 @@ class FormTree(BaseModel):
             # Index into mapping selects the value side of the pair —
             # rename_key handles the key side via its dedicated mutation.
             return node.entries[seg][1]
+        if isinstance(node, UnionNode):
+            if node.selected is None:
+                msg = "cannot navigate into a union with no selected variant"
+                raise KeyError(msg)
+            return self._descend(node.selected, seg)
         msg = (
             f"cannot navigate segment {seg!r} into {type(node).__name__} "
             f"(no rule for ({type(node).__name__}, {type(seg).__name__}))"
         )
         raise KeyError(msg)
 
-    def _walk_to_sequence(self, path: str) -> SequenceNode:
-        """Resolve ``path`` and return the SequenceNode at that location."""
+    def _resolve_path(self, path: str) -> Any:
+        """Resolve ``path`` to a node using the same descent rules as set_value."""
         from pydantic_studio.tree.paths import Path as _Path
 
         path_obj = _Path.parse(path)
         if not path_obj.segments:
-            msg = "empty path"
-            raise ValueError(msg)
+            return self.root
         node: Any = self.root
         for seg in path_obj.segments:
-            if isinstance(node, GroupNode) and isinstance(seg, str):
-                child = node.find(seg)
-                if child is None:
-                    msg = f"no field named {seg!r}"
-                    raise KeyError(msg)
-                node = child
-            else:
-                msg = f"cannot navigate {seg!r}"
-                raise KeyError(msg)
+            node = self._descend(node, seg)
+        return node
+
+    def _walk_to_sequence(self, path: str) -> SequenceNode:
+        """Resolve ``path`` and return the SequenceNode at that location."""
+
+        node = self._resolve_path(path)
         if not isinstance(node, SequenceNode):
             msg = f"{path!r} is not a SequenceNode"
             raise TypeError(msg)
@@ -1387,23 +1401,8 @@ class FormTree(BaseModel):
 
     def _walk_to_mapping(self, path: str) -> MappingNode:
         """Resolve ``path`` and return the MappingNode at that location."""
-        from pydantic_studio.tree.paths import Path as _Path
 
-        path_obj = _Path.parse(path)
-        if not path_obj.segments:
-            msg = "empty path"
-            raise ValueError(msg)
-        node: Any = self.root
-        for seg in path_obj.segments:
-            if isinstance(node, GroupNode) and isinstance(seg, str):
-                child = node.find(seg)
-                if child is None:
-                    msg = f"no field named {seg!r}"
-                    raise KeyError(msg)
-                node = child
-            else:
-                msg = f"cannot navigate {seg!r}"
-                raise KeyError(msg)
+        node = self._resolve_path(path)
         if not isinstance(node, MappingNode):
             msg = f"{path!r} is not a MappingNode"
             raise TypeError(msg)
@@ -1506,23 +1505,7 @@ class FormTree(BaseModel):
         return True
 
     def _walk_to_union(self, path: str) -> UnionNode:
-        from pydantic_studio.tree.paths import Path as _Path
-
-        path_obj = _Path.parse(path)
-        if not path_obj.segments:
-            msg = "empty path"
-            raise ValueError(msg)
-        node: Any = self.root
-        for seg in path_obj.segments:
-            if isinstance(node, GroupNode) and isinstance(seg, str):
-                child = node.find(seg)
-                if child is None:
-                    msg = f"no field named {seg!r}"
-                    raise KeyError(msg)
-                node = child
-            else:
-                msg = f"cannot navigate {seg!r}"
-                raise KeyError(msg)
+        node = self._resolve_path(path)
         if not isinstance(node, UnionNode):
             msg = f"{path!r} is not a UnionNode"
             raise TypeError(msg)

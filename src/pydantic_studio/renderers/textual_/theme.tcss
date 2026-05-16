@@ -49,8 +49,17 @@ FieldListView {
 
 FieldRow {
     height: auto;
+    min-height: 1;
     padding: 0 1;
     color: $text;
+}
+
+FieldRow .field-row--stack {
+    height: auto;
+}
+
+FieldRow .field-row--line {
+    height: 1;
 }
 
 FieldRow.-focused {
@@ -73,11 +82,25 @@ FieldRow .field-row--label {
 }
 
 FieldRow .field-row--leader {
+    width: 10;
     color: $text-muted;
 }
 
+FieldRow .field-row--cell {
+    width: 1fr;
+    min-width: 1;
+    height: 1;
+}
+
 FieldRow .field-row--value {
+    width: 1fr;
+    height: 1;
     color: $text;
+}
+
+FieldRow Input.field-row--value {
+    border: none;
+    padding: 0;
 }
 
 FieldRow .field-row--drill {
@@ -87,6 +110,12 @@ FieldRow .field-row--drill {
 }
 
 FieldRow .field-row--helper {
+    display: none;
+    height: 1;
     color: $error;
     padding-left: 24;
+}
+
+FieldRow.-error .field-row--helper {
+    display: block;
 }

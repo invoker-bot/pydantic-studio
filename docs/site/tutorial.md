@@ -118,8 +118,7 @@ problem.
 $ uv run pydantic-studio edit mypkg.config:AppSettings config.yaml
 ```
 
-`Ctrl+S` saves, `Ctrl+Z`/`Ctrl+Y` undo/redo, `Ctrl+Q` quits (with
-confirmation if you have unsaved changes).
+`Ctrl+S` saves, `Ctrl+Z`/`Ctrl+Y` undo/redo, and `Ctrl+C` quits.
 
 ## 9. Launch the browser UI
 

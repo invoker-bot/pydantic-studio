@@ -250,7 +250,7 @@ ruff knows the rule and won't complain.
   hit `DuplicateIds` errors because `remove_children` returns an
   awaitable.
 - `App.action_quit` is a priority binding at the App level. To route
-  Ctrl+Q through a Screen, override `App.action_quit` to delegate to
+  Ctrl+C through a Screen, override `App.action_quit` to delegate to
   `self.screen.action_quit()`.
 
 ### Pydantic v2 specifics

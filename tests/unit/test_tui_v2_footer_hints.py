@@ -26,8 +26,8 @@ async def test_footer_idle_mode_shows_navigation() -> None:
         assert "navigate" in fh.line1
         assert "Enter" in fh.line1
         assert "Esc" in fh.line1
-        assert "Ctrl+S" in fh.line2
-        assert "Ctrl+Q" in fh.line2
+        assert "Ctrl+S" in fh.line1
+        assert "Ctrl+C" in fh.line1
 
 
 @pytest.mark.asyncio
@@ -39,8 +39,7 @@ async def test_footer_editing_mode_shows_edit_keys() -> None:
         assert "Enter" in fh.line1
         assert "commit" in fh.line1
         assert "cancel" in fh.line1
-        # save/quit always on line 2
-        assert "Ctrl+S" in fh.line2
+        assert "Ctrl+C" in fh.line1
 
 
 @pytest.mark.asyncio

@@ -9,8 +9,10 @@ from pydantic import BaseModel
 from textual.app import App
 
 from pydantic_studio import build_form_tree
+from pydantic_studio.renderers.textual_ import StudioApp
 from pydantic_studio.renderers.textual_.screens import ConfigScreen
 from pydantic_studio.renderers.textual_.widgets.breadcrumb import Breadcrumb
+from pydantic_studio.renderers.textual_.widgets.cells import Cell
 from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
@@ -19,6 +21,13 @@ from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
 class _Schema(BaseModel):
     name: str = "alpha"
     count: int = 5
+
+
+class _LayoutSchema(BaseModel):
+    name: str = "billing-api"
+    api_url: str = "https://api.example.com/v1"
+    database: str = "db-primary.internal"
+    logging: str = "json"
 
 
 class _Host(App):
@@ -73,6 +82,27 @@ async def test_config_screen_field_list_carries_group() -> None:
         await pilot.pause()
         rows = list(app.screen.query(FieldRow))
         assert [r.label_text for r in rows] == ["name", "count"]
+
+
+@pytest.mark.asyncio
+async def test_config_screen_rows_are_compact_and_values_stay_visible() -> None:
+    tree = build_form_tree(_LayoutSchema)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+
+        field_list = app.screen.query_one(FieldListView)
+        rows = list(app.screen.query(FieldRow))
+        assert len(rows) == 4
+
+        list_bottom = field_list.region.y + field_list.region.height
+        for row in rows:
+            assert row.region.y < list_bottom
+            assert row.size.height <= 2
+
+            cell = row.query_one(Cell)
+            assert cell.region.x < app.size.width
+            assert cell.region.x + min(cell.size.width, 1) <= app.size.width
 
 
 @pytest.mark.asyncio

@@ -38,8 +38,9 @@ class ConfigScreen(Screen):
     M1 ships the chrome; M2 lights up editing via per-kind cells. The
     screen listens for ``EditModeEntered`` / ``EditModeExited`` messages
     posted by cells and flips the footer between "idle" and "editing".
-    Container drill-down, sequence/mapping management, union cycling,
-    and the errors screen land in M3-M5.
+    The same screen is reused for drilled-in groups, sequences,
+    mappings, and union selections; footer hints adapt to the active
+    container.
     """
 
     CSS_PATH = "theme.tcss"
@@ -49,16 +50,32 @@ class ConfigScreen(Screen):
         group: GroupNode,
         form_tree: FormTree,
         breadcrumb_parts: list[str],
+        base_path: str = "",
     ) -> None:
         super().__init__()
         self._group = group
         self._form_tree = form_tree
         self._breadcrumb_parts = breadcrumb_parts
+        self._base_path = base_path
+        self._footer_mode = self._mode_for_container(group)
 
     def compose(self) -> ComposeResult:
         yield Breadcrumb(parts=self._breadcrumb_parts)
-        yield FieldListView(group=self._group, form_tree=self._form_tree, base_path="")
-        yield FooterHints(mode="idle")
+        yield FieldListView(
+            group=self._group,
+            form_tree=self._form_tree,
+            base_path=self._base_path,
+        )
+        yield FooterHints(mode=self._footer_mode)
+
+    def _mode_for_container(self, group: AnyNode) -> str:
+        if group.kind == "sequence":
+            return "sequence"
+        if group.kind == "mapping":
+            return "mapping"
+        if group.kind == "union":
+            return "union"
+        return "idle"
 
     def on_edit_mode_entered(self, event: EditModeEntered) -> None:
         try:
@@ -70,7 +87,7 @@ class ConfigScreen(Screen):
     def on_edit_mode_exited(self, event: EditModeExited) -> None:
         try:
             footer = self.query_one(FooterHints)
-            footer.set_mode("idle")
+            footer.set_mode(self._footer_mode)
         except Exception:
             return
 
@@ -115,6 +132,64 @@ class ChooserScreen(Screen):
         with ListView(id="chooser-list"):
             for label, _ in self.options:
                 yield ListItem(Label(label))
+
+
+class RenameKeyScreen(Screen):
+    """Prompt for renaming a mapping key."""
+
+    CSS_PATH = "theme.tcss"
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("escape", "cancel", "back", show=False),
+    ]
+
+    def __init__(
+        self,
+        form_tree: FormTree,
+        mapping_path: str,
+        index: int,
+        initial: str,
+        field_list: FieldListView,
+    ) -> None:
+        super().__init__()
+        self._form_tree = form_tree
+        self._mapping_path = mapping_path
+        self._index = index
+        self._initial = initial
+        self._field_list = field_list
+        self._error: str | None = None
+
+    def compose(self) -> ComposeResult:
+        from textual.widgets import Input, Static
+
+        yield Static("Rename key", classes="rename-key--title", markup=False)
+        yield Input(value=self._initial, classes="rename-key--input")
+        yield Static(self.error_text, classes="rename-key--error", markup=False)
+
+    @property
+    def error_text(self) -> str:
+        return "" if self._error is None else f"[!] {self._error}"
+
+    def on_mount(self) -> None:
+        from textual.widgets import Input
+
+        self.query_one(Input).focus()
+
+    def on_input_submitted(self, event) -> None:
+        result = self._field_list.rename_key_at(self._index, event.value)
+        if not result.ok:
+            self._error = "; ".join(result.errors) or "invalid"
+            try:
+                from textual.widgets import Static
+
+                self.query_one(".rename-key--error", Static).update(self.error_text)
+            except Exception:
+                pass
+            return
+        self.app.pop_screen()
+
+    def action_cancel(self) -> None:
+        self.app.pop_screen()
 
 
 class ErrorsScreen(Screen):

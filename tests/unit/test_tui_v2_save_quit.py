@@ -1,8 +1,8 @@
 """End-to-end save/quit tests for the TUI v2 ConfigScreen.
 
-Drives Ctrl+S and Ctrl+Q via the Pilot harness and asserts the file
+Drives Ctrl+S and Ctrl+C via the Pilot harness and asserts the file
 system + notification side-effects. These tests pin the contract that
-``FooterHints`` advertises on every screen render: ``Ctrl+S save | Ctrl+Q
+``FooterHints`` advertises on every screen render: ``Ctrl+S save | Ctrl+C
 quit``.
 """
 
@@ -97,8 +97,8 @@ async def test_ctrl_s_with_validation_failure_does_not_write(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_footer_ctrl_s_promise_has_real_binding():
-    """Static cross-check that the footer's advertised Ctrl+S has a real binding."""
+async def test_footer_save_and_quit_promises_have_real_bindings():
+    """Static cross-check that advertised Ctrl+S/Ctrl+C have real bindings."""
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
@@ -117,3 +117,45 @@ async def test_footer_ctrl_s_promise_has_real_binding():
     assert "ctrl+s" in bound_keys, (
         f"'ctrl+s' missing from bindings: {sorted(bound_keys)}"
     )
+    assert "ctrl+c" in bound_keys, (
+        f"'ctrl+c' missing from bindings: {sorted(bound_keys)}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_ctrl_c_routes_to_quit_action():
+    """Ctrl+C is the advertised quit shortcut."""
+
+    class _TrackingStudioApp(StudioApp):
+        quit_called = False
+
+        async def action_quit(self) -> None:  # type: ignore[override]
+            self.quit_called = True
+            self.exit()
+
+    tree = build_form_tree(_Schema)
+    app = _TrackingStudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+
+    assert app.quit_called is True
+
+
+def test_studio_app_run_disables_mouse_by_default(monkeypatch):
+    """Native terminal selection/right-click copy requires mouse reporting off."""
+    captured: dict[str, object] = {}
+
+    def fake_run(self, **kwargs):
+        captured.update(kwargs)
+        return None
+
+    from textual.app import App
+
+    monkeypatch.setattr(App, "run", fake_run)
+
+    tree = build_form_tree(_Schema)
+    StudioApp(tree=tree, save_path=None).run()
+
+    assert captured["mouse"] is False

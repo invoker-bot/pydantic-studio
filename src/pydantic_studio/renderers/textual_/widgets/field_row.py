@@ -39,12 +39,14 @@ class FieldRow(Widget):
         path: str,
         form_tree: FormTree,
         focused: bool = False,
+        label_override: str | None = None,
     ) -> None:
         super().__init__()
         self._node = node
         self._path = path
         self._form_tree = form_tree
         self._focused = focused
+        self._label_override = label_override
         self._error: str | None = None
         if focused:
             self.add_class("-focused")
@@ -59,6 +61,8 @@ class FieldRow(Widget):
 
     @property
     def label_text(self) -> str:
+        if self._label_override is not None:
+            return self._label_override
         if self._is_required_and_missing():
             return f"*{self._node.name}"
         return self._node.name
@@ -114,12 +118,34 @@ class FieldRow(Widget):
         except Exception:
             return
 
+    def on_edit_mode_exited(self) -> None:
+        """Refresh row chrome after a child cell commits or cancels."""
+        try:
+            label = self.query_one(".field-row--label", Static)
+            label.update(self.label_text)
+        except Exception:
+            pass
+
+        try:
+            from pydantic_studio.renderers.textual_.widgets.cells import Cell
+
+            cell = self.query_one(Cell)
+            self.set_error(getattr(cell, "last_error", None))
+        except Exception:
+            pass
+
     def compose(self) -> ComposeResult:
-        with Vertical():
-            with Horizontal():
-                yield Static(self.marker_text, classes="field-row--marker")
-                yield Static(self.label_text, classes="field-row--label")
-                yield Static(_LEADER, classes="field-row--leader")
-                yield make_cell(self._node, self._path, self._form_tree)
-                yield Static(self.drill_marker_text, classes="field-row--drill")
-            yield Static(self.helper_text, classes="field-row--helper")
+        with Vertical(classes="field-row--stack"):
+            with Horizontal(classes="field-row--line"):
+                yield Static(
+                    self.marker_text, classes="field-row--marker", markup=False
+                )
+                yield Static(self.label_text, classes="field-row--label", markup=False)
+                yield Static(_LEADER, classes="field-row--leader", markup=False)
+                cell = make_cell(self._node, self._path, self._form_tree)
+                cell.add_class("field-row--cell")
+                yield cell
+                yield Static(
+                    self.drill_marker_text, classes="field-row--drill", markup=False
+                )
+            yield Static(self.helper_text, classes="field-row--helper", markup=False)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic_studio.renderers.textual_.widgets.cells.any_cell import AnyCell
 from pydantic_studio.renderers.textual_.widgets.cells.base import (
     Cell,
     EditModeEntered,
@@ -16,6 +17,7 @@ from pydantic_studio.renderers.textual_.widgets.cells.base import (
 )
 from pydantic_studio.renderers.textual_.widgets.cells.bool_cell import BoolCell
 from pydantic_studio.renderers.textual_.widgets.cells.choice_cell import ChoiceCell
+from pydantic_studio.renderers.textual_.widgets.cells.container_cell import ContainerCell
 from pydantic_studio.renderers.textual_.widgets.cells.secret_cell import SecretCell
 from pydantic_studio.renderers.textual_.widgets.cells.text_cell import TextCell
 
@@ -34,10 +36,8 @@ _TEXT_KINDS = {
 def make_cell(node: AnyNode, path: str, form_tree: FormTree) -> Cell:
     """Dispatch a node to its concrete Cell subclass.
 
-    Containers (group/sequence/mapping/union) are not handled here yet —
-    they get a ContainerCell stub in M3. For M2, they fall through to a
-    TextCell rendering ``str(node.value)`` which approximates the legacy
-    PlaceholderCell behavior.
+    Containers render a non-editing summary cell and FieldListView owns
+    their drill-down and structural mutations.
     """
     kind = node.kind
     if kind in _TEXT_KINDS:
@@ -48,14 +48,19 @@ def make_cell(node: AnyNode, path: str, form_tree: FormTree) -> Cell:
         return ChoiceCell(node=node, path=path, form_tree=form_tree)
     if kind == "secret":
         return SecretCell(node=node, path=path, form_tree=form_tree)
-    # group / sequence / mapping / union / any: M3+ adds ContainerCell.
+    if kind == "any":
+        return AnyCell(node=node, path=path, form_tree=form_tree)
+    if kind in ("group", "sequence", "mapping", "union"):
+        return ContainerCell(node=node, path=path, form_tree=form_tree)
     return TextCell(node=node, path=path, form_tree=form_tree)
 
 
 __all__ = [
+    "AnyCell",
     "BoolCell",
     "Cell",
     "ChoiceCell",
+    "ContainerCell",
     "EditModeEntered",
     "EditModeExited",
     "SecretCell",

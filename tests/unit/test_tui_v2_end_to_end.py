@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 from pydantic import BaseModel, Field
+from textual.widgets import Input, Static
 
 from pydantic_studio import build_form_tree, load_yaml
 from pydantic_studio.renderers.textual_ import StudioApp
@@ -17,6 +18,7 @@ from pydantic_studio.renderers.textual_.screens import (
     ConfigScreen,
     ErrorsScreen,
 )
+from pydantic_studio.renderers.textual_.widgets.cells import BoolCell
 from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
 
 
@@ -91,6 +93,66 @@ async def test_required_field_visible_then_edit_then_save(tmp_path):
     assert instance.name == "production"
     assert instance.db.host == "localhost"
     assert instance.db.port == 5432
+
+
+@pytest.mark.asyncio
+async def test_required_text_field_can_be_edited_with_keyboard() -> None:
+    """User path: Enter edit, type text, Enter commit."""
+    tree = build_form_tree(_AppConfig)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
+
+        row = app.screen.query_one(FieldRow)
+
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("p", "r", "o", "d")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert tree.root.find("name").value == "prod"
+        assert str(row.query_one(".field-row--label", Static).render()) == "name"
+
+
+@pytest.mark.asyncio
+async def test_text_input_is_visible_while_typing() -> None:
+    """Editing must show typed text before Enter commits it."""
+    tree = build_form_tree(_AppConfig)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test(size=(80, 20)) as pilot:
+        await pilot.pause()
+
+        await pilot.press("enter")
+        await pilot.pause()
+        input_widget = app.screen.query_one(Input)
+        assert input_widget.content_size.height >= 1
+
+        await pilot.press("p", "r", "o", "d")
+        await pilot.pause()
+        assert input_widget.value == "prod"
+        assert input_widget.content_size.height >= 1
+
+
+@pytest.mark.asyncio
+async def test_bool_field_can_be_cycled_with_tab() -> None:
+    """Bool is a binary choice, so the advertised Tab cycle edits it."""
+    tree = build_form_tree(_AppConfig)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test(size=(80, 20)) as pilot:
+        await pilot.pause()
+
+        await pilot.press("down")
+        await pilot.pause()
+        cell = app.screen.query_one(BoolCell)
+        assert cell.value_text == "[ off ]"
+
+        await pilot.press("tab")
+        await pilot.pause()
+        assert tree.root.find("debug").value is True
+        assert cell.value_text == "[ on  ]"
+        assert "on" in str(cell.query_one(Static).render())
 
 
 @pytest.mark.asyncio

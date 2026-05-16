@@ -97,7 +97,7 @@ Format is auto-detected from extension (`.yaml` / `.yml` / `.toml` / `.json`).
 |---|---|
 | `Ctrl+S` | Save (writes via `save_yaml`; refuses on validation failure) |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
-| `Ctrl+Q` | Quit (confirms if dirty) |
+| `Ctrl+C` | Quit |
 
 ### Browser UI
 

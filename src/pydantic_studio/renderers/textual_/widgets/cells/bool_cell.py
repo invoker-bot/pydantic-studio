@@ -32,7 +32,7 @@ class BoolCell(Cell):
         return _ON if v else _OFF
 
     def compose(self) -> ComposeResult:
-        yield Static(self.value_text, classes="field-row--value")
+        yield Static(self.value_text, classes="field-row--value", markup=False)
 
     def toggle(self) -> None:
         """Flip the boolean and commit. No edit mode."""

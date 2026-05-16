@@ -44,7 +44,7 @@ class TextCell(Cell):
         return str(v)
 
     def compose(self) -> ComposeResult:
-        yield Static(self.value_text, classes="field-row--value")
+        yield Static(self.value_text, classes="field-row--value", markup=False)
 
     def enter_edit(self) -> None:
         if self.editing:
@@ -91,7 +91,7 @@ class TextCell(Cell):
             input_widget = self.query_one(Input)
         except Exception:
             input_widget = None
-        new_static = Static(self.value_text, classes="field-row--value")
+        new_static = Static(self.value_text, classes="field-row--value", markup=False)
         self.mount(new_static)
         if input_widget is not None:
             input_widget.remove()
