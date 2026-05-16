@@ -38,12 +38,13 @@ class StringBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> StringNode:
         c = extract_constraints(field_info)
+        default = field_default(field_info)
         return StringNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
-            default=field_default(field_info),
+            value=existing if existing is not None else default,
+            default=default,
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
             pattern=c.get("pattern"),
@@ -60,12 +61,13 @@ class IntBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> IntNode:
         c = extract_constraints(field_info)
+        default = field_default(field_info)
         return IntNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
-            default=field_default(field_info),
+            value=existing if existing is not None else default,
+            default=default,
             ge=c.get("ge"),
             le=c.get("le"),
             gt=c.get("gt"),
@@ -82,12 +84,13 @@ class FloatBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> FloatNode:
         c = extract_constraints(field_info)
+        default = field_default(field_info)
         return FloatNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
-            default=field_default(field_info),
+            value=existing if existing is not None else default,
+            default=default,
             ge=c.get("ge"),
             le=c.get("le"),
             gt=c.get("gt"),
@@ -104,12 +107,13 @@ class BoolBuilder:
         return _is_subclass_of(type_, bool)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> BoolNode:
+        default = field_default(field_info)
         return BoolNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
-            default=field_default(field_info),
+            value=existing if existing is not None else default,
+            default=default,
         )
 
 
@@ -121,12 +125,13 @@ class DecimalBuilder:
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> DecimalNode:
         c = extract_constraints(field_info)
+        default = field_default(field_info)
         return DecimalNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
-            default=field_default(field_info),
+            value=existing if existing is not None else default,
+            default=default,
             max_digits=c.get("max_digits"),
             decimal_places=c.get("decimal_places"),
             ge=c.get("ge"),

@@ -32,6 +32,7 @@ nav:
   - CLI: cli.md
   - Examples:
       - examples/index.md
+      - Console prompt mode: examples/console-mode.md
       - Server config: examples/server-config.md
       - Multi-format I/O: examples/multi-format.md
   - API Reference: api.md

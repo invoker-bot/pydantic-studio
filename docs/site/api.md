@@ -30,6 +30,7 @@
 
 ## Renderers
 
+::: pydantic_studio.run_console_app
 ::: pydantic_studio.StudioApp
 ::: pydantic_studio.run_app
 ::: pydantic_studio.StudioServer

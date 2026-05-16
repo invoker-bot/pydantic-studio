@@ -75,17 +75,25 @@ logging:
 ## Edit interactively
 
 ```bash
+$ pydantic-studio edit mypkg.server:ServerConfig server.yaml
+```
+
+The default console mode asks one prompt per field. If you want a visual
+hierarchy, use one of the richer frontends:
+
+```bash
+$ pydantic-studio edit --frontend tui mypkg.server:ServerConfig server.yaml
 $ pydantic-studio edit --frontend web mypkg.server:ServerConfig server.yaml
 ```
 
-The sidebar shows the GroupNode hierarchy:
+The TUI/web hierarchy shows:
 
 - ServerConfig
   - database
   - logging
 
-Click a group to focus its fields. Add replicas with `+ Add` on the
-`read_replicas` row.
+Focus a group to edit its fields. Add replicas through the `read_replicas`
+container controls.
 
 ## Validate
 

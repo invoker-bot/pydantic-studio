@@ -2,11 +2,12 @@
 
 **Interactive editor for Pydantic models.** Generate and edit `config.yaml` /
 `config.toml` / `config.json` against a strongly-typed schema, with three
-frontends sharing a single form-state model:
+interactive frontends sharing a single form-state model:
 
-- A **Textual TUI** — `pydantic-studio edit mypkg:Config config.yaml`
+- A **console prompt flow** — `pydantic-studio edit mypkg:Config config.yaml`
+- A **Textual TUI** — `pydantic-studio edit --frontend tui mypkg:Config config.yaml`
 - An **HTML browser app** — `pydantic-studio edit --frontend web mypkg:Config config.yaml`
-- A **CLI shorthand** — `pydantic-studio fill | run | check`
+- **CLI helpers** — `pydantic-studio fill | run | check`
 
 ## Why?
 

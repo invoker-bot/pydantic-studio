@@ -1,8 +1,7 @@
 """Renderers for pydantic-studio.
 
 Currently ships:
-- ``textual_/`` — terminal UI via Textual
-
-Future plans:
-- ``html/`` — local FastAPI + HTMX (Plan 6)
+- ``console``: sequential stdin/stdout prompts
+- ``textual_``: terminal UI via Textual
+- ``html``: local FastAPI app
 """

@@ -49,25 +49,30 @@ $ pydantic-studio check mypkg.config:AppSettings config.yaml
 config.yaml: OK
 ```
 
-### `edit <module:Class> [<file>] [--frontend tui|web]`
+### `edit <module:Class> [<file>] [--frontend console|tui|web]`
 
-Launch an interactive editor. `tui` (default) launches the Textual UI;
-`web` boots the FastAPI HTML renderer in your default browser.
+Launch an interactive editor. `console` (default) asks one prompt per field
+and writes the save target after the final answer. `tui` launches the Textual
+UI; `web` boots the FastAPI HTML renderer in your default browser.
 
 ```bash
 $ pydantic-studio edit mypkg.config:AppSettings config.yaml
+$ pydantic-studio edit mypkg.config:AppSettings
+$ pydantic-studio edit --frontend tui mypkg.config:AppSettings config.yaml
 $ pydantic-studio edit --frontend web mypkg.config:AppSettings config.yaml
 ```
 
-If `<file>` exists, it's loaded; otherwise a fresh tree is built from
-the schema's defaults. On save, the tree is materialized via
-`to_instance()` and written via `save_config` (extension picks format).
+If `<file>` exists, it's loaded; if it does not exist, it is used as the save
+target for a fresh tree. If `<file>` is omitted, the editor starts from the
+schema's defaults and saves to `<Class>.yaml` in the current directory. On save,
+the tree is materialized via `to_instance()` and written to the configured
+save target. In console mode, press Enter to keep the displayed value.
 
 ### `version`
 
 ```bash
 $ pydantic-studio version
-pydantic-studio 0.1.1
+pydantic-studio 0.1.2
 ```
 
 ## Exit codes

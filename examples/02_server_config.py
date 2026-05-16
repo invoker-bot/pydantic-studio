@@ -7,7 +7,9 @@ collapses each group into a section.
 
 Run with::
 
-    python examples/02_server_config.py             # default: tui
+    python examples/02_server_config.py             # default: console prompts
+    python examples/02_server_config.py console     # console prompts
+    python examples/02_server_config.py tui         # Textual terminal UI
     python examples/02_server_config.py web         # browser UI
     python examples/02_server_config.py show        # print form tree
     python examples/02_server_config.py fill        # print YAML stub

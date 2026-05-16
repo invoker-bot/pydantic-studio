@@ -112,10 +112,19 @@ If validation fails (required fields unset, constraints violated),
 `tree.to_instance()` raises `ValidationFailedError` listing every
 problem.
 
-## 8. Launch the TUI
+## 8. Launch the console editor
 
 ```bash
 $ uv run pydantic-studio edit mypkg.config:AppSettings config.yaml
+```
+
+The default console mode asks one prompt per field. Press Enter to keep
+the displayed value; after the final prompt, the file is saved.
+
+For the Textual TUI, pass `--frontend tui`:
+
+```bash
+$ uv run pydantic-studio edit --frontend tui mypkg.config:AppSettings config.yaml
 ```
 
 `Ctrl+S` saves, `Ctrl+Z`/`Ctrl+Y` undo/redo, and `Ctrl+C` quits.

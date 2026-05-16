@@ -8,7 +8,7 @@ once YAML round-trip support lands.
 from __future__ import annotations
 
 import importlib
-from pathlib import Path  # noqa: TC003 — typer reads at runtime
+from pathlib import Path
 from typing import Any
 
 import typer
@@ -221,13 +221,16 @@ def edit(
     target: str = typer.Argument(..., help="module:Class identifier."),
     file: Path | None = typer.Argument(  # noqa: B008
         None,
-        help="Path to a YAML file. If omitted, edits a fresh tree.",
+        help=(
+            "Path to a YAML file. If omitted, edits a fresh tree and saves "
+            "to <Class>.yaml."
+        ),
     ),
     frontend: str = typer.Option(
-        "tui",
+        "console",
         "--frontend",
         "-f",
-        help="UI to launch: 'tui' (Textual) or 'web' (FastAPI+HTMX).",
+        help="UI to launch: 'console', 'tui' (Textual), or 'web' (FastAPI+HTMX).",
     ),
 ) -> None:
     """Launch an editor for a Pydantic schema."""
@@ -241,17 +244,23 @@ def edit(
     else:
         tree = build_form_tree(schema)
 
-    if frontend == "tui":
+    save_path = file if file is not None else Path(f"{schema.__name__}.yaml")
+
+    if frontend == "console":
+        from pydantic_studio.renderers.console import run_console_app
+
+        run_console_app(tree=tree, save_path=save_path)
+    elif frontend == "tui":
         from pydantic_studio.renderers.textual_ import StudioApp
 
-        StudioApp(tree=tree, save_path=file).run()
+        StudioApp(tree=tree, save_path=save_path).run()
     elif frontend == "web":
         from pydantic_studio.renderers import html as html_module
 
-        html_module.run_html_app(tree=tree, save_path=file)
+        html_module.run_html_app(tree=tree, save_path=save_path)
     else:
         typer.secho(
-            f"Unknown frontend {frontend!r}. Use 'tui' or 'web'.",
+            f"Unknown frontend {frontend!r}. Use 'console', 'tui', or 'web'.",
             fg=typer.colors.RED,
             err=True,
         )

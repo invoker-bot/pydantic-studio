@@ -6,7 +6,9 @@ through YAML/TOML/JSON via Pydantic's ISO 8601 / canonical string forms.
 
 Run with::
 
-    python examples/03_temporal_and_network.py        # default: tui
+    python examples/03_temporal_and_network.py        # default: console prompts
+    python examples/03_temporal_and_network.py console
+    python examples/03_temporal_and_network.py tui    # Textual terminal UI
     python examples/03_temporal_and_network.py web    # browser UI
     python examples/03_temporal_and_network.py show
     python examples/03_temporal_and_network.py fill

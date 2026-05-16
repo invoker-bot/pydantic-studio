@@ -1,39 +1,34 @@
 """Tests for the `pydantic-studio edit` CLI subcommand.
 
-Note: edit launches a Textual TUI which can't be driven through CliRunner
-the same way as `fill`/`run`/`check` (it blocks on App.run()). Instead we
-patch the StudioApp.run() to be a no-op and verify the load/build flow
-worked correctly.
+Interactive renderers block under CliRunner, so these tests patch each
+renderer's run function and verify routing plus tree/save-path setup.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from typer.testing import CliRunner
 
 from pydantic_studio.cli import app
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 runner = CliRunner()
 
 
 def test_edit_with_existing_file(tmp_path: Path, monkeypatch) -> None:
-    """edit loads an existing YAML and launches the app."""
+    """edit loads an existing YAML and launches the default console renderer."""
     cfg = tmp_path / "config.yaml"
     cfg.write_text("name: prod\nport: 9090\n", encoding="utf-8")
 
     captured: dict[str, object] = {}
 
-    def fake_run(self) -> None:
-        captured["tree"] = self.tree
-        captured["save_path"] = self.save_path
+    def fake_run(tree, save_path=None) -> None:
+        captured["tree"] = tree
+        captured["save_path"] = save_path
 
-    from pydantic_studio.renderers.textual_ import StudioApp
+    import pydantic_studio.renderers.console as console_module
 
-    monkeypatch.setattr(StudioApp, "run", fake_run)
+    monkeypatch.setattr(console_module, "run_console_app", fake_run)
 
     result = runner.invoke(
         app,
@@ -46,10 +41,33 @@ def test_edit_with_existing_file(tmp_path: Path, monkeypatch) -> None:
     port_node = tree.root.find("port")
     assert port_node is not None
     assert port_node.value == 9090
+    assert captured["save_path"] == cfg
 
 
 def test_edit_without_file_builds_fresh_tree(tmp_path: Path, monkeypatch) -> None:
-    """edit without a path argument launches with a fresh tree (defaults)."""
+    """edit without a path argument launches with a fresh tree and default output."""
+    captured: dict[str, object] = {}
+
+    def fake_run(tree, save_path=None) -> None:
+        captured["tree"] = tree
+        captured["save_path"] = save_path
+
+    import pydantic_studio.renderers.console as console_module
+
+    monkeypatch.setattr(console_module, "run_console_app", fake_run)
+
+    result = runner.invoke(app, ["edit", "tests.fixtures.schemas:Server"])
+    assert result.exit_code == 0
+    assert captured["save_path"] == Path("Server.yaml")
+    tree = captured["tree"]
+    port_node = tree.root.find("port")
+    assert port_node is not None
+    # A freshly-built tree should expose schema defaults as editable values.
+    assert port_node.value == 8080
+    assert port_node.default == 8080
+
+
+def test_edit_tui_frontend_routes_to_studio_app(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     def fake_run(self) -> None:
@@ -60,16 +78,14 @@ def test_edit_without_file_builds_fresh_tree(tmp_path: Path, monkeypatch) -> Non
 
     monkeypatch.setattr(StudioApp, "run", fake_run)
 
-    result = runner.invoke(app, ["edit", "tests.fixtures.schemas:Server"])
+    result = runner.invoke(
+        app,
+        ["edit", "--frontend", "tui", "tests.fixtures.schemas:Server"],
+    )
+
     assert result.exit_code == 0
-    assert captured["save_path"] is None
-    tree = captured["tree"]
-    port_node = tree.root.find("port")
-    assert port_node is not None
-    # A freshly-built tree carries the schema default on the node; the
-    # ``value`` attribute is filled in lazily by the editor widgets when
-    # they mount (see scalars.TextInputEditor.on_mount).
-    assert port_node.default == 8080
+    assert captured["save_path"] == Path("Server.yaml")
+    assert captured["tree"].root.find("port").value == 8080
 
 
 def test_edit_unknown_schema_errors() -> None:

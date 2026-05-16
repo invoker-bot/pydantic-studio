@@ -28,7 +28,7 @@ class EnumBuilder:
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
+            value=existing if existing is not None else default,
             default=default,
             enum_class_name=f"{enum_cls.__module__}.{enum_cls.__qualname__}",
             choices=choices,
@@ -48,7 +48,7 @@ class LiteralBuilder:
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
-            value=existing,
+            value=existing if existing is not None else default,
             default=default,
             choices=choices,
         )

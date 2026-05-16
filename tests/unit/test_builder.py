@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 
 import pytest
+from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
 from pydantic_studio.exceptions import NoBuilderError
@@ -79,7 +81,7 @@ def test_string_builder_builds_with_default():
     assert isinstance(n, StringNode)
     assert n.default == "hi"
     assert n.description == "a greeting"
-    assert n.value is None  # nothing passed in `existing`
+    assert n.value == "hi"
 
 
 def test_string_builder_picks_existing_value_over_default():
@@ -99,6 +101,7 @@ def test_int_builder_builds():
     b = IntBuilder()
     n = b.build(int, _fi(default=10), existing=None)
     assert isinstance(n, IntNode)
+    assert n.value == 10
     assert n.default == 10
 
 
@@ -107,6 +110,7 @@ def test_float_builder_builds():
     assert b.matches(float)
     n = b.build(float, _fi(default=1.5), existing=None)
     assert isinstance(n, FloatNode)
+    assert n.value == 1.5
     assert n.default == 1.5
 
 
@@ -115,6 +119,7 @@ def test_bool_builder_builds():
     assert b.matches(bool)
     n = b.build(bool, _fi(default=True), existing=None)
     assert isinstance(n, BoolNode)
+    assert n.value is True
     assert n.default is True
 
 
@@ -123,6 +128,7 @@ def test_decimal_builder_builds():
     assert b.matches(Decimal)
     n = b.build(Decimal, _fi(default=Decimal("0.00")), existing=None)
     assert isinstance(n, DecimalNode)
+    assert n.value == Decimal("0.00")
     assert n.default == Decimal("0.00")
 
 
@@ -182,8 +188,8 @@ def test_group_builder_populates_existing_values():
     n = b.build(Simple, FieldInfo(annotation=Simple), existing=existing)
     assert n.find("name").value == "alice"
     assert n.find("age").value == 30
-    # unspecified fields fall back to schema defaults
-    assert n.find("enabled").value is None  # nothing passed
+    # unspecified fields fall back to schema defaults as editable values
+    assert n.find("enabled").value is True
     assert n.find("enabled").default is True
 
 
@@ -214,3 +220,36 @@ def test_build_form_tree_with_existing_dict():
     tree = build_form_tree(Simple, existing={"name": "carol", "age": 7})
     assert tree.root.find("name").value == "carol"
     assert tree.root.find("age").value == 7
+
+
+def test_build_form_tree_populates_scalar_and_choice_defaults():
+    class Defaults(BaseModel):
+        name: str = "prod"
+        port: int = 8080
+        enabled: bool = True
+        level: Literal["debug", "info"] = "info"
+
+    tree = build_form_tree(Defaults)
+
+    assert tree.root.find("name").value == "prod"
+    assert tree.root.find("port").value == 8080
+    assert tree.root.find("enabled").value is True
+    assert tree.root.find("level").value == "info"
+
+
+def test_build_form_tree_populates_container_defaults():
+    class Defaults(BaseModel):
+        tags: list[str] = ["alpha", "beta"]
+        ports: dict[str, int] = {"api": 8080}
+        factory_tags: list[str] = Field(default_factory=lambda: ["factory"])
+
+    tree = build_form_tree(Defaults)
+
+    tags = tree.root.find("tags")
+    ports = tree.root.find("ports")
+    factory_tags = tree.root.find("factory_tags")
+
+    assert [item.value for item in tags.items] == ["alpha", "beta"]
+    assert [(key.value, value.value) for key, value in ports.entries] == [("api", 8080)]
+    assert [item.value for item in factory_tags.items] == ["factory"]
+    assert tree.to_instance() == Defaults()

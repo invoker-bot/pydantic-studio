@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from pydantic_studio.tree.nodes import SequenceNode
 from pydantic_studio.types.annotated import strip_annotated
 from pydantic_studio.types.metadata import extract_constraints
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -64,12 +65,13 @@ class ListBuilder:
         args = get_args(unwrapped)
         item_type = args[0] if args else str
         c = extract_constraints(field_info)
+        seed = existing if existing is not None else field_default(field_info)
         return SequenceNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             origin="list",
-            items=_build_items(self._registry, item_type, existing, field_info),
+            items=_build_items(self._registry, item_type, seed, field_info),
             item_type_name=_fq(item_type),
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
@@ -90,12 +92,13 @@ class SetBuilder:
         args = get_args(unwrapped)
         item_type = args[0] if args else str
         c = extract_constraints(field_info)
+        seed = existing if existing is not None else field_default(field_info)
         return SequenceNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
             origin="set",
-            items=_build_items(self._registry, item_type, existing, field_info),
+            items=_build_items(self._registry, item_type, seed, field_info),
             item_type_name=_fq(item_type),
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
@@ -136,12 +139,13 @@ class TupleBuilder:
         is_variadic = len(args) == 2 and args[1] is Ellipsis
         if is_variadic:
             item_type = args[0]
+            seed = existing if existing is not None else field_default(field_info)
             return SequenceNode(
                 name=field_info.alias or "<unnamed>",
                 description=field_info.description,
                 required=field_info.is_required(),
                 origin="tuple",
-                items=_build_items(self._registry, item_type, existing, field_info),
+                items=_build_items(self._registry, item_type, seed, field_info),
                 item_type_name=_fq(item_type),
                 min_length=c.get("min_length"),
                 max_length=c.get("max_length"),
@@ -149,7 +153,8 @@ class TupleBuilder:
 
         # Fixed-length heterogeneous tuple: one slot per arg.
         items: list[Any] = []
-        existing_seq = list(existing) if existing is not None else [None] * len(args)
+        seed = existing if existing is not None else field_default(field_info)
+        existing_seq = list(seed) if seed is not None else [None] * len(args)
         # Pad existing_seq to len(args) so missing slots become None children.
         while len(existing_seq) < len(args):
             existing_seq.append(None)

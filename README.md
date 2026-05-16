@@ -2,12 +2,12 @@
 
 **Interactive editor for Pydantic models.** Generate and edit `config.yaml` /
 `config.toml` / `config.json` against a strongly-typed schema, with three
-frontends sharing a single form-state model: a Textual TUI, an HTMX-driven
-local web app, and a CLI shorthand.
+frontends sharing a single form-state model: sequential console prompts, a
+Textual TUI, and an HTMX-driven local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-416%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-670%20passing-brightgreen)](#development)
 
 ---
 
@@ -20,8 +20,8 @@ your hand-written comments.
 
 ## Status
 
-**v0.1.1 — Alpha.** All 9 implementation phases are merged on master.
-Production code paths are exercised by 416 tests (unit + integration +
+**v0.1.2 — Alpha.** All 9 implementation phases are merged on master.
+Production code paths are exercised by 670 tests (unit + integration +
 TUI/HTMX smoke). API is stable enough for early adopters; expect
 v0.2 to add polish (Tailwind pipeline, theme toggle, status-bar UI)
 without breaking the public API.
@@ -82,14 +82,26 @@ pydantic-studio check myapp.config:AppSettings config.yaml
 # Print the validated model
 pydantic-studio run myapp.config:AppSettings config.yaml
 
-# Open the Textual TUI
+# Ask one console prompt per field, then save
 pydantic-studio edit myapp.config:AppSettings config.yaml
+
+# Omit the file to start from defaults and save to AppSettings.yaml
+pydantic-studio edit myapp.config:AppSettings
+
+# Or open the Textual TUI
+pydantic-studio edit --frontend tui myapp.config:AppSettings config.yaml
 
 # Or the HTMX-driven browser UI
 pydantic-studio edit --frontend web myapp.config:AppSettings config.yaml
 ```
 
 Format is auto-detected from extension (`.yaml` / `.yml` / `.toml` / `.json`).
+
+### Console Mode
+
+`edit` defaults to the console renderer. It asks one prompt per field,
+pre-fills schema defaults, keeps the current value when you press Enter,
+and writes the configured save target when all prompts are complete.
 
 ### Textual TUI
 
@@ -162,6 +174,7 @@ from pydantic_studio import (
     # Drafts
     save_draft, load_draft, delete_draft, find_draft, draft_newer_than,
     # Renderers
+    run_console_app,              # sequential console prompts
     StudioApp, run_app,           # Textual TUI
     StudioServer, run_html_app,   # HTML/HTMX
     # Registry
@@ -196,31 +209,23 @@ if existing is not None:
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ Textual TUI │ HTML browser │ CLI │  ← renderers          │
-│ (StudioApp) │ (StudioServer)│     │     (frontends)       │
-└──────┬───────────┬────────────┬──┘                        │
-       │           │            │                            │
-       ▼           ▼            ▼                            │
-┌──────────────────────────────────────────────────────────┐│
-│  FormTree (canonical state)                               ││
-│  • 24 node types, discriminated by `kind`                 ││
-│  • path-addressed mutations (set_value / add_item / …)    ││
-│  • snapshot ring for undo / redo                          ││
-│  • validate-first contract                                ││
-└──────────────────────┬───────────────────────────────────┘│
-                       │                                    │
-                       ▼                                    │
-┌──────────────────────────────────────────────────────────┐│
-│  I/O layer                                                ││
-│  • load_config / save_config (extension dispatch)         ││
-│  • YAML / TOML / JSON specific helpers                    ││
-│  • Draft persistence                                      ││
-└──────────────────────────────────────────────────────────┘│
-                                                            │
-   Type registry (NodeBuilder Protocol) — extend with       │
-   `register_builder(MyBuilder())` for custom Pydantic      │
-   types the default registry doesn't recognize.            │
+Frontends
+  console prompts    Textual TUI      HTML browser      CLI helpers
+  run_console_app    StudioApp        StudioServer      fill/run/check
+        \                |                /                  |
+         \               |               /                   |
+          v              v              v                    v
+FormTree (canonical state)
+  - 24 node types, discriminated by `kind`
+  - path-addressed mutations: set_value / add_item / rename_key / ...
+  - snapshot ring for undo / redo
+  - validate-first contract
+        |
+        v
+I/O layer
+  - load_config / save_config (extension dispatch)
+  - YAML / TOML / JSON helpers
+  - draft persistence
 ```
 
 The full architecture doc is at `docs/site/architecture.md`. Run
@@ -234,7 +239,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 416 tests
+uv run pytest -q                          # 670 tests
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint
@@ -252,7 +257,13 @@ contributor.
 
 ## Frontend development (Phase 2+)
 
-The Textual TUI and CLI are pure Python — `uv sync && uv run python examples/02_server_config.py tui` is enough.
+The console and Textual frontends are pure Python. For example:
+
+```bash
+uv sync
+uv run python examples/05_console_prompts.py
+uv run python examples/02_server_config.py tui
+```
 
 The web renderer is a React SPA built with Vite, source under `frontend/`. End users do NOT need Node — `pip install pydantic-studio` ships the pre-built bundle. To modify the SPA:
 

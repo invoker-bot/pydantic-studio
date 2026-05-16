@@ -1,4 +1,4 @@
-"""Recursive None filtering in GroupNode.to_python and FormTree.to_instance."""
+"""Recursive defaults and None filtering in GroupNode/FormTree materialization."""
 
 from __future__ import annotations
 
@@ -17,17 +17,10 @@ class Outer(BaseModel):
     inner: Inner = Inner()
 
 
-def test_nested_none_dropped_for_default_to_apply() -> None:
+def test_nested_defaults_are_materialized() -> None:
     tree = build_form_tree(Outer)
-    # Nothing was filled in: every leaf is None.
     out = tree.root.to_python()
-    # Top-level None dropped (was already true in Phase 1).
-    assert "name" not in out
-    # The nested group's all-None children produce an empty dict, which is
-    # itself NOT None and therefore not filtered. Pydantic treats {} as
-    # "use all of Inner's defaults", so this is the correct serialization.
-    assert "inner" in out
-    assert out["inner"] == {}
+    assert out == {"name": "n", "inner": {"a": 7, "b": "default-b"}}
 
 
 def test_nested_to_instance_applies_defaults() -> None:
@@ -41,7 +34,7 @@ def test_nested_to_instance_applies_defaults() -> None:
 def test_nested_partially_filled() -> None:
     tree = build_form_tree(Outer, existing={"inner": {"a": 99}})
     out = tree.root.to_python()
-    assert out["inner"] == {"a": 99}  # b is None and is filtered
+    assert out["inner"] == {"a": 99, "b": "default-b"}
     instance = tree.to_instance()
     assert instance.inner.a == 99
-    assert instance.inner.b == "default-b"  # default applied
+    assert instance.inner.b == "default-b"

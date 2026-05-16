@@ -33,8 +33,12 @@ file extension.
 
 ## Renderers — frontends
 
-Three first-class renderers share the same FormTree mutation API:
+Three interactive renderers and the CLI commands share the same FormTree
+mutation API:
 
+- **Console prompts** (`pydantic_studio.renderers.console`) — sequential
+  stdin/stdout questions. Blank answers keep current values, and completion
+  writes through the normal save dispatch.
 - **Textual TUI** (`pydantic_studio.renderers.textual_`) — `StudioApp` +
   `EditorScreen` + per-node-kind widgets. Tested via `App.run_test()`
   and `Pilot`.
@@ -44,13 +48,13 @@ Three first-class renderers share the same FormTree mutation API:
 - **CLI shorthand** (`pydantic_studio.cli`) — `fill`, `run`, `check`,
   `edit`, `show`, `version`. Uses typer.
 
-Adding a 4th renderer (e.g., a Tk desktop app) means implementing one
+Adding another renderer (e.g., a Tk desktop app) means implementing one
 new module under `renderers/`. The tree stays untouched.
 
 ## Cross-frontend identity
 
 A **path** identifies any node in the tree (e.g.,
-`database.replicas[2].host`). Both renderers send the same path strings;
+`database.replicas[2].host`). Renderers send the same path strings;
 the tree's `set_value` and friends resolve them. A draft saved from web
 can be resumed in TUI, and vice versa, because the persisted format is
 the FormTree's own JSON dump.

@@ -6,14 +6,15 @@ constraint kinds the studio surfaces (``ge`` / ``le`` / ``min_length`` /
 
 Run with::
 
-    python examples/01_basic_settings.py            # default: tui
+    python examples/01_basic_settings.py            # default: console prompts
+    python examples/01_basic_settings.py console    # console prompts
     python examples/01_basic_settings.py tui        # Textual terminal UI
     python examples/01_basic_settings.py web        # browser UI
     python examples/01_basic_settings.py show       # print form tree
     python examples/01_basic_settings.py fill       # print YAML stub
 
 If pydantic-studio is not installed in editable mode, prefix with ``uv
-run``: ``uv run python examples/01_basic_settings.py tui``.
+run``: ``uv run python examples/01_basic_settings.py console``.
 """
 
 from __future__ import annotations

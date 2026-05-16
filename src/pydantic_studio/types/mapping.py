@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from pydantic_studio.tree.nodes import MappingNode
 from pydantic_studio.types.annotated import strip_annotated
 from pydantic_studio.types.metadata import extract_constraints
+from pydantic_studio.types.utils import field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -37,12 +38,13 @@ class DictBuilder:
         c = extract_constraints(field_info)
 
         entries: list[tuple[Any, Any]] = []
-        if isinstance(existing, dict):
+        seed = existing if existing is not None else field_default(field_info)
+        if isinstance(seed, dict):
             key_builder = self._registry.find(key_type)
             value_builder = self._registry.find(value_type)
             key_finfo = _FI(annotation=key_type)
             value_finfo = _FI(annotation=value_type)
-            for raw_key, raw_value in existing.items():
+            for raw_key, raw_value in seed.items():
                 k_node = key_builder.build(key_type, key_finfo, raw_key)
                 v_node = value_builder.build(value_type, value_finfo, raw_value)
                 k_node.name = "key"

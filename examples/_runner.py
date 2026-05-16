@@ -1,8 +1,8 @@
 """Shared launcher for the example schemas.
 
 Each example imports ``run_demo`` and calls it with the schema class plus
-any seed data. The launcher parses ``sys.argv`` for one of ``tui``,
-``web``, ``show``, or ``fill`` (default: ``tui``) and dispatches.
+any seed data. The launcher parses ``sys.argv`` for one of ``console``,
+``tui``, ``web``, ``show``, or ``fill`` (default: ``console``) and dispatches.
 
 Keeping this in one place means every example file is just *schema +
 data* — no argparse boilerplate.
@@ -19,7 +19,7 @@ from pydantic_studio import build_form_tree
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
-_USAGE = "usage: python examples/<file>.py [tui|web|show|fill]"
+_USAGE = "usage: python examples/<file>.py [console|tui|web|show|fill]"
 
 
 def _show(schema: type[BaseModel], existing: dict[str, Any] | None) -> None:
@@ -47,6 +47,15 @@ def _fill(schema: type[BaseModel], existing: dict[str, Any] | None) -> None:
     sys.stdout.write(buf.getvalue())
 
 
+def _console(schema: type[BaseModel], existing: dict[str, Any] | None) -> None:
+    from pathlib import Path
+
+    from pydantic_studio import run_console_app
+
+    tree = build_form_tree(schema, existing=existing or None)
+    run_console_app(tree, Path(f"{schema.__name__}.yaml"))
+
+
 def _tui(schema: type[BaseModel], existing: dict[str, Any] | None) -> None:
     from pydantic_studio import run_app
 
@@ -66,8 +75,14 @@ def run_demo(
     existing: dict[str, Any] | None = None,
 ) -> None:
     """Entry point each example calls from its ``__main__`` block."""
-    mode = sys.argv[1] if len(sys.argv) > 1 else "tui"
-    dispatch = {"tui": _tui, "web": _web, "show": _show, "fill": _fill}
+    mode = sys.argv[1] if len(sys.argv) > 1 else "console"
+    dispatch = {
+        "console": _console,
+        "tui": _tui,
+        "web": _web,
+        "show": _show,
+        "fill": _fill,
+    }
     handler = dispatch.get(mode)
     if handler is None:
         sys.stderr.write(f"{_USAGE}\nunknown mode: {mode!r}\n")

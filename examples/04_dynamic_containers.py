@@ -15,7 +15,9 @@ The dynamic side of the form tree:
 
 Run with::
 
-    python examples/04_dynamic_containers.py           # default: tui
+    python examples/04_dynamic_containers.py           # default: console prompts
+    python examples/04_dynamic_containers.py console
+    python examples/04_dynamic_containers.py tui       # Textual terminal UI
     python examples/04_dynamic_containers.py web       # browser UI
     python examples/04_dynamic_containers.py show
     python examples/04_dynamic_containers.py fill
