@@ -9,9 +9,10 @@ immediately.
 
 - **What**: Interactive editor for Pydantic models. Generate and edit
   YAML / TOML / JSON config files against a strongly-typed schema.
-- **Status**: v0.2.0 alpha — all 9 implementation phases + the
-  task-oriented TUI overhaul shipped on master. 727 tests passing.
-  ruff clean. `mkdocs build --strict` clean.
+- **Status**: v0.3.0 alpha — all 9 implementation phases + the
+  task-oriented overhaul + TUI form mode (focus = edit) shipped on
+  master. 744 tests passing. ruff clean. `mkdocs build --strict`
+  clean.
 - **Three frontends**: Textual TUI, FastAPI+HTMX browser app, CLI
   (`fill`/`run`/`check`/`edit`/`show`/`version`).
 - **Three formats**: YAML (full round-trip), TOML, JSON.

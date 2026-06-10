@@ -7,7 +7,7 @@ Textual TUI, and an HTMX-driven local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-727%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-744%20passing-brightgreen)](#development)
 
 ---
 
@@ -20,7 +20,7 @@ your hand-written comments.
 
 ## Status
 
-**v0.2.0 — Alpha.** All 9 implementation phases plus the task-oriented
+**v0.3.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
 by 720+ tests (unit + integration + TUI/HTMX smoke). The editing
 session now has an explicit submit/cancel contract (`run_app` returns
@@ -107,13 +107,23 @@ and writes the configured save target when all prompts are complete.
 
 ### Textual TUI
 
+The TUI is a **form**: the focused field is the editable field — type
+to edit (focus selects the text, like Tab in a browser), no edit mode
+to enter or leave. Mouse is on by default (click rows, toggles, the
+Save/Cancel buttons; wheel scrolls).
+
 | Key | Action |
 |---|---|
-| `Ctrl+S` | Submit: validate, write `save_path` if configured, exit `submitted`. On failure: errors screen, then the cursor jumps to the first offending field |
-| `Ctrl+C` | Cancel: clean tree exits `cancelled`; dirty tree asks (`S` save & exit / `D` discard / `Esc` keep editing); double `Ctrl+C` force-discards |
-| `n` | Jump to the next missing-required field |
-| `/` | Filter fields by name substring (group screens) |
-| `Esc` | Layered: cancel edit → clear filter → pop child screen → cancel session |
+| type | Edit the focused field (persistent input, masked for secrets) |
+| `Tab` / `Shift+Tab` / `↑` `↓` | Commit the pending value, move to the next/previous field (invalid values block the move and show why) |
+| `Enter` | Commit + advance; on containers: open; on large enums: chooser |
+| `Space` / `←` `→` | Toggle bools / cycle choices and union variants |
+| `Ctrl+S` | Submit: flush + validate, write `save_path` if configured, exit `submitted`. On failure the cursor jumps to the first offending field |
+| `Ctrl+C` | Cancel: clean tree exits `cancelled`; dirty tree asks (`S` save & exit / `D` discard / `Esc` keep editing) |
+| `Ctrl+N` | Jump to the next missing-required field |
+| `Ctrl+F` | Filter fields by name substring (group screens) |
+| `Esc` | Layered: revert field → clear filter → pop child screen → cancel session |
+| `F2` / `Del` / `[ + add item ]` / `✕` | Rename mapping key / delete / add items on container screens |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
 
 `run_app(tree, save_path=None, readonly_paths=())` returns an
@@ -126,10 +136,15 @@ fields. `readonly_paths` marks caller-owned fields: the row is labeled
 ### Browser UI
 
 `--frontend web` boots a local FastAPI app on a random free port and
-opens your browser. Edits POST to HTMX endpoints; the preview pane
-updates live. Closing the tab triggers a 30-second heartbeat timeout
-(configurable via `run_html_app(..., heartbeat_timeout_seconds=...)`)
-and the server shuts down.
+opens your browser (a React form sharing the TUI's session contract:
+`run_html_app(...) -> EditOutcome`, `readonly_paths` supported).
+Submit errors anchor to their fields (click-to-jump, red ring,
+auto-scroll); nested models collapse to one-line summaries (untouched
+optional models say `not set`); the header counts and cycles missing
+required fields; the YAML preview updates live. Closing the tab
+triggers a 30-second heartbeat timeout (configurable via
+`run_html_app(..., heartbeat_timeout_seconds=...)`) and the server
+shuts down with a `cancelled` outcome.
 
 ## Type coverage
 
