@@ -205,8 +205,14 @@ class FieldListView(VerticalScroll):
         if isinstance(cell, BoolCell):
             cell.toggle()
             return
-        if isinstance(cell, ChoiceCell) and cell.large_choice:
-            cell.open_chooser()
+        if isinstance(cell, ChoiceCell):
+            if cell.large_choice:
+                cell.open_chooser()
+            else:
+                # Small choices have no edit UI — Enter cycles like Tab.
+                # Falling through to the base enter_edit() here was the
+                # phantom-edit bug (footer flipped, Esc crashed).
+                cell.cycle_next()
             return
         cell.enter_edit()
 
@@ -481,7 +487,11 @@ class FieldListView(VerticalScroll):
 
         cell = self._focused_cell()
         if cell is not None and cell.editing:
-            cell.cancel_edit()
+            # Every Cell has cancel_edit (base default added with the
+            # phantom-edit fix); getattr keeps Esc crash-proof even for
+            # exotic third-party cells.
+            cancel = getattr(cell, "cancel_edit", cell.exit_edit)
+            cancel()
             return
         config_screens = [
             s for s in self.app.screen_stack if isinstance(s, ConfigScreen)

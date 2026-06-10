@@ -90,6 +90,16 @@ class Cell(Widget):
         self._editing = False
         self.post_message(EditModeExited(path=self._path))
 
+    def cancel_edit(self) -> None:
+        """Esc handler — leave edit mode without mutating.
+
+        Cells with a real edit UI (TextCell, SecretCell, AnyCell)
+        override this to also tear down their Input widget. The base
+        implementation only clears the flag, so Esc is *always* safe
+        even if a cell ends up in edit mode without a custom UI.
+        """
+        self.exit_edit()
+
     def commit(self, value: Any) -> ValidationResult:
         """Route a typed value through FormTree.set_value and return
         the result. The tree owns validation; the cell just dispatches.
