@@ -78,6 +78,16 @@ class FieldListView(VerticalScroll):
         self._form_tree = form_tree
         self._base_path = base_path
         self._cursor: int = 0
+        self._filter: str = ""
+
+    def set_filter(self, value: str) -> None:
+        """Substring-narrow the visible rows (group containers only)."""
+        normalized = value.strip().lower()
+        if normalized == self._filter:
+            return
+        self._filter = normalized
+        self._cursor = 0
+        self.refresh(recompose=True)
 
     @property
     def cursor(self) -> int:
@@ -122,13 +132,18 @@ class FieldListView(VerticalScroll):
         """Return child rows for the container this view is scoped to."""
         node = self._group
         if node.kind == "group":
-            return [
+            specs = [
                 _RowSpec(
                     child,
                     self._join_path(self._base_path, child.name),
                 )
                 for child in node.fields
             ]
+            if self._filter:
+                specs = [
+                    s for s in specs if self._filter in s.node.name.lower()
+                ]
+            return specs
         if node.kind == "sequence":
             return [
                 _RowSpec(child, self._join_path(self._base_path, idx))
@@ -587,14 +602,15 @@ class FieldListView(VerticalScroll):
         return False, None
 
     def action_cancel_focused(self) -> None:
-        """Esc on the focused row.
+        """Esc on the focused row — layered: edit > filter > screen > session.
 
         - If a cell is in edit mode → cancel the edit (in-place).
+        - Else if a filter is active → clear it (all rows return).
         - Else if the active screen is a drilled-in child (more than
           one ConfigScreen on the stack) → pop one level.
-        - Else (root screen, no edit) → cancel the session (same flow
-          as Ctrl+C: clean trees exit, dirty trees get the confirm
-          screen). Esc means "get me out" at every level.
+        - Else (root screen) → cancel the session (same flow as Ctrl+C:
+          clean trees exit, dirty trees get the confirm screen). Esc
+          means "get me out" at every level.
         """
         from pydantic_studio.renderers.textual_.screens import ConfigScreen
 
@@ -605,6 +621,9 @@ class FieldListView(VerticalScroll):
             # exotic third-party cells.
             cancel = getattr(cell, "cancel_edit", cell.exit_edit)
             cancel()
+            return
+        clear_filter = getattr(self.screen, "clear_filter", None)
+        if clear_filter is not None and clear_filter():
             return
         config_screens = [
             s for s in self.app.screen_stack if isinstance(s, ConfigScreen)

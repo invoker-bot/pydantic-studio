@@ -37,7 +37,8 @@ if TYPE_CHECKING:
 
 
 class ConfigScreen(Screen):
-    """TUI v2 single-panel screen: Breadcrumb + FieldListView + FooterHints.
+    """TUI v2 single-panel screen: Breadcrumb + FieldListView + HelpBar
+    + FooterHints.
 
     M1 ships the chrome; M2 lights up editing via per-kind cells. The
     screen listens for ``EditModeEntered`` / ``EditModeExited`` messages
@@ -45,9 +46,21 @@ class ConfigScreen(Screen):
     The same screen is reused for drilled-in groups, sequences,
     mappings, and union selections; footer hints adapt to the active
     container.
+
+    `/` mounts a filter Input above the list (group screens only). The
+    Input lives on the *screen*, not inside FieldListView — the list
+    recomposes on every filter keystroke, and an Input inside it would
+    be rebuilt (and lose focus) per character.
     """
 
     CSS_PATH = "theme.tcss"
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("slash", "show_filter", "filter", show=False),
+        Binding("escape", "dismiss_filter", "clear filter", show=False),
+    ]
+
+    _FILTER_INPUT_ID = "field-filter"
 
     def __init__(
         self,
@@ -81,6 +94,63 @@ class ConfigScreen(Screen):
         if group.kind == "union":
             return "union"
         return "idle"
+
+    def action_show_filter(self) -> None:
+        """`/` — mount (or refocus) the filter input. Group screens only:
+        sequence/mapping rows are positional, and filtering would desync
+        the cursor index from the container index used by A/D/move."""
+        from textual.widgets import Input
+
+        if self._group.kind != "group":
+            return
+        existing = self._filter_input()
+        if existing is not None:
+            existing.focus()
+            return
+        field_list = self.query_one(FieldListView)
+        inp = Input(placeholder="filter fields…", id=self._FILTER_INPUT_ID)
+        self.mount(inp, before=field_list)
+        inp.focus()
+
+    def action_dismiss_filter(self) -> None:
+        """Esc while the filter input is focused (the input itself has no
+        escape binding, so the event resolves at screen level)."""
+        self.clear_filter()
+
+    def _filter_input(self):
+        from textual.widgets import Input
+
+        try:
+            return self.query_one(f"#{self._FILTER_INPUT_ID}", Input)
+        except Exception:
+            return None
+
+    def clear_filter(self) -> bool:
+        """Remove the filter input and restore all rows.
+
+        Returns True when there was a filter to clear — callers use the
+        result to implement layered Esc (edit > filter > screen > session).
+        """
+        inp = self._filter_input()
+        if inp is None:
+            return False
+        inp.remove()
+        view = self.query_one(FieldListView)
+        view.set_filter("")
+        view.focus()
+        return True
+
+    def on_input_changed(self, event) -> None:
+        if getattr(event.input, "id", None) != self._FILTER_INPUT_ID:
+            return  # cell Inputs bubble up here too — not ours
+        self.query_one(FieldListView).set_filter(event.value)
+
+    def on_input_submitted(self, event) -> None:
+        if getattr(event.input, "id", None) != self._FILTER_INPUT_ID:
+            return
+        # Keep the filter (and the input as its visible indicator);
+        # hand focus back to the narrowed list.
+        self.query_one(FieldListView).focus()
 
     def _refresh_help_bar(self, node: Any, path: str) -> None:
         try:

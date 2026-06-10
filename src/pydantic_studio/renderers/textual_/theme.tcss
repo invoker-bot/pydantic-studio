@@ -44,6 +44,14 @@ HelpBar {
     padding: 0 1;
 }
 
+#field-filter {
+    height: 1;
+    border: none;
+    padding: 0 1;
+    background: $surface-lighten-1;
+    color: $text;
+}
+
 ConfirmExitScreen {
     background: $surface;
     color: $text;
