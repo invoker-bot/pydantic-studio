@@ -58,8 +58,13 @@ async def test_ctrl_s_writes_save_path(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_ctrl_s_without_save_path_notifies_warning():
-    """Ctrl+S with no ``save_path`` warns rather than crashing."""
+async def test_ctrl_s_without_save_path_submits_without_warning():
+    """Ctrl+S with no ``save_path`` is a real submit, not a dead end.
+
+    Pre-v0.2 this warned "No save path configured" — the natural save
+    gesture did nothing in exactly the flow downstream CLIs use (they
+    persist the tree themselves after the session ends).
+    """
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None)
     notifications = _hook_notifications(app)
@@ -67,10 +72,9 @@ async def test_ctrl_s_without_save_path_notifies_warning():
         await pilot.pause()
         await pilot.press("ctrl+s")
         await pilot.pause()
+    assert app.outcome.submitted is True
     severities = {sev for _, sev in notifications}
-    assert "warning" in severities, (
-        f"Expected a warning notification for missing save_path, got: {notifications}"
-    )
+    assert "warning" not in severities, f"unexpected warning: {notifications}"
 
 
 @pytest.mark.asyncio

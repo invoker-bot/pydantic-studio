@@ -151,6 +151,26 @@ class FieldListView(VerticalScroll):
         # Let VerticalScroll bring the newly focused row into view.
         rows[new_idx].scroll_visible()
 
+    def focus_path(self, path: str) -> bool:
+        """Move the cursor to the row addressing ``path``.
+
+        Accepts exact row paths and *descendant* paths — a validation
+        error at ``addresses.0.network`` focuses the ``addresses`` row
+        on the root screen. Returns False when no row matches.
+        """
+        specs = self._row_specs()
+        target: int | None = None
+        for idx, spec in enumerate(specs):
+            if spec.path == path:
+                target = idx
+                break
+            if spec.path and path.startswith(f"{spec.path}.") and target is None:
+                target = idx
+        if target is None or target == self._cursor:
+            return target is not None
+        self._move_cursor(target)
+        return True
+
     def _refresh_rows(self) -> None:
         specs = self._row_specs()
         if specs:
@@ -481,7 +501,9 @@ class FieldListView(VerticalScroll):
         - If a cell is in edit mode → cancel the edit (in-place).
         - Else if the active screen is a drilled-in child (more than
           one ConfigScreen on the stack) → pop one level.
-        - Else (root screen, no edit) → no-op.
+        - Else (root screen, no edit) → cancel the session (same flow
+          as Ctrl+C: clean trees exit, dirty trees get the confirm
+          screen). Esc means "get me out" at every level.
         """
         from pydantic_studio.renderers.textual_.screens import ConfigScreen
 
@@ -498,3 +520,7 @@ class FieldListView(VerticalScroll):
         ]
         if len(config_screens) > 1:
             self.app.pop_screen()
+            return
+        cancel_session = getattr(self.app, "action_cancel_session", None)
+        if cancel_session is not None:
+            cancel_session()

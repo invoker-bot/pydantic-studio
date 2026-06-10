@@ -21,6 +21,7 @@ from pydantic_studio.io import (
     save_toml,
     save_yaml,
 )
+from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.console import run_console_app
 from pydantic_studio.renderers.html import StudioServer, run_html_app
 from pydantic_studio.renderers.textual_ import StudioApp, run_app
@@ -85,6 +86,7 @@ __all__ = [
     "DateNode",
     "DatetimeNode",
     "DecimalNode",
+    "EditOutcome",
     "EmailNode",
     "EnumNode",
     "FloatNode",

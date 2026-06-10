@@ -192,13 +192,54 @@ class RenameKeyScreen(Screen):
         self.app.pop_screen()
 
 
+class ConfirmExitScreen(Screen):
+    """Unsaved-changes guard, pushed by ``StudioApp.action_quit`` when
+    the tree is dirty. Three exits:
+
+    - ``s`` — save & exit (same path as Ctrl+S; validation failures
+      bounce back to the editor with the errors screen)
+    - ``d`` — discard & exit (session ends ``cancelled``)
+    - ``Esc`` — keep editing
+    """
+
+    CSS_PATH = "theme.tcss"
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("s", "save_and_exit", "save & exit", show=False),
+        Binding("d", "discard", "discard", show=False),
+        Binding("escape", "keep_editing", "keep editing", show=False),
+    ]
+
+    def compose(self) -> ComposeResult:
+        from textual.widgets import Static
+
+        yield Static(
+            "You have unsaved changes.", classes="confirm-exit--title", markup=False
+        )
+        yield Static(
+            "S save & exit | D discard | Esc keep editing",
+            classes="confirm-exit--hints",
+            markup=False,
+        )
+
+    def action_save_and_exit(self) -> None:
+        self.app._submit()  # type: ignore[attr-defined]
+
+    def action_discard(self) -> None:
+        self.app._finish("cancelled")  # type: ignore[attr-defined]
+
+    def action_keep_editing(self) -> None:
+        self.app.pop_screen()
+
+
 class ErrorsScreen(Screen):
     """Modal listing validation errors after a failed save.
 
     Pushed by :meth:`StudioApp.action_save` when ``save_yaml`` raises
     :exc:`ValidationFailedError`. The body shows one line per error;
-    Esc dismisses and returns control to the underlying ConfigScreen
-    so the user can fix things and retry.
+    Esc dismisses, returns control to the underlying ConfigScreen, and
+    jumps the cursor to the first offending field so the fix is one
+    keystroke away instead of a memory exercise.
     """
 
     CSS_PATH = "theme.tcss"
@@ -208,9 +249,10 @@ class ErrorsScreen(Screen):
         Binding("enter", "dismiss", "back", show=False),
     ]
 
-    def __init__(self, errors: list[str]) -> None:
+    def __init__(self, errors: list[str], paths: list[str] | None = None) -> None:
         super().__init__()
         self._errors = list(errors)
+        self._paths = list(paths) if paths is not None else []
 
     @property
     def error_text(self) -> str:
@@ -232,5 +274,12 @@ class ErrorsScreen(Screen):
         )
 
     def action_dismiss(self) -> None:  # type: ignore[override]
-        """Pop this screen, returning to the underlying ConfigScreen."""
+        """Pop back to the editor and focus the first offending field."""
         self.app.pop_screen()
+        if not self._paths:
+            return
+        try:
+            view = self.app.screen.query_one(FieldListView)
+        except Exception:
+            return
+        view.focus_path(self._paths[0])

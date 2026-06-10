@@ -67,13 +67,14 @@ async def test_escape_after_enter_on_small_choice_does_not_crash() -> None:
 
 
 @pytest.mark.asyncio
-async def test_footer_returns_to_idle_after_choice_interaction() -> None:
+async def test_footer_stays_idle_after_choice_interaction() -> None:
+    """Enter on a small choice cycles in place — the footer must never
+    flip to editing hints (the phantom mode used to leave it stuck)."""
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("enter")
-        await pilot.press("escape")
         await pilot.pause()
         footer = app.screen.query_one(FooterHints)
         assert footer._mode == "idle"
