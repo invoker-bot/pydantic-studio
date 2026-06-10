@@ -9,8 +9,9 @@ immediately.
 
 - **What**: Interactive editor for Pydantic models. Generate and edit
   YAML / TOML / JSON config files against a strongly-typed schema.
-- **Status**: v0.1.1 alpha — all 9 implementation phases shipped on
-  master. 416 tests passing. ruff clean. `mkdocs build --strict` clean.
+- **Status**: v0.2.0 alpha — all 9 implementation phases + the
+  task-oriented TUI overhaul shipped on master. 727 tests passing.
+  ruff clean. `mkdocs build --strict` clean.
 - **Three frontends**: Textual TUI, FastAPI+HTMX browser app, CLI
   (`fill`/`run`/`check`/`edit`/`show`/`version`).
 - **Three formats**: YAML (full round-trip), TOML, JSON.
@@ -136,6 +137,30 @@ except Exception:
 `os.replace` is atomic on every platform we target when source + dest
 are on the same filesystem (guaranteed by `dir=path.parent`). Don't
 hand-roll a different scheme.
+
+### 5a. Parse-on-load symmetry
+
+Loading must be symmetric with saving. ``model_dump`` applies field
+serializers, so the tree has to hold *post-validator* (runtime) values:
+``GroupBuilder`` runs existing values of fields whose ``Annotated``
+metadata carries a transforming validator (``PlainValidator`` /
+``BeforeValidator`` / ``WrapValidator``) through
+``TypeAdapter(...).validate_python`` before node construction.
+``ValidationError`` falls back to the raw value (file-repair UX); any
+other exception propagates. Breaking this re-introduces the
+double-encryption bug (HFT field report, 2026-06-11): every load→save
+cycle re-applied an encrypt serializer to an already-encrypted value.
+Corollary: transforming validators are expected to be idempotent on
+runtime instances (they already receive instances for TUI-typed
+values).
+
+### 5b. Session outcome protocol
+
+``run_app`` returns ``EditOutcome("submitted" | "cancelled")``; only
+``submitted`` means the user committed AND the tree validated. Callers
+persist on ``submitted`` and abort otherwise. The TUI never exits with
+unsaved dirty state without explicit user choice (ConfirmExitScreen).
+Don't add exit paths that bypass ``StudioApp._finish``.
 
 ### 5. `save_yaml` requires a valid tree
 

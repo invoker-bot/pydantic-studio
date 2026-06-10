@@ -7,7 +7,7 @@ Textual TUI, and an HTMX-driven local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-670%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-727%20passing-brightgreen)](#development)
 
 ---
 
@@ -20,11 +20,13 @@ your hand-written comments.
 
 ## Status
 
-**v0.1.2 — Alpha.** All 9 implementation phases are merged on master.
-Production code paths are exercised by 670 tests (unit + integration +
-TUI/HTMX smoke). API is stable enough for early adopters; expect
-v0.2 to add polish (Tailwind pipeline, theme toggle, status-bar UI)
-without breaking the public API.
+**v0.2.0 — Alpha.** All 9 implementation phases plus the task-oriented
+TUI overhaul are merged on master. Production code paths are exercised
+by 720+ tests (unit + integration + TUI/HTMX smoke). The editing
+session now has an explicit submit/cancel contract (`run_app` returns
+`EditOutcome`), and loading is symmetric with saving (existing values
+run through field validators — see
+`docs/superpowers/specs/2026-06-11-task-oriented-editing-design.md`).
 
 ## Install
 
@@ -107,9 +109,19 @@ and writes the configured save target when all prompts are complete.
 
 | Key | Action |
 |---|---|
-| `Ctrl+S` | Save (writes via `save_yaml`; refuses on validation failure) |
+| `Ctrl+S` | Submit: validate, write `save_path` if configured, exit `submitted`. On failure: errors screen, then the cursor jumps to the first offending field |
+| `Ctrl+C` | Cancel: clean tree exits `cancelled`; dirty tree asks (`S` save & exit / `D` discard / `Esc` keep editing); double `Ctrl+C` force-discards |
+| `n` | Jump to the next missing-required field |
+| `/` | Filter fields by name substring (group screens) |
+| `Esc` | Layered: cancel edit → clear filter → pop child screen → cancel session |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
-| `Ctrl+C` | Quit |
+
+`run_app(tree, save_path=None, readonly_paths=())` returns an
+`EditOutcome`; persist the tree only when `outcome.submitted` is true.
+A one-line HelpBar describes the focused field (type, constraints,
+required-ness, `FieldInfo.description`) and counts missing required
+fields. `readonly_paths` marks caller-owned fields: the row is labeled
+`(read-only)` and edits are rejected with a visible message.
 
 ### Browser UI
 
@@ -175,7 +187,8 @@ from pydantic_studio import (
     save_draft, load_draft, delete_draft, find_draft, draft_newer_than,
     # Renderers
     run_console_app,              # sequential console prompts
-    StudioApp, run_app,           # Textual TUI
+    StudioApp, run_app,           # Textual TUI (run_app -> EditOutcome)
+    EditOutcome,                  # session result: submitted | cancelled
     StudioServer, run_html_app,   # HTML/HTMX
     # Registry
     Registry, NodeBuilder, register_builder,
