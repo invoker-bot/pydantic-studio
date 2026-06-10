@@ -104,6 +104,27 @@ async def test_escape_while_typing_clears_and_restores() -> None:
 
 
 @pytest.mark.asyncio
+async def test_help_bar_follows_filter_cursor_reset() -> None:
+    from pydantic_studio.renderers.textual_.widgets.help_bar import HelpBar
+
+    tree = build_form_tree(_Schema)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        for _ in range(4):
+            await pilot.press("down")  # park the cursor on 'leverage'
+        await pilot.press("slash")
+        for ch in "fee":
+            await pilot.press(ch)
+        await pilot.pause()
+        bar = app.screen.query_one(HelpBar)
+        assert "swap_maker_fee" in bar.text, (
+            "after filtering, the HelpBar must describe the row the "
+            f"cursor actually sits on; got: {bar.text!r}"
+        )
+
+
+@pytest.mark.asyncio
 async def test_slash_is_noop_on_sequence_screens() -> None:
     from textual.widgets import Input
 

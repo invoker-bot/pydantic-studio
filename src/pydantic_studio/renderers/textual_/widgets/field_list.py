@@ -88,6 +88,9 @@ class FieldListView(VerticalScroll):
         self._filter = normalized
         self._cursor = 0
         self.refresh(recompose=True)
+        # The cursor landed on a (potentially) different row — keep the
+        # HelpBar in sync with what's actually focused now.
+        self._post_cursor_moved()
 
     @property
     def cursor(self) -> int:
@@ -268,6 +271,7 @@ class FieldListView(VerticalScroll):
         else:
             self._cursor = 0
         self.refresh(recompose=True)
+        self._post_cursor_moved()
 
     def _focused_cell(self):
         """Return the Cell mounted inside the cursor-focused row, or None."""
