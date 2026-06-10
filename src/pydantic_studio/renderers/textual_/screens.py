@@ -17,8 +17,12 @@ from textual.binding import Binding, BindingType
 from textual.screen import Screen
 
 from pydantic_studio.renderers.textual_.widgets.breadcrumb import Breadcrumb
-from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
+from pydantic_studio.renderers.textual_.widgets.field_list import (
+    CursorMoved,
+    FieldListView,
+)
 from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
+from pydantic_studio.renderers.textual_.widgets.help_bar import HelpBar
 
 if TYPE_CHECKING:
     from typing import Any
@@ -66,6 +70,7 @@ class ConfigScreen(Screen):
             form_tree=self._form_tree,
             base_path=self._base_path,
         )
+        yield HelpBar()
         yield FooterHints(mode=self._footer_mode)
 
     def _mode_for_container(self, group: AnyNode) -> str:
@@ -76,6 +81,18 @@ class ConfigScreen(Screen):
         if group.kind == "union":
             return "union"
         return "idle"
+
+    def _refresh_help_bar(self, node: Any, path: str) -> None:
+        try:
+            bar = self.query_one(HelpBar)
+        except Exception:
+            return
+        readonly = path in getattr(self.app, "readonly_paths", frozenset())
+        missing = len(self._form_tree.missing_required_paths())
+        bar.show_node(node, missing_count=missing, readonly=readonly)
+
+    def on_cursor_moved(self, event: CursorMoved) -> None:
+        self._refresh_help_bar(event.node, event.path)
 
     def on_edit_mode_entered(self, event: EditModeEntered) -> None:
         try:
@@ -88,6 +105,16 @@ class ConfigScreen(Screen):
         try:
             footer = self.query_one(FooterHints)
             footer.set_mode(self._footer_mode)
+        except Exception:
+            return
+        # A commit may have filled (or blanked) values — refresh the
+        # missing-required counter for the still-focused row.
+        try:
+            view = self.query_one(FieldListView)
+            specs = view._row_specs()
+            if 0 <= view.cursor < len(specs):
+                spec = specs[view.cursor]
+                self._refresh_help_bar(spec.node, spec.path)
         except Exception:
             return
 

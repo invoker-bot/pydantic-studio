@@ -12,19 +12,20 @@ Mode = Literal["idle", "editing", "sequence", "mapping", "union", "errors"]
 
 _LINE1: dict[str, str] = {
     "idle": (
-        "Ctrl+C quit | Ctrl+S save | Up/Down navigate | Enter edit | Tab cycle | Esc back"
+        "Ctrl+S save+exit | Ctrl+C cancel | Up/Down navigate | Enter edit | "
+        "Tab cycle | N next required | Esc back"
     ),
-    "editing": "Ctrl+C quit | Enter commit | Esc cancel",
+    "editing": "Ctrl+C cancel session | Enter commit | Esc cancel edit",
     "sequence": (
-        "Ctrl+C quit | Ctrl+S save | Up/Down navigate | Enter edit | "
+        "Ctrl+S save+exit | Ctrl+C cancel | Up/Down navigate | Enter edit | "
         "A add | D delete | Ctrl+Up/Down move | Esc back"
     ),
     "mapping": (
-        "Ctrl+C quit | Ctrl+S save | Up/Down navigate | Enter edit | "
+        "Ctrl+S save+exit | Ctrl+C cancel | Up/Down navigate | Enter edit | "
         "A add | R rename | D delete | Esc back"
     ),
-    "union": "Ctrl+C quit | Ctrl+S save | Enter edit | Tab variant | Esc back",
-    "errors": "Ctrl+C quit | Esc back to edit | Enter jump to first error",
+    "union": "Ctrl+S save+exit | Ctrl+C cancel | Enter edit | Tab variant | Esc back",
+    "errors": "Esc / Enter back to edit (cursor jumps to the first error)",
 }
 _LINE2 = ""
 

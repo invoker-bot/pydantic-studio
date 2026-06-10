@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from textual.binding import Binding, BindingType
 from textual.containers import VerticalScroll
+from textual.message import Message
 
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 
@@ -29,6 +30,18 @@ class _RowSpec:
     node: Any
     path: str
     label: str | None = None
+
+
+@dataclass
+class CursorMoved(Message):
+    """Posted whenever the focused row changes (incl. the initial one).
+
+    ConfigScreen routes it to the HelpBar so guidance always describes
+    the row under the cursor.
+    """
+
+    path: str
+    node: Any
 
 
 class FieldListView(VerticalScroll):
@@ -50,6 +63,7 @@ class FieldListView(VerticalScroll):
         Binding("ctrl+up", "move_focused_up", "move up", show=False),
         Binding("ctrl+down", "move_focused_down", "move down", show=False),
         Binding("r", "rename_focused_key", "rename", show=False),
+        Binding("n", "jump_next_required", "next required", show=False),
         Binding("escape", "cancel_focused", "cancel", show=False),
     ]
 
@@ -141,6 +155,17 @@ class FieldListView(VerticalScroll):
             return
         self._move_cursor(self._cursor + 1)
 
+    def on_mount(self) -> None:
+        """Announce the initial focused row so the HelpBar starts populated."""
+        self._post_cursor_moved()
+
+    def _post_cursor_moved(self) -> None:
+        specs = self._row_specs()
+        if not (0 <= self._cursor < len(specs)):
+            return
+        spec = specs[self._cursor]
+        self.post_message(CursorMoved(path=spec.path, node=spec.node))
+
     def _move_cursor(self, new_idx: int) -> None:
         rows = list(self.query(FieldRow))
         if not rows:
@@ -150,6 +175,31 @@ class FieldListView(VerticalScroll):
         rows[new_idx].set_focused(True)
         # Let VerticalScroll bring the newly focused row into view.
         rows[new_idx].scroll_visible()
+        self._post_cursor_moved()
+
+    def action_jump_next_required(self) -> None:
+        """`n` — cycle the cursor to the next row whose subtree still
+        misses a required value. The fastest route from "opened the
+        form" to "valid config" regardless of field declaration order.
+        """
+        missing = self._form_tree.missing_required_paths()
+        if not missing:
+            return
+        specs = self._row_specs()
+        hits = [
+            idx
+            for idx, spec in enumerate(specs)
+            if spec.path
+            and any(
+                m == spec.path or m.startswith(f"{spec.path}.") for m in missing
+            )
+        ]
+        if not hits:
+            return
+        after = [idx for idx in hits if idx > self._cursor]
+        target = after[0] if after else hits[0]
+        if target != self._cursor:
+            self._move_cursor(target)
 
     def focus_path(self, path: str) -> bool:
         """Move the cursor to the row addressing ``path``.
