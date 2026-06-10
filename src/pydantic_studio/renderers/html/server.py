@@ -10,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from fastapi import Request
     from fastapi.responses import HTMLResponse
 
@@ -33,9 +35,11 @@ class StudioServer:
         tree: FormTree,
         save_path: str | Path | None = None,
         heartbeat_timeout_seconds: float = 30.0,
+        readonly_paths: Iterable[str] = (),
     ) -> None:
         self.tree = tree
         self.save_path = Path(save_path) if save_path is not None else None
+        self.readonly_paths = frozenset(readonly_paths)
         self.app = FastAPI()
         self.templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
         self.submitted = False
@@ -104,13 +108,19 @@ def run_html_app(
     tree: FormTree,
     save_path: str | Path | None = None,
     heartbeat_timeout_seconds: float = 30.0,
-) -> None:
+    readonly_paths: Iterable[str] = (),
+):
     """Launch the HTML renderer. Blocks until /submit, /cancel, or heartbeat timeout.
 
     Prints the editor URL to stdout before opening the browser so the user
     can copy/paste it (e.g. when the auto-open fails or the terminal lives
     on a different host than the desktop). When the server exits, prints
     a one-line summary indicating whether the form was saved or cancelled.
+
+    Returns the session's :class:`~pydantic_studio.outcome.EditOutcome` —
+    the same contract as the TUI's ``run_app``: persist only on
+    ``outcome.submitted`` (heartbeat timeouts and Cancel both come back
+    ``cancelled``).
     """
     import asyncio
     import socket
@@ -119,10 +129,13 @@ def run_html_app(
 
     import uvicorn
 
+    from pydantic_studio.outcome import EditOutcome
+
     studio_server = StudioServer(
         tree=tree,
         save_path=save_path,
         heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+        readonly_paths=readonly_paths,
     )
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))
@@ -175,5 +188,7 @@ def run_html_app(
             print(f"saved to {save_path}", file=sys.stdout)
         else:
             print("submitted (no save path configured)", file=sys.stdout)
-    elif studio_server.cancelled:
+        return EditOutcome(status="submitted")
+    if studio_server.cancelled:
         print("cancelled", file=sys.stdout)
+    return EditOutcome(status="cancelled")

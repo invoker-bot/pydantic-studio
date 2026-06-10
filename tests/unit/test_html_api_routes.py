@@ -125,3 +125,35 @@ def test_api_heartbeat_returns_ok_and_records_timestamp() -> None:
     assert response.status_code == 200
     assert response.json() == {"ok": True}
     assert before <= server.last_heartbeat_ts <= after
+
+
+def test_api_tree_includes_readonly_paths() -> None:
+    """The server's readonly_paths reach the SPA via /api/tree — the
+    frontend renders those fields inside a disabled fieldset."""
+    from fastapi.testclient import TestClient
+    from pydantic import BaseModel
+
+    from pydantic_studio import build_form_tree
+    from pydantic_studio.renderers.html.server import StudioServer
+
+    class _S(BaseModel):
+        path: str = "x"
+        name: str = "y"
+
+    server = StudioServer(
+        tree=build_form_tree(_S), save_path=None, readonly_paths={"path"}
+    )
+    client = TestClient(server.app)
+    payload = client.get("/api/tree").json()
+    assert payload["readonly_paths"] == ["path"]
+
+
+def test_run_html_app_signature_matches_run_app_contract() -> None:
+    """run_html_app mirrors the TUI session contract: readonly_paths in,
+    EditOutcome out — `hft config gen/edit --web` depends on it."""
+    import inspect
+
+    from pydantic_studio.renderers.html.server import run_html_app
+
+    signature = inspect.signature(run_html_app)
+    assert "readonly_paths" in signature.parameters

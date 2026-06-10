@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { GroupNodeData } from "@/api/schemas";
+import { hasErrorUnder, useFormFlags } from "@/components/form/errors";
 import { FormField } from "@/components/form/FormField";
 import { childPath } from "@/components/form/path";
+import { isUnsetSubtree } from "@/lib/required";
 import { shortTypeName } from "@/lib/typeName";
 
 export function GroupField({
@@ -32,7 +34,23 @@ function NestedGroup({
   node,
   path,
 }: { node: GroupNodeData; path: string }) {
-  const [expanded, setExpanded] = useState(true);
+  // Collapsed by default: a 30-field schema with nested models used to
+  // render as one giant wall (every plugin card fully spread, optional
+  // models looking mandatory). The summary line carries the scent;
+  // expansion is one click — and automatic when a submit error points
+  // inside.
+  const [expanded, setExpanded] = useState(false);
+  const flags = useFormFlags();
+  const errored = hasErrorUnder(flags, path);
+
+  useEffect(() => {
+    if (errored) setExpanded(true);
+  }, [errored]);
+
+  const unset = isUnsetSubtree(node);
+  const summary = unset
+    ? "not set — expand to configure"
+    : `${node.fields.length} ${node.fields.length === 1 ? "field" : "fields"}`;
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50/50">
       <button
@@ -49,6 +67,7 @@ function NestedGroup({
               {shortTypeName(node.schema_class)}
             </span>
           )}
+          <span className="text-xs text-zinc-400">{summary}</span>
         </span>
         <span className="text-zinc-400">{expanded ? "v" : ">"}</span>
       </button>

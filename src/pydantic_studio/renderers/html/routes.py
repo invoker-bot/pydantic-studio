@@ -317,7 +317,9 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.get("/api/tree", response_class=JSONResponse)
     async def api_tree() -> JSONResponse:
-        return JSONResponse(content=tree_to_json(server.tree))
+        payload = tree_to_json(server.tree)
+        payload["readonly_paths"] = sorted(server.readonly_paths)
+        return JSONResponse(content=payload)
 
     @app.post("/api/mutations", response_class=JSONResponse)
     async def api_mutations(request: Request) -> JSONResponse:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchTree } from "@/api/tree";
@@ -8,7 +8,13 @@ import {
   type SubmitError,
 } from "@/api/submit";
 import { FormField } from "@/components/form/FormField";
+import {
+  FormFlagsContext,
+  scrollToField,
+  type FormFlags,
+} from "@/components/form/errors";
 import { Button } from "@/components/ui/button";
+import { missingRequiredPaths } from "@/lib/required";
 
 type Status = "editing" | "saved" | "cancelled";
 
@@ -22,6 +28,27 @@ export default function App() {
   const cancel = useCancelEdit();
   const [status, setStatus] = useState<Status>("editing");
   const [submitErrors, setSubmitErrors] = useState<SubmitError[]>([]);
+  const [requiredCursor, setRequiredCursor] = useState(0);
+
+  const flags = useMemo<FormFlags>(
+    () => ({
+      errorPaths: new Set(submitErrors.map((e) => e.path).filter(Boolean)),
+      readonlyPaths: new Set(data?.readonly_paths ?? []),
+    }),
+    [submitErrors, data],
+  );
+  const missingRequired = useMemo(
+    () => (data ? missingRequiredPaths(data.root) : []),
+    [data],
+  );
+
+  // A failed submit scrolls straight to the first offending field —
+  // the banner is the summary, the field is the destination.
+  useEffect(() => {
+    if (submitErrors.length > 0 && submitErrors[0].path) {
+      scrollToField(submitErrors[0].path);
+    }
+  }, [submitErrors]);
 
   if (isLoading) {
     return <div className="p-8 text-zinc-500">Loading tree...</div>;
@@ -87,7 +114,23 @@ export default function App() {
             <h1 className="text-2xl font-semibold">{schemaName}</h1>
             <p className="text-xs text-zinc-500 mt-1">{data.schema_name}</p>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {missingRequired.length > 0 && (
+              <button
+                type="button"
+                data-testid="required-jump"
+                onClick={() => {
+                  const target =
+                    missingRequired[requiredCursor % missingRequired.length];
+                  setRequiredCursor((c) => c + 1);
+                  scrollToField(target);
+                }}
+                className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800 hover:bg-amber-100"
+                title="jump to the next missing required field"
+              >
+                {missingRequired.length} required missing →
+              </button>
+            )}
             <Button
               variant="outline"
               onClick={handleCancel}
@@ -115,7 +158,14 @@ export default function App() {
             <ul className="text-red-700 list-disc list-inside space-y-1">
               {submitErrors.map((err, idx) => (
                 <li key={`${err.path}-${idx}`}>
-                  <span className="font-mono">{err.path || "(root)"}</span>
+                  <button
+                    type="button"
+                    className="font-mono underline decoration-dotted underline-offset-2 hover:text-red-900"
+                    onClick={() => err.path && scrollToField(err.path)}
+                    title="jump to this field"
+                  >
+                    {err.path || "(root)"}
+                  </button>
                   {": "}
                   {err.message}
                 </li>
@@ -123,7 +173,9 @@ export default function App() {
             </ul>
           </div>
         )}
-        <FormField node={data.root} path="" />
+        <FormFlagsContext.Provider value={flags}>
+          <FormField node={data.root} path="" />
+        </FormFlagsContext.Provider>
       </section>
       <section className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">

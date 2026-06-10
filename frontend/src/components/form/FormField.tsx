@@ -1,6 +1,15 @@
 // Dispatcher: switch on node.kind to render the right field component.
+// Every field renders inside an anchored wrapper (id="field-<path>") so
+// submit errors can scroll-to and highlight it; readonly paths render
+// inside a disabled fieldset (native form disabling, no per-field code).
 
 import type { FormNodeData } from "@/api/schemas";
+import {
+  fieldAnchorId,
+  hasErrorAt,
+  isReadonly,
+  useFormFlags,
+} from "@/components/form/errors";
 import { AnyField } from "@/components/form/fields/AnyField";
 import { BoolField } from "@/components/form/fields/BoolField";
 import { BytesField } from "@/components/form/fields/BytesField";
@@ -33,6 +42,37 @@ export function FormField({
   node,
   path,
 }: { node: FormNodeData; path: string }) {
+  const flags = useFormFlags();
+  const body = dispatch(node, path);
+  if (path === "") return body;
+  const errored = hasErrorAt(flags, path);
+  const readonly = isReadonly(flags, path);
+  const inner = readonly ? (
+    <fieldset disabled className="opacity-60">
+      <legend className="text-[10px] uppercase tracking-wide text-zinc-400">
+        read-only
+      </legend>
+      {body}
+    </fieldset>
+  ) : (
+    body
+  );
+  return (
+    <div
+      id={fieldAnchorId(path)}
+      data-field-path={path}
+      className={
+        errored
+          ? "rounded-md ring-2 ring-red-400 ring-offset-2 ring-offset-white"
+          : undefined
+      }
+    >
+      {inner}
+    </div>
+  );
+}
+
+function dispatch(node: FormNodeData, path: string) {
   switch (node.kind) {
     case "string":
       return <StringField node={node as NodeOfKind<"string">} path={path} />;
