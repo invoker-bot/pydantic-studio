@@ -989,19 +989,25 @@ class GroupNode(FormNode):
                 return f
         return None
 
-    def to_python(self) -> dict[str, Any]:
+    def to_python(self) -> dict[str, Any] | None:
         """Collect child values into a dict keyed by child names.
 
         Filters by *omitting the key from the returned dict* whenever a
         child's ``to_python()`` returns ``None`` — which causes Pydantic to
-        apply the field's schema default. An all-None nested ``GroupNode``
-        returns ``{}`` (empty dict), which is NOT itself filtered: Pydantic
-        treats ``{}`` as "use all of the nested model's defaults", and
-        keeping the empty dict in the parent yields more precise validation
-        error messages when a required leaf is missing.
+        apply the field's schema default.
+
+        An all-None nested *required* ``GroupNode`` returns ``{}``: the
+        empty dict stays in the parent so Pydantic reports the nested
+        model's missing required leaves with precise dotted locations.
+        An all-None *optional* group returns ``None`` instead — the
+        parent omits the key and the field's default (``None``) applies.
+        Keeping ``{}`` there used to manufacture validation errors for
+        ``Optional[Model]`` fields the user never touched, making fresh
+        trees of such schemas unsaveable.
 
         Known v0.1 limitation: users cannot save an Optional[T] field as
-        explicit None — that requires v0.2's explicit-null toggle.
+        explicit None once the subtree has values — that requires v0.2's
+        explicit-null toggle.
         """
         out: dict[str, Any] = {}
         for f in self.fields:
@@ -1009,6 +1015,8 @@ class GroupNode(FormNode):
             if v is None:
                 continue
             out[f.name] = v
+        if not out and not self.required:
+            return None
         return out
 
 
@@ -1123,6 +1131,44 @@ MappingNode.model_rebuild()
 UnionNode.model_rebuild()
 
 
+def _collect_missing_required(node: Any, base: str, out: list[str]) -> None:
+    """Preorder walk collecting required-and-unset leaf paths."""
+
+    def join(segment: Any) -> str:
+        return f"{base}.{segment}" if base else str(segment)
+
+    kind = getattr(node, "kind", None)
+    if kind == "group":
+        # An untouched optional group resolves to None (field default) —
+        # its required children only become real validation gaps once
+        # the subtree holds any value. Mirrors GroupNode.to_python.
+        if not node.required and node.to_python() is None:
+            return
+        for child in node.fields:
+            _collect_missing_required(child, join(child.name), out)
+        return
+    if kind == "sequence":
+        for idx, item in enumerate(node.items):
+            _collect_missing_required(item, join(idx), out)
+        return
+    if kind == "mapping":
+        for idx, (_key, value) in enumerate(node.entries):
+            _collect_missing_required(value, join(idx), out)
+        return
+    if kind == "union":
+        if node.selected is not None:
+            _collect_missing_required(node.selected, base, out)
+        elif node.required:
+            out.append(base)
+        return
+    if (
+        getattr(node, "required", False)
+        and hasattr(node, "value")
+        and node.value is None
+    ):
+        out.append(base)
+
+
 class FormTree(BaseModel):
     """Root container: schema reference, root group, and history (added later)."""
 
@@ -1142,7 +1188,9 @@ class FormTree(BaseModel):
     yaml_source: Any = Field(default=None, exclude=True, repr=False)
 
     def to_python(self) -> dict[str, Any]:
-        return self.root.to_python()
+        # The root group is always required, so to_python never returns
+        # None here; the `or {}` keeps the signature honest regardless.
+        return self.root.to_python() or {}
 
     def to_instance(self) -> BaseModel:
         """Materialize the tree into the user's schema_class.
@@ -1167,7 +1215,21 @@ class FormTree(BaseModel):
                 f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
                 for err in e.errors()
             ]
-            raise ValidationFailedError(errors) from e
+            paths = [".".join(str(p) for p in err["loc"]) for err in e.errors()]
+            raise ValidationFailedError(errors, paths=paths) from e
+
+    def missing_required_paths(self) -> list[str]:
+        """Dotted paths of required leaves with no value, in field order.
+
+        Drives the required-field guidance surface: the `n` jump key,
+        the HelpBar counter, and the post-save-failure cursor jump.
+        Containers are walked (sequence items, mapping values, selected
+        union variants); an *unselected* union only counts when the
+        field itself is required.
+        """
+        out: list[str] = []
+        _collect_missing_required(self.root, "", out)
+        return out
 
     @model_validator(mode="after")
     def _inject_schema_from_context(self, info: ValidationInfo) -> FormTree:

@@ -20,10 +20,17 @@ class CancelledByUser(PydanticStudioError):
 
 
 class ValidationFailedError(PydanticStudioError):
-    """Raised when materializing the form tree into an instance fails validation."""
+    """Raised when materializing the form tree into an instance fails validation.
 
-    def __init__(self, errors: list[str]) -> None:
+    ``errors`` are human-readable ``"dotted.path: message"`` lines.
+    ``paths`` carries just the dotted locations, parallel to ``errors``
+    where available — renderers use them to jump the cursor to the first
+    offending field instead of leaving a detached wall of text.
+    """
+
+    def __init__(self, errors: list[str], paths: list[str] | None = None) -> None:
         self.errors = list(errors)
+        self.paths = list(paths) if paths is not None else []
         if errors:
             msg = "Validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
         else:
