@@ -23,11 +23,13 @@ async def test_footer_idle_mode_shows_navigation() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         fh = app.screen.query_one(FooterHints)
-        assert "navigate" in fh.line1
+        assert "Tab" in fh.line1
         assert "Enter" in fh.line1
         assert "Esc" in fh.line1
-        assert "Ctrl+S" in fh.line1
-        assert "Ctrl+C" in fh.line1
+        # Save/Cancel chords moved to the always-visible ActionBar
+        # buttons; the footer teaches the form keys instead.
+        assert "Ctrl+N" in fh.line1
+        assert "Ctrl+F" in fh.line1
 
 
 @pytest.mark.asyncio
@@ -37,9 +39,7 @@ async def test_footer_editing_mode_shows_edit_keys() -> None:
         await pilot.pause()
         fh = app.screen.query_one(FooterHints)
         assert "Enter" in fh.line1
-        assert "commit" in fh.line1
-        assert "cancel" in fh.line1
-        assert "Ctrl+C" in fh.line1
+        assert "revert" in fh.line1
 
 
 @pytest.mark.asyncio
@@ -58,7 +58,7 @@ async def test_footer_mapping_mode_shows_rename() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         fh = app.screen.query_one(FooterHints)
-        assert "R" in fh.line1
+        assert "F2" in fh.line1
         assert "rename" in fh.line1
         assert "D" in fh.line1
 
@@ -80,4 +80,4 @@ async def test_footer_unknown_mode_falls_back_to_idle() -> None:
         await pilot.pause()
         fh = app.screen.query_one(FooterHints)
         # Idle text on unknown modes — safe default, never crash.
-        assert "navigate" in fh.line1
+        assert "Tab" in fh.line1

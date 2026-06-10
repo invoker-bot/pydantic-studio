@@ -56,7 +56,10 @@ class ConfigScreen(Screen):
     CSS_PATH = "theme.tcss"
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("slash", "show_filter", "filter", show=False),
+        # Ctrl+F: the universal find chord. (A bare `/` would type into
+        # the form-mode persistent Inputs.) priority so it also works
+        # while an Input has focus.
+        Binding("ctrl+f", "show_filter", "filter", show=False, priority=True),
         Binding("escape", "dismiss_filter", "clear filter", show=False),
     ]
 
@@ -77,6 +80,8 @@ class ConfigScreen(Screen):
         self._footer_mode = self._mode_for_container(group)
 
     def compose(self) -> ComposeResult:
+        from pydantic_studio.renderers.textual_.widgets.action_bar import ActionBar
+
         yield Breadcrumb(parts=self._breadcrumb_parts)
         yield FieldListView(
             group=self._group,
@@ -84,6 +89,7 @@ class ConfigScreen(Screen):
             base_path=self._base_path,
         )
         yield HelpBar()
+        yield ActionBar()
         yield FooterHints(mode=self._footer_mode)
 
     def _mode_for_container(self, group: AnyNode) -> str:
@@ -163,6 +169,18 @@ class ConfigScreen(Screen):
 
     def on_cursor_moved(self, event: CursorMoved) -> None:
         self._refresh_help_bar(event.node, event.path)
+
+    def on_cell_value_changed(self, event) -> None:
+        """A form-mode commit/revert happened — refresh the HelpBar
+        (missing-required counter) for the still-focused row."""
+        try:
+            view = self.query_one(FieldListView)
+            specs = view._row_specs()
+            if 0 <= view.cursor < len(specs):
+                spec = specs[view.cursor]
+                self._refresh_help_bar(spec.node, spec.path)
+        except Exception:
+            return
 
     def on_edit_mode_entered(self, event: EditModeEntered) -> None:
         try:

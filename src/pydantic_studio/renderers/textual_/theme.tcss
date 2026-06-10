@@ -52,6 +52,49 @@ HelpBar {
     color: $text;
 }
 
+FieldListView .field-list--add-row {
+    height: 1;
+    padding: 0 2;
+    color: $accent;
+}
+
+FieldListView .field-list--add-row:hover {
+    background: $surface-lighten-1;
+    text-style: bold;
+}
+
+FieldRow .field-row--x {
+    width: 3;
+    color: $text-muted;
+    content-align: right top;
+}
+
+FieldRow .field-row--x:hover {
+    color: $error;
+    text-style: bold;
+}
+
+ActionBar {
+    height: 1;
+    background: $surface;
+    padding: 0 1;
+}
+
+ActionBar Button {
+    height: 1;
+    min-width: 16;
+    border: none;
+    margin: 0 1 0 0;
+    background: $surface-lighten-1;
+    color: $text;
+}
+
+ActionBar Button.-primary {
+    background: $accent;
+    color: $surface;
+    text-style: bold;
+}
+
 ConfirmExitScreen {
     background: $surface;
     color: $text;

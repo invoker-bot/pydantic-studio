@@ -172,7 +172,8 @@ async def test_field_list_thirty_rows_mount_without_crash() -> None:
 
 
 @pytest.mark.asyncio
-async def test_field_list_enter_on_bool_row_toggles() -> None:
+async def test_field_list_enter_on_bool_row_advances_not_toggles() -> None:
+    """Form mode: Enter is the flow key (commit+next); Space toggles."""
     from pydantic import BaseModel
 
     class _BoolOnly(BaseModel):
@@ -185,7 +186,7 @@ async def test_field_list_enter_on_bool_row_toggles() -> None:
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        assert tree.root.find("debug").value is True
+        assert tree.root.find("debug").value is False
 
 
 @pytest.mark.asyncio
@@ -206,7 +207,7 @@ async def test_field_list_space_on_bool_row_toggles() -> None:
 
 
 @pytest.mark.asyncio
-async def test_field_list_tab_on_small_choice_cycles() -> None:
+async def test_field_list_right_on_small_choice_cycles() -> None:
     from enum import StrEnum
 
     from pydantic import BaseModel
@@ -224,15 +225,17 @@ async def test_field_list_tab_on_small_choice_cycles() -> None:
     view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
-        await pilot.press("tab")
+        await pilot.press("right")
         await pilot.pause()
         # info -> warn
         assert tree.root.find("level").value == _Lvl.WARN
 
 
 @pytest.mark.asyncio
-async def test_field_list_enter_on_string_row_enters_edit() -> None:
-    """String field: Enter should put the TextCell into edit mode."""
+async def test_field_list_string_row_is_directly_editable() -> None:
+    """Form mode: no edit mode to enter — the row hosts a live Input."""
+    from textual.widgets import Input
+
     from pydantic_studio.renderers.textual_.widgets.cells import TextCell
 
     tree = build_form_tree(_Schema)
@@ -240,9 +243,7 @@ async def test_field_list_enter_on_string_row_enters_edit() -> None:
     view = FieldListView(group=tree.root, form_tree=tree, base_path="")
     async with _Host(view).run_test() as pilot:
         await pilot.pause()
-        await pilot.press("enter")
-        await pilot.pause()
-        # The focused row's TextCell should now be in edit mode.
         rows = list(view.query(FieldRow))
         cell = rows[0].query_one(TextCell)
-        assert cell.editing is True
+        assert cell.query_one(Input).value == "alpha"
+        assert cell.editing is False

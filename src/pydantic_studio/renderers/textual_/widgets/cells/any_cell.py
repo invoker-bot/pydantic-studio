@@ -1,33 +1,23 @@
-"""AnyCell -- JSON-aware inline editor for ``typing.Any`` nodes."""
+"""AnyCell — JSON-aware persistent editor for ``typing.Any`` nodes.
+
+Form mode: same InputCell contract as TextCell; values parse as JSON
+when possible and fall back to plain text (matching the node's
+mode-inference round-trip).
+"""
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from textual.widgets import Input, Static
-
-from pydantic_studio.renderers.textual_.widgets.cells.base import Cell
-
-if TYPE_CHECKING:
-    from textual.app import ComposeResult
+from pydantic_studio.renderers.textual_.widgets.cells.input_cell import InputCell
 
 
-class AnyCell(Cell):
+class AnyCell(InputCell):
     """Edit arbitrary values as JSON when possible, plain text otherwise."""
 
-    DEFAULT_CSS = ""
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._last_error: str | None = None
-
     @property
-    def last_error(self) -> str | None:
-        return self._last_error
-
-    @property
-    def value_text(self) -> str:
+    def display_value(self) -> str:
         value = getattr(self._node, "value", None)
         if value is None:
             return ""
@@ -35,55 +25,11 @@ class AnyCell(Cell):
             return value
         return json.dumps(value, ensure_ascii=False)
 
-    def compose(self) -> ComposeResult:
-        yield Static(self.value_text, classes="field-row--value", markup=False)
-
-    def enter_edit(self) -> None:
-        if self.editing:
-            return
-        super().enter_edit()
-        self._last_error = None
-        try:
-            static = self.query_one(Static)
-        except Exception:
-            static = None
-        new_input = Input(value=self.value_text, classes="field-row--value")
-        self.mount(new_input)
-        if static is not None:
-            static.remove()
-        new_input.focus()
-
-    def cancel_edit(self) -> None:
-        if not self.editing:
-            return
-        self._exit_to_idle()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        parsed = self._parse_any(event.value)
-        result = self.commit(parsed)
-        if not result.ok:
-            self._last_error = "; ".join(result.errors) or "invalid"
-            self._exit_to_idle()
-            return
-        self._last_error = None
-        self._exit_to_idle()
-
-    def _parse_any(self, raw: str) -> Any:
+    def parse(self, raw: str) -> tuple[bool, Any]:
         stripped = raw.strip()
         if stripped == "":
-            return None
+            return True, None
         try:
-            return json.loads(stripped)
+            return True, json.loads(stripped)
         except json.JSONDecodeError:
-            return raw
-
-    def _exit_to_idle(self) -> None:
-        try:
-            input_widget = self.query_one(Input)
-        except Exception:
-            input_widget = None
-        new_static = Static(self.value_text, classes="field-row--value", markup=False)
-        self.mount(new_static)
-        if input_widget is not None:
-            input_widget.remove()
-        super().exit_edit()
+            return True, raw

@@ -1,9 +1,9 @@
-"""`n` — jump to the next missing-required field.
+"""`Ctrl+N` — jump to the next missing-required field.
 
 The dominant editing task is "make this config valid with the least
 effort"; required fields can sit anywhere in declaration order (in the
 motivating downstream schema: dead last, behind 20 pre-filled optional
-fields). `n` cycles the cursor through rows whose subtree still misses
+fields). `Ctrl+N` cycles the cursor through rows whose subtree still misses
 required values.
 """
 
@@ -41,7 +41,7 @@ async def test_n_jumps_to_first_missing_required() -> None:
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("n")
+        await pilot.press("ctrl+n")
         await pilot.pause()
         assert _cursor_path(app) == "api_key"
 
@@ -52,11 +52,11 @@ async def test_n_cycles_through_missing_required() -> None:
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("n")
-        await pilot.press("n")
+        await pilot.press("ctrl+n")
+        await pilot.press("ctrl+n")
         await pilot.pause()
         assert _cursor_path(app) == "api_secret"
-        await pilot.press("n")  # wraps around
+        await pilot.press("ctrl+n")  # wraps around
         await pilot.pause()
         assert _cursor_path(app) == "api_key"
 
@@ -70,7 +70,7 @@ async def test_n_targets_container_rows_for_nested_missing() -> None:
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("n")
+        await pilot.press("ctrl+n")
         await pilot.pause()
         assert _cursor_path(app) == "items"
 
@@ -84,6 +84,6 @@ async def test_n_noop_when_nothing_missing() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         before = _cursor_path(app)
-        await pilot.press("n")
+        await pilot.press("ctrl+n")
         await pilot.pause()
         assert _cursor_path(app) == before

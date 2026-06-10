@@ -22,7 +22,12 @@ if TYPE_CHECKING:
 
 @dataclass
 class EditModeEntered(Message):
-    """Posted by a Cell when it enters edit mode."""
+    """Posted by a Cell when it enters edit mode.
+
+    Form-mode note: persistent-input cells (text/secret/any) never post
+    this — focus IS edit. Only legacy modal flows (large-choice chooser)
+    still flip footer modes.
+    """
 
     path: str
 
@@ -30,6 +35,27 @@ class EditModeEntered(Message):
 @dataclass
 class EditModeExited(Message):
     """Posted by a Cell when it exits edit mode (commit OR cancel)."""
+
+    path: str
+
+
+@dataclass
+class CellValueChanged(Message):
+    """Posted by a Cell after any commit attempt or revert.
+
+    ``error`` is None on success; FieldRow uses it to refresh the label
+    (required marker) and the inline error helper, ConfigScreen to
+    refresh the HelpBar's missing-required counter.
+    """
+
+    path: str
+    error: str | None = None
+
+
+@dataclass
+class AdvanceRequested(Message):
+    """Posted by a Cell when Enter committed its value successfully —
+    the form flow then advances the cursor to the next row."""
 
     path: str
 

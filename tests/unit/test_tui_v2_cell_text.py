@@ -1,11 +1,16 @@
-"""Unit tests for TextCell — covers 16 leaf node kinds via parse_for_kind."""
+"""Unit tests for TextCell — covers 16 leaf node kinds via parse_for_kind.
+
+Form mode: the cell hosts a persistent Input (focus = edit). Commit
+happens via Enter (Input.Submitted) or ``commit_pending()`` (the
+move-away path driven by FieldListView).
+"""
 
 from __future__ import annotations
 
 import pytest
 from pydantic import BaseModel
 from textual.app import App
-from textual.widgets import Input, Static
+from textual.widgets import Input
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.textual_.widgets.cells.text_cell import TextCell
@@ -34,16 +39,15 @@ def _make_cell(field: str, value):
 
 
 @pytest.mark.asyncio
-async def test_text_cell_idle_renders_string_value() -> None:
+async def test_text_cell_hosts_persistent_input_with_value() -> None:
     _, _, cell = _make_cell("name", "beta")
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
         assert cell.value_text == "beta"
-        # Static shows the value in idle mode. In Textual 8.2.5 Static
-        # no longer exposes a ``renderable`` attribute; the displayed
-        # content is reachable via ``.render()`` (a Content object) or
-        # ``.content`` (the original input). We compare via ``str(...)``.
-        assert str(cell.query_one(Static).render()) == "beta"
+        assert cell.query_one(Input).value == "beta", (
+            "form mode: the Input is always mounted and pre-filled"
+        )
+        assert cell.editing is False, "no modal edit state exists"
 
 
 @pytest.mark.asyncio
@@ -55,47 +59,54 @@ async def test_text_cell_idle_renders_int_value() -> None:
 
 
 @pytest.mark.asyncio
-async def test_text_cell_enter_edit_swaps_to_input() -> None:
-    _, _, cell = _make_cell("name", "beta")
-    async with _Host(cell).run_test() as pilot:
-        await pilot.pause()
-        cell.enter_edit()
-        await pilot.pause()
-        # Input is mounted; Static is gone or hidden.
-        input_widget = cell.query_one(Input)
-        assert input_widget.value == "beta"
-        assert cell.editing is True
-
-
-@pytest.mark.asyncio
 async def test_text_cell_commit_on_enter_in_input() -> None:
     tree, _, cell = _make_cell("name", "beta")
     async with _Host(cell).run_test() as pilot:
-        await pilot.pause()
-        cell.enter_edit()
         await pilot.pause()
         input_widget = cell.query_one(Input)
         input_widget.value = "gamma"
         await input_widget.action_submit()
         await pilot.pause()
         assert tree.root.find("name").value == "gamma"
-        assert cell.editing is False
-        # Back to idle text rendering.
         assert cell.value_text == "gamma"
 
 
 @pytest.mark.asyncio
-async def test_text_cell_esc_cancels_edit() -> None:
+async def test_text_cell_commit_pending_on_move_away() -> None:
+    """The form-flow path: FieldListView calls commit_pending before
+    every cursor move; no Enter involved."""
     tree, _, cell = _make_cell("name", "beta")
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        cell.enter_edit()
+        cell.query_one(Input).value = "delta"
+        result = cell.commit_pending()
         await pilot.pause()
-        # Esc triggers cell.cancel_edit (binding wires it).
-        cell.cancel_edit()
+        assert result is not None
+        assert result.ok
+        assert tree.root.find("name").value == "delta"
+
+
+@pytest.mark.asyncio
+async def test_text_cell_commit_pending_noop_when_clean() -> None:
+    _, _, cell = _make_cell("name", "beta")
+    async with _Host(cell).run_test() as pilot:
+        await pilot.pause()
+        assert cell.commit_pending() is None, "unchanged text commits nothing"
+
+
+@pytest.mark.asyncio
+async def test_text_cell_revert_restores_committed_value() -> None:
+    tree, _, cell = _make_cell("name", "beta")
+    async with _Host(cell).run_test() as pilot:
+        await pilot.pause()
+        input_widget = cell.query_one(Input)
+        input_widget.value = "zzz"
+        assert cell.is_dirty()
+        cell.revert()
         await pilot.pause()
         assert tree.root.find("name").value == "beta"  # unchanged
-        assert cell.editing is False
+        assert input_widget.value == "beta"
+        assert not cell.is_dirty()
 
 
 @pytest.mark.asyncio
@@ -103,29 +114,21 @@ async def test_text_cell_unparseable_int_sets_last_error() -> None:
     tree, _, cell = _make_cell("count", 5)
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        cell.enter_edit()
+        cell.query_one(Input).value = "not-an-int"
+        result = cell.commit_pending()
         await pilot.pause()
-        input_widget = cell.query_one(Input)
-        input_widget.value = "not-an-int"
-        await input_widget.action_submit()
-        await pilot.pause()
-        # Tree NOT mutated.
-        assert tree.root.find("count").value == 5
-        # Cell records the parse failure.
+        assert result is not None
+        assert not result.ok
+        assert tree.root.find("count").value == 5  # tree NOT mutated
         assert cell.last_error is not None
         assert "parse" in cell.last_error.lower() or "int" in cell.last_error.lower()
-        # Exits edit mode.
-        assert cell.editing is False
 
 
 @pytest.mark.asyncio
 async def test_text_cell_validate_failure_sets_last_error() -> None:
     """A string that parses fine (parse_for_kind always returns the raw
     str for ip_address) but flunks the node's validate_value surfaces
-    via the FormTree's validate-first contract. (We can't use an int
-    range constraint here because IntNode.validate_value only checks
-    type, not ge/le bounds — those are enforced at to_instance() time.)
-    """
+    via the FormTree's validate-first contract."""
     from ipaddress import IPv4Address
 
     class _IpSchema(BaseModel):
@@ -137,15 +140,13 @@ async def test_text_cell_validate_failure_sets_last_error() -> None:
     cell = TextCell(node=node, path="host", form_tree=tree)
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        cell.enter_edit()
+        cell.query_one(Input).value = "not-an-ip"
+        result = cell.commit_pending()
         await pilot.pause()
-        input_widget = cell.query_one(Input)
-        input_widget.value = "not-an-ip"
-        await input_widget.action_submit()
-        await pilot.pause()
+        assert result is not None
+        assert not result.ok
         assert tree.root.find("host").value == "127.0.0.1"  # unchanged
         assert cell.last_error is not None
-        assert cell.editing is False
 
 
 @pytest.mark.asyncio
@@ -160,8 +161,6 @@ async def test_text_cell_bytes_renders_hex_and_parses_hex() -> None:
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
         assert cell.value_text == "dead"  # hex of b"\xde\xad"
-        cell.enter_edit()
-        await pilot.pause()
         input_widget = cell.query_one(Input)
         assert input_widget.value == "dead"
         input_widget.value = "beef"

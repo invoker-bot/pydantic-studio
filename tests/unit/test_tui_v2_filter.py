@@ -1,6 +1,6 @@
-"""`/` filter — substring-narrow the visible rows of a group screen.
+"""`Ctrl+F` filter — substring-narrow the visible rows of a group screen.
 
-23+ field forms were arrow-key-only. `/` mounts a filter input above
+23+ field forms were arrow-key-only. `Ctrl+F` mounts a filter input above
 the list; typing narrows live; Enter returns focus to the (filtered)
 list; Esc clears. Esc is layered: filter → child screen → session.
 """
@@ -35,12 +35,12 @@ def _visible_labels(app: StudioApp) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_slash_filters_rows_live() -> None:
+async def test_ctrl_f_filters_rows_live() -> None:
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("slash")
+        await pilot.press("ctrl+f")
         await pilot.pause()
         for ch in "fee":
             await pilot.press(ch)
@@ -55,7 +55,7 @@ async def test_enter_keeps_filter_and_returns_focus_to_list() -> None:
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("slash")
+        await pilot.press("ctrl+f")
         for ch in "swap":
             await pilot.press(ch)
         await pilot.press("enter")
@@ -74,7 +74,7 @@ async def test_escape_clears_filter_before_anything_else() -> None:
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("slash")
+        await pilot.press("ctrl+f")
         for ch in "fee":
             await pilot.press(ch)
         await pilot.press("enter")
@@ -94,7 +94,7 @@ async def test_escape_while_typing_clears_and_restores() -> None:
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("slash")
+        await pilot.press("ctrl+f")
         for ch in "fee":
             await pilot.press(ch)
         await pilot.press("escape")
@@ -113,7 +113,7 @@ async def test_help_bar_follows_filter_cursor_reset() -> None:
         await pilot.pause()
         for _ in range(4):
             await pilot.press("down")  # park the cursor on 'leverage'
-        await pilot.press("slash")
+        await pilot.press("ctrl+f")
         for ch in "fee":
             await pilot.press(ch)
         await pilot.pause()
@@ -125,7 +125,7 @@ async def test_help_bar_follows_filter_cursor_reset() -> None:
 
 
 @pytest.mark.asyncio
-async def test_slash_is_noop_on_sequence_screens() -> None:
+async def test_ctrl_f_is_noop_on_sequence_screens() -> None:
     from textual.widgets import Input
 
     tree = build_form_tree(_Schema)
@@ -137,6 +137,6 @@ async def test_slash_is_noop_on_sequence_screens() -> None:
         view.focus_path("items")
         await pilot.press("enter")  # drill into the sequence
         await pilot.pause()
-        await pilot.press("slash")
+        await pilot.press("ctrl+f")
         await pilot.pause()
         assert not list(app.screen.query(Input))

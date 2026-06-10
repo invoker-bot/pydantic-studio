@@ -1,4 +1,7 @@
-"""Unit tests for SecretCell — masked display + password Input on edit."""
+"""Unit tests for SecretCell — persistent password Input (form mode).
+
+The Input lives with password=True, so the value renders as bullets at
+all times; the plaintext stays in the widget value for editing."""
 
 from __future__ import annotations
 
@@ -34,11 +37,17 @@ def _make_cell(initial):
 
 
 @pytest.mark.asyncio
-async def test_secret_cell_idle_renders_mask_even_with_value() -> None:
+async def test_secret_cell_never_renders_plaintext() -> None:
     _, cell = _make_cell("super-secret-value")
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        assert cell.value_text == "**********"
+        input_widget = cell.query_one(Input)
+        assert input_widget.password is True, (
+            "the persistent Input must mask the value at all times"
+        )
+        assert input_widget.value == "super-secret-value", (
+            "the plaintext stays available for editing (rendered as bullets)"
+        )
 
 
 @pytest.mark.asyncio
@@ -50,15 +59,13 @@ async def test_secret_cell_idle_renders_empty_for_none() -> None:
 
 
 @pytest.mark.asyncio
-async def test_secret_cell_enter_edit_uses_password_input() -> None:
+async def test_secret_cell_input_prefills_plaintext_masked() -> None:
     _, cell = _make_cell("hunter2")
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        cell.enter_edit()
-        await pilot.pause()
         input_widget = cell.query_one(Input)
         assert input_widget.password is True
-        # Pre-fills with the actual value (NOT the mask).
+        # Pre-fills with the actual value (NOT a literal mask string).
         assert input_widget.value == "hunter2"
 
 
@@ -66,8 +73,6 @@ async def test_secret_cell_enter_edit_uses_password_input() -> None:
 async def test_secret_cell_commit_via_enter() -> None:
     tree, cell = _make_cell("old")
     async with _Host(cell).run_test() as pilot:
-        await pilot.pause()
-        cell.enter_edit()
         await pilot.pause()
         input_widget = cell.query_one(Input)
         input_widget.value = "new-secret"
@@ -79,9 +84,9 @@ async def test_secret_cell_commit_via_enter() -> None:
             hasattr(node.value, "get_secret_value")
             and node.value.get_secret_value() == "new-secret"
         )
-        assert cell.editing is False
-        # Idle back to mask.
-        assert cell.value_text == "**********"
+        # value_text mirrors the committed plaintext; the Input's
+        # password flag keeps the on-screen rendering masked.
+        assert cell.value_text == "new-secret"
 
 
 @pytest.mark.asyncio
@@ -89,9 +94,8 @@ async def test_secret_cell_esc_cancels() -> None:
     tree, cell = _make_cell("hunter2")
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        cell.enter_edit()
-        await pilot.pause()
-        cell.cancel_edit()
+        cell.query_one(Input).value = "tampered"
+        cell.revert()
         await pilot.pause()
         assert cell.editing is False
         # Value unchanged.

@@ -114,15 +114,16 @@ async def test_pydantic_leaf_validation_error_stays_visible_on_row() -> None:
         field_list = app.screen.query_one(FieldListView)
         while app.screen.query(FieldRow)[field_list.cursor].node.name != "contact":
             field_list.action_cursor_down()
-        await pilot.press("enter")
-        await pilot.pause()
-        input_widget = app.screen.query_one(Input)
-        input_widget.value = "not-an-email"
-        await input_widget.action_submit()
         await pilot.pause()
         row = app.screen.query(FieldRow)[field_list.cursor]
+        row.query_one(Input).value = "not-an-email"
+        field_list.action_cursor_down()  # move-away commit gate fires
+        await pilot.pause()
         assert tree.root.find("contact").value != "not-an-email"
         assert "email" in row.helper_text.lower() or "valid" in row.helper_text.lower()
+        assert app.screen.query(FieldRow)[field_list.cursor].node.name == "contact", (
+            "the blocked move keeps the cursor on the offending field"
+        )
 
 
 @pytest.mark.asyncio
@@ -201,12 +202,13 @@ async def test_sequence_drill_add_move_delete_and_edit_item() -> None:
         await pilot.pause()
         assert [item.value for item in tree.root.find("tags").items] == ["b", "a", None]
 
-        await pilot.press("enter")
+        rows = list(app.screen.query(FieldRow))
+        cell = rows[field_list.cursor].query_one(TextCell)
+        cell.query_one(Input).value = "edited"
+        result = cell.commit_pending()
         await pilot.pause()
-        input_widget = app.screen.query_one(Input)
-        input_widget.value = "edited"
-        await input_widget.action_submit()
-        await pilot.pause()
+        assert result is not None
+        assert result.ok
         assert tree.root.find("tags").items[1].value == "edited"
 
         field_list.action_delete_focused()
@@ -231,16 +233,17 @@ async def test_mapping_drill_edit_value_add_delete_and_rename_key() -> None:
         field_list = app.screen.query_one(FieldListView)
         assert app.screen.query(FieldRow)[0].label_text == "timeout"
 
-        await pilot.press("enter")
+        rows = list(app.screen.query(FieldRow))
+        cell = rows[0].query_one(TextCell)
+        cell.query_one(Input).value = "60"
+        result = cell.commit_pending()
         await pilot.pause()
-        input_widget = app.screen.query_one(Input)
-        input_widget.value = "60"
-        await input_widget.action_submit()
-        await pilot.pause()
+        assert result is not None
+        assert result.ok
         settings = tree.root.find("settings")
         assert settings.entries[0][1].value == 60
 
-        await pilot.press("r")
+        await pilot.press("f2")
         await pilot.pause()
         assert isinstance(app.screen, RenameKeyScreen)
         rename_input = app.screen.query_one(Input)
@@ -272,7 +275,7 @@ async def test_mapping_rename_parses_typed_key_and_reports_parse_error() -> None
         await pilot.pause()
         await pilot.pause()
 
-        await pilot.press("r")
+        await pilot.press("f2")
         await pilot.pause()
         assert isinstance(app.screen, RenameKeyScreen)
         rename_input = app.screen.query_one(Input)
@@ -282,7 +285,7 @@ async def test_mapping_rename_parses_typed_key_and_reports_parse_error() -> None
         settings = tree.root.find("settings")
         assert settings.entries[0][0].value == 2
 
-        await pilot.press("r")
+        await pilot.press("f2")
         await pilot.pause()
         rename_input = app.screen.query_one(Input)
         rename_input.value = "not-an-int"
@@ -325,7 +328,7 @@ async def test_union_cycle_variant_drill_and_edit_selected_value() -> None:
         await pilot.pause()
         await pilot.press("down")
         await pilot.press("down")
-        await pilot.press("tab")
+        await pilot.press("right")
         await pilot.pause()
         union = tree.root.find("value")
         assert union.selected_index == 1
@@ -334,8 +337,6 @@ async def test_union_cycle_variant_drill_and_edit_selected_value() -> None:
         await pilot.pause()
         await pilot.pause()
         assert _config_screen_depth(app) == 2
-        await pilot.press("enter")
-        await pilot.pause()
         input_widget = app.screen.query_one(Input)
         input_widget.value = "from-union"
         await input_widget.action_submit()

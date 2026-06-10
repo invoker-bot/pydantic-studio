@@ -6,10 +6,11 @@ did nothing and Esc crashed the app (``AttributeError:
 'ChoiceCell' object has no attribute 'cancel_edit'``), and the footer
 stayed stuck on editing hints. These tests pin the fixed contract:
 
-- Enter on a small choice cycles the value (same as Tab); no edit mode.
+- Enter on a small choice advances (form flow); Left/Right cycle the
+  value; no phantom edit mode anywhere.
 - Esc never raises, whatever cell is focused.
 - ``Cell.cancel_edit`` exists on the base class as a safe no-op exit.
-- The footer returns to idle hints after the interaction.
+- The footer stays on idle hints after the interaction.
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ class _Schema(BaseModel):
 
 
 @pytest.mark.asyncio
-async def test_enter_on_small_choice_cycles_instead_of_phantom_edit() -> None:
+async def test_enter_on_small_choice_never_phantom_edits() -> None:
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
@@ -48,22 +49,37 @@ async def test_enter_on_small_choice_cycles_instead_of_phantom_edit() -> None:
         await pilot.pause()
         cell = app.screen.query_one(ChoiceCell)
         assert cell.editing is False, "small choice must never enter edit mode"
-        assert tree._resolve_path("level").value == _Level.WARN, (
-            "Enter on a small choice cycles to the next value"
+        assert tree._resolve_path("level").value == _Level.INFO, (
+            "Enter advances the form; values change via Left/Right"
         )
 
 
 @pytest.mark.asyncio
+async def test_right_cycles_small_choice_value() -> None:
+    tree = build_form_tree(_Schema)
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("right")
+        await pilot.pause()
+        assert tree._resolve_path("level").value == _Level.WARN
+
+
+@pytest.mark.asyncio
 async def test_escape_after_enter_on_small_choice_does_not_crash() -> None:
+    """Pre-fix this raised AttributeError (cancel_edit missing) and the
+    whole session died. Now Esc walks the layered flow; on a clean tree
+    at root it exits gracefully with a cancelled outcome — run_test
+    re-raises any in-app exception, so reaching the assert IS the pin."""
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        await pilot.press("escape")  # pre-fix: AttributeError crash
+        await pilot.press("escape")
         await pilot.pause()
-        assert app.is_running
+    assert app.outcome.submitted is False
 
 
 @pytest.mark.asyncio

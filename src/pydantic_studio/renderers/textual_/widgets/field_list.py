@@ -1,9 +1,11 @@
 """FieldListView — the scrollable vertical stack of FieldRows that
 sits between the Breadcrumb and FooterHints inside a ConfigScreen.
 
-Owns the focused-row cursor and translates up/down key events into
-cursor moves. Scroll is delegated to Textual's VerticalScroll
-container; we never set scroll_y manually.
+Form mode: the focused row IS the editable row. Text-backed rows host
+persistent Inputs; the view owns the cursor, commits pending values on
+every move (Tab / arrows / Enter / click-away), reverts on Esc, and
+keeps Textual focus in sync with the cursor. Scroll is delegated to
+Textual's VerticalScroll container; we never set scroll_y manually.
 """
 
 from __future__ import annotations
@@ -14,15 +16,34 @@ from typing import TYPE_CHECKING, Any
 from textual.binding import Binding, BindingType
 from textual.containers import VerticalScroll
 from textual.message import Message
+from textual.widgets import Static
 
-from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
+from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow, RowClicked
 
 if TYPE_CHECKING:
     from typing import ClassVar
 
+    from textual import events
     from textual.app import ComposeResult
 
     from pydantic_studio.tree.nodes import AnyNode, FormTree
+
+
+class AddRow(Static):
+    """Clickable ``[ + add item ]`` row at the end of sequence/mapping
+    screens — the discoverable replacement for the old invisible `a`."""
+
+    DEFAULT_CSS = ""
+
+    def __init__(self) -> None:
+        super().__init__("[ + add item ]", classes="field-list--add-row", markup=False)
+
+    def on_click(self, event: events.Click) -> None:
+        event.stop()
+        parent = self.parent
+        add = getattr(parent, "action_add_item", None)
+        if add is not None:
+            add()
 
 
 @dataclass(frozen=True)
@@ -50,21 +71,28 @@ class FieldListView(VerticalScroll):
     DEFAULT_CSS = ""
 
     BINDINGS: ClassVar[list[BindingType]] = [
+        # Form flow — commit pending value, then move.
         Binding("up", "cursor_up", "up", show=False),
         Binding("down", "cursor_down", "down", show=False),
-        Binding("enter", "activate_focused", "edit", show=False),
+        Binding("tab", "cursor_down", "next field", show=False, priority=True),
+        Binding("shift+tab", "cursor_up", "previous field", show=False, priority=True),
+        Binding("enter", "activate_focused", "open / next", show=False),
+        # Value manipulation on non-text rows (text rows consume these
+        # keys inside their Input, so there is no collision).
         Binding("space", "toggle_focused", "toggle", show=False),
-        Binding("tab", "cycle_next_focused", "next", show=False, priority=True),
-        Binding(
-            "shift+tab", "cycle_prev_focused", "prev", show=False, priority=True
-        ),
-        Binding("a", "add_item", "add", show=False),
-        Binding("d", "delete_focused", "delete", show=False),
+        Binding("right", "cycle_next_focused", "cycle", show=False),
+        Binding("left", "cycle_prev_focused", "cycle back", show=False),
+        # Structure (container screens). Letter keys are gone — they
+        # would type into the persistent Inputs; chords and the visible
+        # AddRow / per-row ✕ replace them.
+        Binding("delete", "delete_focused", "delete item", show=False),
         Binding("ctrl+up", "move_focused_up", "move up", show=False),
         Binding("ctrl+down", "move_focused_down", "move down", show=False),
-        Binding("r", "rename_focused_key", "rename", show=False),
-        Binding("n", "jump_next_required", "next required", show=False),
-        Binding("escape", "cancel_focused", "cancel", show=False),
+        Binding("f2", "rename_focused_key", "rename key", show=False),
+        Binding(
+            "ctrl+n", "jump_next_required", "next required", show=False, priority=True
+        ),
+        Binding("escape", "cancel_focused", "revert / back", show=False),
     ]
 
     def __init__(
@@ -100,6 +128,7 @@ class FieldListView(VerticalScroll):
         specs = self._row_specs()
         width = self._label_width_for(specs)
         readonly_paths = self._readonly_paths()
+        deletable = self._group.kind in {"sequence", "mapping"}
         for idx, spec in enumerate(specs):
             yield FieldRow(
                 node=spec.node,
@@ -109,7 +138,10 @@ class FieldListView(VerticalScroll):
                 label_override=spec.label,
                 readonly=spec.path in readonly_paths,
                 label_width=width,
+                deletable=deletable,
             )
+        if deletable:
+            yield AddRow()
 
     _LABEL_WIDTH_MIN = 10
     _LABEL_WIDTH_MAX = 48
@@ -188,19 +220,55 @@ class FieldListView(VerticalScroll):
             return "selected"
         return names[idx].rsplit(".", 1)[-1]
 
+    def _commit_gate(self) -> bool:
+        """Commit the focused row's pending value before a move.
+
+        Returns False (blocking the move) when the pending text fails
+        parsing or tree validation — the error is already surfaced on
+        the row by the cell.
+        """
+        cell = self._focused_cell()
+        commit = getattr(cell, "commit_pending", None)
+        if commit is None:
+            return True
+        result = commit()
+        return result is None or result.ok
+
+    def _focus_cursor_cell(self) -> None:
+        """Give Textual focus to the cursor row's editor (text rows get
+        their Input; everything else focuses the list for key bindings).
+
+        Programmatic focus raises a one-shot flag so the resulting
+        DescendantFocus event is not mistaken for a user click-away
+        (the events arrive asynchronously and would race the cursor).
+        """
+        cell = self._focused_cell()
+        focus_value = getattr(cell, "focus_value", None)
+        if focus_value is not None and not getattr(
+            self._focused_row(), "readonly", False
+        ):
+            self._programmatic_focus = getattr(self, "_programmatic_focus", 0) + 1
+            focus_value()
+            return
+        self.focus()
+
     def action_cursor_up(self) -> None:
-        if self._cursor <= 0:
+        # Commit even at the boundary — moving "off the edge" is still
+        # a blur in form terms; the pending value must not stay limbo.
+        if not self._commit_gate() or self._cursor <= 0:
             return
         self._move_cursor(self._cursor - 1)
 
     def action_cursor_down(self) -> None:
-        if self._cursor >= len(self._row_specs()) - 1:
+        if not self._commit_gate() or self._cursor >= len(self._row_specs()) - 1:
             return
         self._move_cursor(self._cursor + 1)
 
     def on_mount(self) -> None:
-        """Announce the initial focused row so the HelpBar starts populated."""
+        """Announce the initial focused row so the HelpBar starts populated,
+        and put Textual focus on its editor (form mode: focus = edit)."""
         self._post_cursor_moved()
+        self.call_after_refresh(self._focus_cursor_cell)
 
     def _post_cursor_moved(self) -> None:
         specs = self._row_specs()
@@ -219,6 +287,53 @@ class FieldListView(VerticalScroll):
         # Let VerticalScroll bring the newly focused row into view.
         rows[new_idx].scroll_visible()
         self._post_cursor_moved()
+        self._focus_cursor_cell()
+
+    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+        """Sync the cursor when focus lands inside a different row —
+        the mouse-click-on-an-Input path. Click-away commits (form
+        habit); a failed commit bounces focus back to the dirty row."""
+        pending = getattr(self, "_programmatic_focus", 0)
+        if pending > 0:
+            # Our own _focus_cursor_cell caused this event (a counter:
+            # rapid programmatic moves queue several events before any
+            # get processed); the cursor already points at the right row.
+            self._programmatic_focus = pending - 1
+            return
+        widget: Any = event.widget
+        row: FieldRow | None = None
+        node = widget
+        while node is not None:
+            if isinstance(node, FieldRow):
+                row = node
+                break
+            node = node.parent
+        if row is None:
+            return
+        rows = list(self.query(FieldRow))
+        try:
+            idx = rows.index(row)
+        except ValueError:
+            return
+        if idx == self._cursor:
+            return
+        if not self._commit_gate():
+            previous = self._focused_cell()
+            focus_value = getattr(previous, "focus_value", None)
+            if focus_value is not None:
+                self._programmatic_focus = getattr(self, "_programmatic_focus", 0) + 1
+                focus_value()
+            return
+        rows[self._cursor].set_focused(False)
+        self._cursor = idx
+        rows[idx].set_focused(True)
+        self._post_cursor_moved()
+
+    def on_advance_requested(self, event) -> None:
+        """Enter committed a value inside an Input — advance the form."""
+        event.stop()
+        if self._cursor < len(self._row_specs()) - 1:
+            self._move_cursor(self._cursor + 1)
 
     def action_jump_next_required(self) -> None:
         """`n` — cycle the cursor to the next row whose subtree still
@@ -300,20 +415,18 @@ class FieldListView(VerticalScroll):
         return True
 
     def action_activate_focused(self) -> None:
-        """Enter on the focused row -> drill-down (container) or edit (leaf).
+        """Enter on the focused row.
 
-        Drill-down takes priority over cell editing: Enter on a
-        container row pushes a child ConfigScreen scoped to that node.
-        Read-only rows reject the edit with a visible message.
+        - Containers open (drill into a child screen).
+        - Large choices open the chooser.
+        - Everything else advances to the next row — the spreadsheet /
+          form habit. (Text rows never reach this handler: their Input
+          consumes Enter and posts AdvanceRequested after committing.)
+        Values change via Space (bool) and Left/Right (bool/choice/union).
         """
-        from pydantic_studio.renderers.textual_.widgets.cells import (
-            BoolCell,
-            ChoiceCell,
-        )
+        from pydantic_studio.renderers.textual_.widgets.cells import ChoiceCell
 
         row = self._focused_row()
-        if self._reject_readonly(row):
-            return
         if row is not None and row.node.kind in {
             "group",
             "sequence",
@@ -324,21 +437,13 @@ class FieldListView(VerticalScroll):
             return
 
         cell = self._focused_cell()
-        if cell is None:
+        if isinstance(cell, ChoiceCell) and cell.large_choice:
+            if self._reject_readonly(row):
+                return
+            cell.open_chooser()
             return
-        if isinstance(cell, BoolCell):
-            cell.toggle()
-            return
-        if isinstance(cell, ChoiceCell):
-            if cell.large_choice:
-                cell.open_chooser()
-            else:
-                # Small choices have no edit UI — Enter cycles like Tab.
-                # Falling through to the base enter_edit() here was the
-                # phantom-edit bug (footer flipped, Esc crashed).
-                cell.cycle_next()
-            return
-        cell.enter_edit()
+        if self._cursor < len(self._row_specs()) - 1:
+            self._move_cursor(self._cursor + 1)
 
     def _push_child_screen(self, group, base_path: str) -> None:
         """Push a child ConfigScreen scoped to ``group``.
@@ -373,7 +478,11 @@ class FieldListView(VerticalScroll):
             cell.toggle()
 
     def action_cycle_next_focused(self) -> None:
-        """Tab on the focused row -> cycle binary/small-choice/union cells."""
+        """Right on the focused row -> cycle bool/small-choice/union values.
+
+        Text rows never reach this: their Input consumes Left/Right for
+        caret movement — exactly the disambiguation a form needs.
+        """
         from pydantic_studio.renderers.textual_.widgets.cells import (
             BoolCell,
             ChoiceCell,
@@ -395,7 +504,7 @@ class FieldListView(VerticalScroll):
             cell.cycle_next()
 
     def action_cycle_prev_focused(self) -> None:
-        """Shift+Tab on the focused row -> reverse cycle where possible."""
+        """Left on the focused row -> reverse cycle where possible."""
         from pydantic_studio.renderers.textual_.widgets.cells import (
             BoolCell,
             ChoiceCell,
@@ -606,23 +715,25 @@ class FieldListView(VerticalScroll):
         return False, None
 
     def action_cancel_focused(self) -> None:
-        """Esc on the focused row — layered: edit > filter > screen > session.
+        """Esc — layered: revert field > clear filter > pop screen > session.
 
-        - If a cell is in edit mode → cancel the edit (in-place).
+        - If the focused field has uncommitted text → revert it.
         - Else if a filter is active → clear it (all rows return).
         - Else if the active screen is a drilled-in child (more than
           one ConfigScreen on the stack) → pop one level.
         - Else (root screen) → cancel the session (same flow as Ctrl+C:
           clean trees exit, dirty trees get the confirm screen). Esc
-          means "get me out" at every level.
+          means "undo what I'm in the middle of" at every level.
         """
         from pydantic_studio.renderers.textual_.screens import ConfigScreen
 
         cell = self._focused_cell()
+        if cell is not None and getattr(cell, "is_dirty", lambda: False)():
+            cell.revert()
+            return
         if cell is not None and cell.editing:
-            # Every Cell has cancel_edit (base default added with the
-            # phantom-edit fix); getattr keeps Esc crash-proof even for
-            # exotic third-party cells.
+            # Legacy modal cells (none in-tree since form mode, but
+            # third-party cells may still use the lifecycle).
             cancel = getattr(cell, "cancel_edit", cell.exit_edit)
             cancel()
             return
@@ -638,3 +749,26 @@ class FieldListView(VerticalScroll):
         cancel_session = getattr(self.app, "action_cancel_session", None)
         if cancel_session is not None:
             cancel_session()
+
+    def on_row_clicked(self, event: RowClicked) -> None:
+        """Mouse click on a row's chrome (label/marker/value statics)."""
+        event.stop()
+        rows = list(self.query(FieldRow))
+        for idx, row in enumerate(rows):
+            if row.path == event.path:
+                if idx != self._cursor and self._commit_gate():
+                    self._move_cursor(idx)
+                elif idx == self._cursor:
+                    self._focus_cursor_cell()
+                return
+
+    def on_row_delete_requested(self, event) -> None:
+        """Click on a row's ✕ (container screens)."""
+        event.stop()
+        rows = list(self.query(FieldRow))
+        for idx, row in enumerate(rows):
+            if row.path == event.path:
+                if idx != self._cursor:
+                    self._move_cursor(idx)
+                self.action_delete_focused()
+                return

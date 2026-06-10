@@ -119,12 +119,15 @@ class StudioApp(App):
         headless: bool = False,
         inline: bool = False,
         inline_no_clear: bool = False,
-        mouse: bool = False,
+        mouse: bool = True,
         size: tuple[int, int] | None = None,
         auto_pilot: AutopilotCallbackType | None = None,
         loop: AbstractEventLoop | None = None,
     ):
-        """Run with mouse reporting off so terminals keep native copy behavior."""
+        """Run with mouse reporting ON: clicking a row focuses it, clicking
+        toggles/choices changes them, the ActionBar buttons work, the wheel
+        scrolls. Pass ``mouse=False`` for copy-heavy terminal workflows
+        (most terminals also bypass reporting via Shift+drag)."""
         return super().run(
             headless=headless,
             inline=inline,
@@ -188,6 +191,23 @@ class StudioApp(App):
             ConfirmExitScreen,
             ErrorsScreen,
         )
+        from pydantic_studio.renderers.textual_.widgets.field_list import (
+            FieldListView,
+        )
+
+        # Form mode: flush the focused field's pending text first —
+        # Ctrl+S right after typing must save what the user sees.
+        try:
+            view = self.screen.query_one(FieldListView)
+        except Exception:
+            view = None
+        if view is not None and not view._commit_gate():
+            self.notify(
+                "fix the highlighted field first",
+                severity="error",
+                title="Save",
+            )
+            return False
 
         try:
             if self.save_path is not None:

@@ -1,47 +1,24 @@
-"""SecretCell — masked display + password Input on edit.
+"""SecretCell — persistent masked Input for SecretNode.
 
-Idle always renders ``**********`` (never reveal in display mode).
-Editing swaps to a Textual Input with ``password=True`` so the
-keystrokes show as bullets while the user types. Empty value shows
-as empty (no mask) so the user knows the field is unset.
+Form mode: the Input lives with ``password=True`` so the value renders
+as bullets at all times, typing included. The plaintext never appears
+on screen; it remains in the widget value for editing.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, ClassVar
 
-from textual.widgets import Input, Static
-
-from pydantic_studio.renderers.textual_.widgets.cells.base import Cell
-
-if TYPE_CHECKING:
-    from textual.app import ComposeResult
+from pydantic_studio.renderers.textual_.widgets.cells.input_cell import InputCell
 
 
-_MASK = "**********"
+class SecretCell(InputCell):
+    """Masked persistent editor for SecretNode."""
 
-
-class SecretCell(Cell):
-    """Masked editor for SecretNode."""
-
-    DEFAULT_CSS = ""
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._last_error: str | None = None
+    password: ClassVar[bool] = True
 
     @property
-    def last_error(self) -> str | None:
-        return self._last_error
-
-    @property
-    def _underlying_value(self) -> str:
-        """Read node.value, unwrapping SecretStr if needed.
-
-        The form tree stores either a plain str/bytes or a Pydantic
-        SecretStr/SecretBytes depending on schema annotation. We need
-        the plaintext for pre-filling the edit Input.
-        """
+    def display_value(self) -> str:
         v = getattr(self._node, "value", None)
         if v is None:
             return ""
@@ -54,57 +31,7 @@ class SecretCell(Cell):
             return v.decode("utf-8", errors="replace")
         return str(v)
 
-    @property
-    def value_text(self) -> str:
-        # Never show the actual value at idle.
-        return _MASK if self._underlying_value else ""
-
-    def compose(self) -> ComposeResult:
-        yield Static(self.value_text, classes="field-row--value", markup=False)
-
-    def enter_edit(self) -> None:
-        if self.editing:
-            return
-        super().enter_edit()
-        self._last_error = None
-        try:
-            static = self.query_one(Static)
-        except Exception:
-            static = None
-        new_input = Input(
-            value=self._underlying_value,
-            password=True,
-            classes="field-row--value",
-        )
-        self.mount(new_input)
-        if static is not None:
-            static.remove()
-        new_input.focus()
-
-    def cancel_edit(self) -> None:
-        if not self.editing:
-            return
-        self._exit_to_idle()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        value: str | bytes = event.value
+    def parse(self, raw: str) -> tuple[bool, Any]:
         if getattr(self._node, "secret_kind", None) == "bytes":
-            value = event.value.encode()
-        result = self.commit(value)
-        if not result.ok:
-            self._last_error = "; ".join(result.errors) or "invalid"
-            self._exit_to_idle()
-            return
-        self._last_error = None
-        self._exit_to_idle()
-
-    def _exit_to_idle(self) -> None:
-        try:
-            input_widget = self.query_one(Input)
-        except Exception:
-            input_widget = None
-        new_static = Static(self.value_text, classes="field-row--value", markup=False)
-        self.mount(new_static)
-        if input_widget is not None:
-            input_widget.remove()
-        super().exit_edit()
+            return True, raw.encode()
+        return True, raw

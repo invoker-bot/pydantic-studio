@@ -65,10 +65,18 @@ async def test_required_field_visible_then_edit_then_save(tmp_path):
         assert isinstance(app.screen, ConfigScreen)
         assert not save.exists(), "Invalid save must not write a file"
 
-        # Set the required field directly on the tree (the cell-edit path
-        # is covered by test_tui_v2_cell_text.py; here we focus on
-        # save + reload semantics).
-        tree.set_value("name", "production")
+        # Fill the required field the way a user does — through the
+        # live Input. (Form mode treats the screen as the truth: a
+        # programmatic tree.set_value would leave the stale on-screen
+        # text to be flushed right back on Ctrl+S.)
+        rows = list(app.screen.query(FieldRow))
+        name_row = next(r for r in rows if r.node.name == "name")
+        name_input = name_row.query_one(Input)
+        name_input.value = "production"
+        cell = name_row.query_one(".field-row--cell")
+        result = cell.commit_pending()
+        assert result is not None
+        assert result.ok
 
         # Re-render so the marker drops. Force a recompose by re-querying.
         # The label_text property reflects current node state on each read.
@@ -97,7 +105,7 @@ async def test_required_field_visible_then_edit_then_save(tmp_path):
 
 @pytest.mark.asyncio
 async def test_required_text_field_can_be_edited_with_keyboard() -> None:
-    """User path: Enter edit, type text, Enter commit."""
+    """Form mode: the field is live on focus — just type, Enter commits."""
     tree = build_form_tree(_AppConfig)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test() as pilot:
@@ -106,8 +114,6 @@ async def test_required_text_field_can_be_edited_with_keyboard() -> None:
 
         row = app.screen.query_one(FieldRow)
 
-        await pilot.press("enter")
-        await pilot.pause()
         await pilot.press("p", "r", "o", "d")
         await pilot.press("enter")
         await pilot.pause()
@@ -124,8 +130,6 @@ async def test_text_input_is_visible_while_typing() -> None:
     async with app.run_test(size=(80, 20)) as pilot:
         await pilot.pause()
 
-        await pilot.press("enter")
-        await pilot.pause()
         input_widget = app.screen.query_one(Input)
         assert input_widget.content_size.height >= 1
 
@@ -136,8 +140,8 @@ async def test_text_input_is_visible_while_typing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_bool_field_can_be_cycled_with_tab() -> None:
-    """Bool is a binary choice, so the advertised Tab cycle edits it."""
+async def test_bool_field_toggles_with_space_and_arrows() -> None:
+    """Form mode: Space (and Left/Right) edit bools; Tab moves on."""
     tree = build_form_tree(_AppConfig)
     app = StudioApp(tree=tree, save_path=None)
     async with app.run_test(size=(80, 20)) as pilot:
@@ -148,7 +152,7 @@ async def test_bool_field_can_be_cycled_with_tab() -> None:
         cell = app.screen.query_one(BoolCell)
         assert cell.value_text == "[ off ]"
 
-        await pilot.press("tab")
+        await pilot.press("space")
         await pilot.pause()
         assert tree.root.find("debug").value is True
         assert cell.value_text == "[ on  ]"

@@ -11,13 +11,16 @@ from typing import TYPE_CHECKING
 
 from pydantic_studio.renderers.textual_.widgets.cells.any_cell import AnyCell
 from pydantic_studio.renderers.textual_.widgets.cells.base import (
+    AdvanceRequested,
     Cell,
+    CellValueChanged,
     EditModeEntered,
     EditModeExited,
 )
 from pydantic_studio.renderers.textual_.widgets.cells.bool_cell import BoolCell
 from pydantic_studio.renderers.textual_.widgets.cells.choice_cell import ChoiceCell
 from pydantic_studio.renderers.textual_.widgets.cells.container_cell import ContainerCell
+from pydantic_studio.renderers.textual_.widgets.cells.input_cell import InputCell
 from pydantic_studio.renderers.textual_.widgets.cells.secret_cell import SecretCell
 from pydantic_studio.renderers.textual_.widgets.cells.text_cell import TextCell
 
@@ -56,13 +59,16 @@ def make_cell(node: AnyNode, path: str, form_tree: FormTree) -> Cell:
 
 
 __all__ = [
+    "AdvanceRequested",
     "AnyCell",
     "BoolCell",
     "Cell",
+    "CellValueChanged",
     "ChoiceCell",
     "ContainerCell",
     "EditModeEntered",
     "EditModeExited",
+    "InputCell",
     "SecretCell",
     "TextCell",
     "make_cell",

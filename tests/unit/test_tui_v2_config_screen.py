@@ -70,7 +70,7 @@ async def test_config_screen_footer_starts_in_idle_mode() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         fh = app.screen.query_one(FooterHints)
-        assert "navigate" in fh.line1
+        assert "Tab" in fh.line1
 
 
 @pytest.mark.asyncio

@@ -147,8 +147,9 @@ async def test_ctrl_c_routes_to_quit_action():
     assert app.quit_called is True
 
 
-def test_studio_app_run_disables_mouse_by_default(monkeypatch):
-    """Native terminal selection/right-click copy requires mouse reporting off."""
+def test_studio_app_run_enables_mouse_by_default(monkeypatch):
+    """Form mode is mouse-first: click rows, toggles, buttons. Copy-heavy
+    workflows opt out via run(mouse=False) / Shift+drag selection."""
     captured: dict[str, object] = {}
 
     def fake_run(self, **kwargs):
@@ -162,4 +163,4 @@ def test_studio_app_run_disables_mouse_by_default(monkeypatch):
     tree = build_form_tree(_Schema)
     StudioApp(tree=tree, save_path=None).run()
 
-    assert captured["mouse"] is False
+    assert captured["mouse"] is True

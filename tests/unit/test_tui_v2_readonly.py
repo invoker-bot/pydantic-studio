@@ -39,16 +39,24 @@ async def test_enter_on_readonly_row_does_not_edit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_readonly_row_shows_marker_and_helper() -> None:
+async def test_readonly_row_marker_and_disabled_input() -> None:
+    """Form mode enforces read-only physically: the cell is disabled —
+    no focus, no typing — and the label carries the marker."""
     tree = build_form_tree(_Schema)
     app = StudioApp(tree=tree, save_path=None, readonly_paths={"path"})
     async with app.run_test() as pilot:
         await pilot.pause()
         row = app.screen.query(FieldRow).first()
         assert "read-only" in row.label_text
-        await pilot.press("enter")
+        from pydantic_studio.renderers.textual_.widgets.cells import Cell as _Cell
+
+        assert row.query_one(_Cell).disabled is True
+        for ch in "junk":
+            await pilot.press(ch)
         await pilot.pause()
-        assert "read-only" in row.helper_text
+        assert tree._resolve_path("path").value == "okx/okx", (
+            "typing must not reach a read-only field"
+        )
 
 
 @pytest.mark.asyncio
