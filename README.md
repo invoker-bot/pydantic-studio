@@ -11,6 +11,46 @@ Textual TUI, and an HTMX-driven local web app.
 
 ---
 
+## At a glance
+
+**Textual TUI** — a real form, not a modal editor: the focused field IS
+the editable field (type to edit, `Tab`/`Enter` to flow on), with inline
+descriptions and constraints, a required-field counter that `Ctrl+N`
+jumps through, and clickable Save/Cancel:
+
+<p align="center">
+  <img src="docs/assets/readme/tui-form.svg" alt="pydantic-studio TUI: form mode editing a ServerConfig — persistent inputs, HelpBar guidance, required counter, ActionBar" width="92%">
+</p>
+
+Containers are first-class: breadcrumb drill-in, a clickable
+`[ + add item ]` row, per-row `✕` delete, `Ctrl+↑↓` reorder:
+
+<p align="center">
+  <img src="docs/assets/readme/tui-sequence.svg" alt="pydantic-studio TUI: editing a list of nested models with breadcrumb and add/remove affordances" width="92%">
+</p>
+
+**Browser UI** (`--frontend web`) — the same session contract in a local
+web form: live YAML preview with your comments, nested models collapsed
+to one-line summaries, a required-missing counter in the header:
+
+<p align="center">
+  <img src="docs/assets/readme/web-form.png" alt="pydantic-studio web UI: form with type badges, descriptions, collapsed nested groups, and a live YAML preview" width="92%">
+</p>
+
+Validation errors anchor to their fields — the banner entries are
+click-to-jump links, offending rows ring red, and collapsed sections
+holding an error expand themselves:
+
+<p align="center">
+  <img src="docs/assets/readme/web-errors.png" alt="pydantic-studio web UI: submit errors anchored to fields with red rings and auto-expanded nested groups" width="92%">
+</p>
+
+Every shot above is generated from the shipped example
+(`uv run python scripts/readme_screenshots.py`, driving
+`examples/02_server_config.py`) — run it yourself to reproduce.
+
+---
+
 ## Why?
 
 Hand-editing config files is error-prone. Pydantic schemas already encode

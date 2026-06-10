@@ -80,7 +80,7 @@ class HelpBar(Static):
         parts: list[str] = []
         if missing_count > 0:
             noun = "field" if missing_count == 1 else "fields"
-            parts.append(f"[!] {missing_count} required {noun} missing (n jumps)")
+            parts.append(f"[!] {missing_count} required {noun} missing (Ctrl+N jumps)")
         if node is not None:
             parts.append(describe_node(node, readonly=readonly))
         self._text = "  |  ".join(parts)
