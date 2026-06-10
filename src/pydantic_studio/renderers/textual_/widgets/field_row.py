@@ -40,6 +40,8 @@ class FieldRow(Widget):
         form_tree: FormTree,
         focused: bool = False,
         label_override: str | None = None,
+        readonly: bool = False,
+        label_width: int | None = None,
     ) -> None:
         super().__init__()
         self._node = node
@@ -47,6 +49,8 @@ class FieldRow(Widget):
         self._form_tree = form_tree
         self._focused = focused
         self._label_override = label_override
+        self._readonly = readonly
+        self._label_width = label_width
         self._error: str | None = None
         if focused:
             self.add_class("-focused")
@@ -60,12 +64,24 @@ class FieldRow(Widget):
         return self._path
 
     @property
+    def readonly(self) -> bool:
+        return self._readonly
+
+    @property
     def label_text(self) -> str:
         if self._label_override is not None:
-            return self._label_override
-        if self._is_required_and_missing():
-            return f"*{self._node.name}"
-        return self._node.name
+            label = self._label_override
+        elif self._is_required_and_missing():
+            label = f"*{self._node.name}"
+        else:
+            label = self._node.name
+        if self._readonly:
+            label += " (read-only)"
+        if self._label_width is not None and len(label) > self._label_width:
+            # Honest truncation: a real ellipsis instead of the silent
+            # hard cut that made auto_tracking_orders_a/_b identical.
+            label = label[: self._label_width - 1] + "…"
+        return label
 
     def _is_required_and_missing(self) -> bool:
         """True iff this row's node is required and has no value yet.
@@ -140,7 +156,14 @@ class FieldRow(Widget):
                 yield Static(
                     self.marker_text, classes="field-row--marker", markup=False
                 )
-                yield Static(self.label_text, classes="field-row--label", markup=False)
+                label = Static(
+                    self.label_text, classes="field-row--label", markup=False
+                )
+                if self._label_width is not None:
+                    # Inline style beats the fixed width:22 in theme.tcss —
+                    # the column is sized to the longest label on screen.
+                    label.styles.width = self._label_width
+                yield label
                 yield Static(_LEADER, classes="field-row--leader", markup=False)
                 cell = make_cell(self._node, self._path, self._form_tree)
                 cell.add_class("field-row--cell")

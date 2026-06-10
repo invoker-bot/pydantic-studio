@@ -84,14 +84,39 @@ class FieldListView(VerticalScroll):
         return self._cursor
 
     def compose(self) -> ComposeResult:
-        for idx, spec in enumerate(self._row_specs()):
+        specs = self._row_specs()
+        width = self._label_width_for(specs)
+        readonly_paths = self._readonly_paths()
+        for idx, spec in enumerate(specs):
             yield FieldRow(
                 node=spec.node,
                 path=spec.path,
                 form_tree=self._form_tree,
                 focused=(idx == self._cursor),
                 label_override=spec.label,
+                readonly=spec.path in readonly_paths,
+                label_width=width,
             )
+
+    _LABEL_WIDTH_MIN = 10
+    _LABEL_WIDTH_MAX = 48
+    _READONLY_SUFFIX = " (read-only)"
+
+    def _readonly_paths(self) -> frozenset[str]:
+        return getattr(self.app, "readonly_paths", frozenset())
+
+    def _label_width_for(self, specs: list[_RowSpec]) -> int:
+        """Column width fitting the longest label (clamped) so long field
+        names stay distinguishable instead of hard-cutting at a fixed 22."""
+        readonly_paths = self._readonly_paths()
+        longest = 0
+        for spec in specs:
+            label = spec.label if spec.label is not None else spec.node.name
+            extra = 1  # potential required marker '*'
+            if spec.path in readonly_paths:
+                extra += len(self._READONLY_SUFFIX)
+            longest = max(longest, len(label) + extra)
+        return max(self._LABEL_WIDTH_MIN, min(longest, self._LABEL_WIDTH_MAX))
 
     def _row_specs(self) -> list[_RowSpec]:
         """Return child rows for the container this view is scoped to."""
@@ -248,11 +273,19 @@ class FieldListView(VerticalScroll):
             return None
         return rows[self._cursor]
 
+    def _reject_readonly(self, row: FieldRow | None) -> bool:
+        """Show the read-only helper and report True when ``row`` is locked."""
+        if row is None or row.path not in self._readonly_paths():
+            return False
+        row.set_error("read-only — value is managed by the caller")
+        return True
+
     def action_activate_focused(self) -> None:
         """Enter on the focused row -> drill-down (container) or edit (leaf).
 
         Drill-down takes priority over cell editing: Enter on a
         container row pushes a child ConfigScreen scoped to that node.
+        Read-only rows reject the edit with a visible message.
         """
         from pydantic_studio.renderers.textual_.widgets.cells import (
             BoolCell,
@@ -260,6 +293,8 @@ class FieldListView(VerticalScroll):
         )
 
         row = self._focused_row()
+        if self._reject_readonly(row):
+            return
         if row is not None and row.node.kind in {
             "group",
             "sequence",
@@ -312,6 +347,8 @@ class FieldListView(VerticalScroll):
         """Space on the focused row -> toggle (BoolCell only)."""
         from pydantic_studio.renderers.textual_.widgets.cells import BoolCell
 
+        if self._reject_readonly(self._focused_row()):
+            return
         cell = self._focused_cell()
         if isinstance(cell, BoolCell):
             cell.toggle()
@@ -324,6 +361,8 @@ class FieldListView(VerticalScroll):
         )
 
         row = self._focused_row()
+        if self._reject_readonly(row):
+            return
         if row is not None and row.node.kind == "union":
             self._cycle_union(row.node, +1)
             row.refresh(recompose=True)
@@ -344,6 +383,8 @@ class FieldListView(VerticalScroll):
         )
 
         row = self._focused_row()
+        if self._reject_readonly(row):
+            return
         if row is not None and row.node.kind == "union":
             self._cycle_union(row.node, -1)
             row.refresh(recompose=True)
