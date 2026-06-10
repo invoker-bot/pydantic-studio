@@ -47,7 +47,7 @@ async def test_readonly_row_marker_and_disabled_input() -> None:
     async with app.run_test() as pilot:
         await pilot.pause()
         row = app.screen.query(FieldRow).first()
-        assert "read-only" in row.label_text
+        assert "🔒" in row.label_text
         from pydantic_studio.renderers.textual_.widgets.cells import Cell as _Cell
 
         assert row.query_one(_Cell).disabled is True

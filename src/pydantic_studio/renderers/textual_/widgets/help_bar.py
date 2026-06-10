@@ -62,12 +62,13 @@ class HelpBar(Static):
     DEFAULT_CSS = ""  # styled via theme.tcss
 
     def __init__(self) -> None:
-        super().__init__("", markup=False)
+        super().__init__("")
         self._text = ""
 
     @property
     def text(self) -> str:
-        """Current bar content — the test- and render-facing string."""
+        """Current bar content as plain text — the testable contract.
+        Rendering adds color (amber counter, accent field name)."""
         return self._text
 
     def show_node(
@@ -77,11 +78,22 @@ class HelpBar(Static):
         missing_count: int = 0,
         readonly: bool = False,
     ) -> None:
-        parts: list[str] = []
+        plain: list[str] = []
+        rich: list[str] = []
         if missing_count > 0:
             noun = "field" if missing_count == 1 else "fields"
-            parts.append(f"[!] {missing_count} required {noun} missing (Ctrl+N jumps)")
+            counter = f"⚠ {missing_count} required {noun} missing (Ctrl+N jumps)"
+            plain.append(counter)
+            rich.append(f"[#e0af68]{counter}[/]")
         if node is not None:
-            parts.append(describe_node(node, readonly=readonly))
-        self._text = "  |  ".join(parts)
-        self.update(self._text)
+            described = describe_node(node, readonly=readonly)
+            plain.append(described)
+            name = str(node.name)
+            if described.startswith(name):
+                rich.append(
+                    f"[bold #d18b40]{name}[/][dim]{described[len(name):]}[/]"
+                )
+            else:
+                rich.append(f"[dim]{described}[/]")
+        self._text = "   ".join(plain)
+        self.update("   ".join(rich))

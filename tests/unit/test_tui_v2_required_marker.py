@@ -49,7 +49,7 @@ async def test_required_unset_leaf_shows_marker():
     async with app.run_test() as pilot:
         await pilot.pause()
         row = _row_named(app, "api_key")
-        assert row.label_text.startswith("*"), (
+        assert row.required_badge_text == "●", (
             f"required+unset row should be marked; got label={row.label_text!r}"
         )
 
@@ -63,7 +63,7 @@ async def test_required_set_leaf_has_no_marker():
     async with app.run_test() as pilot:
         await pilot.pause()
         row = _row_named(app, "api_key")
-        assert not row.label_text.startswith("*"), (
+        assert row.required_badge_text == " ", (
             f"required+set row must not show marker; got label={row.label_text!r}"
         )
 
@@ -77,7 +77,7 @@ async def test_optional_unset_leaf_has_no_marker():
         await pilot.pause()
         # _AllOptional fields have defaults, so neither is "missing".
         for row in app.screen.query(FieldRow):
-            assert not row.label_text.startswith("*"), (
+            assert row.required_badge_text == " ", (
                 f"optional-with-default row must not show marker; got {row.label_text!r}"
             )
 
@@ -91,7 +91,7 @@ async def test_group_node_never_shows_required_marker():
     async with app.run_test() as pilot:
         await pilot.pause()
         row = _row_named(app, "nested")
-        assert not row.label_text.startswith("*"), (
+        assert row.required_badge_text == " ", (
             f"group rows must not show missing-marker on the container "
             f"itself; got {row.label_text!r}"
         )

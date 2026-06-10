@@ -130,6 +130,10 @@ FieldRow {
     color: $text;
 }
 
+FieldRow:hover {
+    background: $surface-lighten-1;
+}
+
 FieldRow .field-row--stack {
     height: auto;
 }
@@ -144,10 +148,10 @@ FieldRow.-focused {
 
 FieldRow .field-row--marker {
     width: 2;
-    color: $text-muted;
+    color: $accent;
 }
 
-FieldRow.-focused .field-row--marker {
+FieldRow.-focused .field-row--label {
     color: $accent;
     text-style: bold;
 }
@@ -157,9 +161,10 @@ FieldRow .field-row--label {
     color: $text;
 }
 
-FieldRow .field-row--leader {
-    width: 10;
-    color: $text-muted;
+FieldRow .field-row--required {
+    width: 3;
+    color: #e0af68;
+    text-style: bold;
 }
 
 FieldRow .field-row--cell {
@@ -177,6 +182,20 @@ FieldRow .field-row--value {
 FieldRow Input.field-row--value {
     border: none;
     padding: 0;
+    background: transparent;
+}
+
+FieldRow Input.field-row--value:focus {
+    background: $surface-lighten-1;
+}
+
+BoolCell .field-row--value {
+    color: $text-muted;
+}
+
+BoolCell.-on .field-row--value {
+    color: $accent;
+    text-style: bold;
 }
 
 FieldRow .field-row--drill {
@@ -185,11 +204,16 @@ FieldRow .field-row--drill {
     content-align: right top;
 }
 
+FieldRow.-focused .field-row--drill {
+    color: $accent;
+    text-style: bold;
+}
+
 FieldRow .field-row--helper {
     display: none;
     height: 1;
     color: $error;
-    padding-left: 24;
+    padding-left: 2;
 }
 
 FieldRow.-error .field-row--helper {

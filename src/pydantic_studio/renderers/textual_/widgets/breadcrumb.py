@@ -21,7 +21,19 @@ class Breadcrumb(Static):
 
     def __init__(self, parts: list[str]) -> None:
         self._parts = list(parts)
-        super().__init__(self._compute_label())
+        super().__init__(self._compute_markup())
+
+    def _compute_markup(self) -> str:
+        """Trail dimmed, current segment accent-bold; plain past depth 3."""
+        if not self._parts:
+            return ""
+        if len(self._parts) <= 3:
+            shown = self._parts
+        else:
+            shown = [self._parts[0], _ELLIPSIS, self._parts[-1]]
+        head = f"[dim]{_SEP}[/]".join(shown[:-1])
+        sep = f"[dim]{_SEP}[/]" if head else ""
+        return f"[dim]{head}[/]{sep}[bold #d18b40]{shown[-1]}[/]"
 
     @property
     def label_text(self) -> str:

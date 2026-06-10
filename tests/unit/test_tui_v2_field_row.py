@@ -55,7 +55,7 @@ async def test_field_row_focused_shows_marker() -> None:
     row = FieldRow(node=node, path="name", form_tree=tree, focused=True)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
-        assert row.marker_text == "▸"  # U+25B8 focus indicator
+        assert row.marker_text == "▎"  # U+25B8 focus indicator
 
 
 @pytest.mark.asyncio
@@ -74,7 +74,7 @@ async def test_field_row_container_kind_renders_drill_marker() -> None:
     row = FieldRow(node=node, path="tags", form_tree=tree, focused=False)
     async with _Host(row).run_test() as pilot:
         await pilot.pause()
-        assert row.drill_marker_text == ">"
+        assert row.drill_marker_text == "›"  # noqa: RUF001
 
 
 @pytest.mark.asyncio
@@ -104,7 +104,7 @@ async def test_field_row_set_error_shows_helper() -> None:
         await pilot.pause()
         row.set_error("pattern requires ^[a-z]+$")
         await pilot.pause()
-        assert row.helper_text == "[!] pattern requires ^[a-z]+$"
+        assert row.helper_text == "↳ pattern requires ^[a-z]+$"
 
 
 @pytest.mark.asyncio

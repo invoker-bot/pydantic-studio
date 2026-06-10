@@ -109,15 +109,38 @@ class FieldListView(VerticalScroll):
         self._filter: str = ""
 
     def set_filter(self, value: str) -> None:
-        """Substring-narrow the visible rows (group containers only)."""
+        """Substring-narrow the visible rows (group containers only).
+
+        Filtering toggles row *visibility* instead of recomposing the
+        list: rows (and their live Inputs) persist, so typing in the
+        filter narrows instantly with zero rebuild flicker.
+        """
         normalized = value.strip().lower()
         if normalized == self._filter:
             return
         self._filter = normalized
-        self._cursor = 0
-        self.refresh(recompose=True)
-        # The cursor landed on a (potentially) different row — keep the
-        # HelpBar in sync with what's actually focused now.
+        self._apply_filter_visibility()
+
+    def _filter_match(self, spec: _RowSpec) -> bool:
+        return not self._filter or self._filter in spec.node.name.lower()
+
+    def _visible_indices(self) -> list[int]:
+        specs = self._row_specs()
+        return [i for i, spec in enumerate(specs) if self._filter_match(spec)]
+
+    def _apply_filter_visibility(self) -> None:
+        rows = list(self.query(FieldRow))
+        specs = self._row_specs()
+        visible: list[int] = []
+        for idx, (row, spec) in enumerate(zip(rows, specs, strict=False)):
+            shown = self._filter_match(spec)
+            row.display = shown
+            if shown:
+                visible.append(idx)
+        if visible and self._cursor not in visible:
+            rows[self._cursor].set_focused(False)
+            self._cursor = visible[0]
+            rows[self._cursor].set_focused(True)
         self._post_cursor_moved()
 
     @property
@@ -145,7 +168,7 @@ class FieldListView(VerticalScroll):
 
     _LABEL_WIDTH_MIN = 10
     _LABEL_WIDTH_MAX = 48
-    _READONLY_SUFFIX = " (read-only)"
+    _READONLY_SUFFIX = "  🔒"
 
     def _readonly_paths(self) -> frozenset[str]:
         return getattr(self.app, "readonly_paths", frozenset())
@@ -157,9 +180,9 @@ class FieldListView(VerticalScroll):
         longest = 0
         for spec in specs:
             label = spec.label if spec.label is not None else spec.node.name
-            extra = 1  # potential required marker '*'
+            extra = 0  # required state lives in its own badge column now
             if spec.path in readonly_paths:
-                extra += len(self._READONLY_SUFFIX)
+                extra += len(self._READONLY_SUFFIX) + 1  # 🔒 is double-width
             longest = max(longest, len(label) + extra)
         return max(self._LABEL_WIDTH_MIN, min(longest, self._LABEL_WIDTH_MAX))
 
@@ -167,18 +190,13 @@ class FieldListView(VerticalScroll):
         """Return child rows for the container this view is scoped to."""
         node = self._group
         if node.kind == "group":
-            specs = [
+            return [
                 _RowSpec(
                     child,
                     self._join_path(self._base_path, child.name),
                 )
                 for child in node.fields
             ]
-            if self._filter:
-                specs = [
-                    s for s in specs if self._filter in s.node.name.lower()
-                ]
-            return specs
         if node.kind == "sequence":
             return [
                 _RowSpec(child, self._join_path(self._base_path, idx))
@@ -252,17 +270,31 @@ class FieldListView(VerticalScroll):
             return
         self.focus()
 
+    def _neighbor_visible(self, delta: int) -> int | None:
+        """Nearest visible row index in ``delta`` direction, or None."""
+        visible = self._visible_indices()
+        if not visible:
+            return None
+        candidates = [i for i in visible if (i > self._cursor if delta > 0 else i < self._cursor)]
+        if not candidates:
+            return None
+        return min(candidates) if delta > 0 else max(candidates)
+
     def action_cursor_up(self) -> None:
         # Commit even at the boundary — moving "off the edge" is still
         # a blur in form terms; the pending value must not stay limbo.
-        if not self._commit_gate() or self._cursor <= 0:
+        if not self._commit_gate():
             return
-        self._move_cursor(self._cursor - 1)
+        target = self._neighbor_visible(-1)
+        if target is not None:
+            self._move_cursor(target)
 
     def action_cursor_down(self) -> None:
-        if not self._commit_gate() or self._cursor >= len(self._row_specs()) - 1:
+        if not self._commit_gate():
             return
-        self._move_cursor(self._cursor + 1)
+        target = self._neighbor_visible(+1)
+        if target is not None:
+            self._move_cursor(target)
 
     def on_mount(self) -> None:
         """Announce the initial focused row so the HelpBar starts populated,
@@ -284,8 +316,8 @@ class FieldListView(VerticalScroll):
         rows[self._cursor].set_focused(False)
         self._cursor = new_idx
         rows[new_idx].set_focused(True)
-        # Let VerticalScroll bring the newly focused row into view.
-        rows[new_idx].scroll_visible()
+        # Glide the newly focused row into view instead of jump-cutting.
+        rows[new_idx].scroll_visible(animate=True, duration=0.15)
         self._post_cursor_moved()
         self._focus_cursor_cell()
 
@@ -332,8 +364,9 @@ class FieldListView(VerticalScroll):
     def on_advance_requested(self, event) -> None:
         """Enter committed a value inside an Input — advance the form."""
         event.stop()
-        if self._cursor < len(self._row_specs()) - 1:
-            self._move_cursor(self._cursor + 1)
+        target = self._neighbor_visible(+1)
+        if target is not None:
+            self._move_cursor(target)
 
     def action_jump_next_required(self) -> None:
         """`n` — cycle the cursor to the next row whose subtree still
@@ -344,10 +377,12 @@ class FieldListView(VerticalScroll):
         if not missing:
             return
         specs = self._row_specs()
+        visible = set(self._visible_indices())
         hits = [
             idx
             for idx, spec in enumerate(specs)
-            if spec.path
+            if idx in visible
+            and spec.path
             and any(
                 m == spec.path or m.startswith(f"{spec.path}.") for m in missing
             )
@@ -367,8 +402,11 @@ class FieldListView(VerticalScroll):
         on the root screen. Returns False when no row matches.
         """
         specs = self._row_specs()
+        visible = set(self._visible_indices())
         target: int | None = None
         for idx, spec in enumerate(specs):
+            if idx not in visible:
+                continue
             if spec.path == path:
                 target = idx
                 break
@@ -442,8 +480,9 @@ class FieldListView(VerticalScroll):
                 return
             cell.open_chooser()
             return
-        if self._cursor < len(self._row_specs()) - 1:
-            self._move_cursor(self._cursor + 1)
+        target = self._neighbor_visible(+1)
+        if target is not None:
+            self._move_cursor(target)
 
     def _push_child_screen(self, group, base_path: str) -> None:
         """Push a child ConfigScreen scoped to ``group``.

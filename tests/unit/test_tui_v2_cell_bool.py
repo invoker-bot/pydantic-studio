@@ -36,7 +36,7 @@ async def test_bool_cell_idle_false_renders_off_chip() -> None:
     _, cell = _make_cell(False)
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        assert cell.value_text == "[ off ]"
+        assert cell.value_text == "○ off"
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_bool_cell_idle_true_renders_on_chip() -> None:
     _, cell = _make_cell(True)
     async with _Host(cell).run_test() as pilot:
         await pilot.pause()
-        assert cell.value_text == "[ on  ]"
+        assert cell.value_text == "● on "
 
 
 @pytest.mark.asyncio
@@ -55,7 +55,7 @@ async def test_bool_cell_toggle_flips_false_to_true() -> None:
         cell.toggle()
         await pilot.pause()
         assert tree.root.find("debug").value is True
-        assert cell.value_text == "[ on  ]"
+        assert cell.value_text == "● on "
 
 
 @pytest.mark.asyncio
@@ -66,7 +66,7 @@ async def test_bool_cell_toggle_flips_true_to_false() -> None:
         cell.toggle()
         await pilot.pause()
         assert tree.root.find("debug").value is False
-        assert cell.value_text == "[ off ]"
+        assert cell.value_text == "○ off"
 
 
 @pytest.mark.asyncio

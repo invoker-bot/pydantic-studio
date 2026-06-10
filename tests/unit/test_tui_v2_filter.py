@@ -31,7 +31,9 @@ class _Schema(BaseModel):
 
 
 def _visible_labels(app: StudioApp) -> list[str]:
-    return [row.label_text for row in app.screen.query(FieldRow)]
+    # Filtering toggles row visibility (no recompose), so enumerate
+    # mounted rows and keep only the displayed ones.
+    return [row.label_text for row in app.screen.query(FieldRow) if row.display]
 
 
 @pytest.mark.asyncio

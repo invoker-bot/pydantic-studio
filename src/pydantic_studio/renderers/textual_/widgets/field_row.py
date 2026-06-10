@@ -28,8 +28,8 @@ if TYPE_CHECKING:
     from pydantic_studio.tree.nodes import AnyNode, FormTree
 
 
-_FOCUS_MARKER = "▸"
-_LEADER = " " + ("· " * 5)
+_FOCUS_MARKER = "▎"  # slim accent bar, colored via .-focused css
+_REQUIRED_BADGE = "●"  # amber dot while a required field is still unset
 _DRILLABLE_KINDS = {"group", "sequence", "mapping", "union"}
 
 
@@ -102,19 +102,23 @@ class FieldRow(Widget):
 
     @property
     def label_text(self) -> str:
-        if self._label_override is not None:
-            label = self._label_override
-        elif self._is_required_and_missing():
-            label = f"*{self._node.name}"
-        else:
-            label = self._node.name
+        label = (
+            self._label_override
+            if self._label_override is not None
+            else self._node.name
+        )
         if self._readonly:
-            label += " (read-only)"
+            label += "  🔒"
         if self._label_width is not None and len(label) > self._label_width:
             # Honest truncation: a real ellipsis instead of the silent
             # hard cut that made auto_tracking_orders_a/_b identical.
             label = label[: self._label_width - 1] + "…"
         return label
+
+    @property
+    def required_badge_text(self) -> str:
+        """Amber ● while required-and-unset; clears once a value lands."""
+        return _REQUIRED_BADGE if self._is_required_and_missing() else " "
 
     def _is_required_and_missing(self) -> bool:
         """True iff this row's node is required and has no value yet.
@@ -137,11 +141,11 @@ class FieldRow(Widget):
 
     @property
     def drill_marker_text(self) -> str:
-        return ">" if self._node.kind in _DRILLABLE_KINDS else ""
+        return "›" if self._node.kind in _DRILLABLE_KINDS else ""  # noqa: RUF001
 
     @property
     def helper_text(self) -> str:
-        return "" if self._error is None else f"[!] {self._error}"
+        return "" if self._error is None else f"↳ {self._error}"
 
     def set_focused(self, focused: bool) -> None:
         self._focused = focused
@@ -183,6 +187,8 @@ class FieldRow(Widget):
         try:
             label = self.query_one(".field-row--label", Static)
             label.update(self.label_text)
+            badge = self.query_one(".field-row--required", Static)
+            badge.update(self.required_badge_text)
         except Exception:
             pass
         if error is not None:
@@ -215,11 +221,15 @@ class FieldRow(Widget):
                     self.label_text, classes="field-row--label", markup=False
                 )
                 if self._label_width is not None:
-                    # Inline style beats the fixed width:22 in theme.tcss —
+                    # Inline style beats the fixed width in theme.tcss —
                     # the column is sized to the longest label on screen.
                     label.styles.width = self._label_width
                 yield label
-                yield Static(_LEADER, classes="field-row--leader", markup=False)
+                yield Static(
+                    self.required_badge_text,
+                    classes="field-row--required",
+                    markup=False,
+                )
                 cell = make_cell(self._node, self._path, self._form_tree)
                 cell.add_class("field-row--cell")
                 if self._readonly:

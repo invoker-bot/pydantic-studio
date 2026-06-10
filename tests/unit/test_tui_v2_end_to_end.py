@@ -51,8 +51,9 @@ async def test_required_field_visible_then_edit_then_save(tmp_path):
         rows = list(app.screen.query(FieldRow))
         # Order is [name (required), debug, db (group)] — verify marker.
         name_row = next(r for r in rows if r.node.name == "name")
-        assert name_row.label_text.startswith("*"), (
-            f"required+unset 'name' should show marker; got {name_row.label_text!r}"
+        assert name_row.required_badge_text == "●", (
+            "required+unset 'name' must show the amber badge; got "
+            f"{name_row.required_badge_text!r}"
         )
 
         # First save attempt: tree is invalid (name unset) → ErrorsScreen.
@@ -82,8 +83,8 @@ async def test_required_field_visible_then_edit_then_save(tmp_path):
         # The label_text property reflects current node state on each read.
         rows = list(app.screen.query(FieldRow))
         name_row = next(r for r in rows if r.node.name == "name")
-        assert not name_row.label_text.startswith("*"), (
-            "marker should drop after required field is set"
+        assert name_row.required_badge_text == " ", (
+            "badge should clear after required field is set"
         )
 
         # Second save: tree is now valid → write succeeds.
@@ -150,12 +151,12 @@ async def test_bool_field_toggles_with_space_and_arrows() -> None:
         await pilot.press("down")
         await pilot.pause()
         cell = app.screen.query_one(BoolCell)
-        assert cell.value_text == "[ off ]"
+        assert cell.value_text == "○ off"
 
         await pilot.press("space")
         await pilot.pause()
         assert tree.root.find("debug").value is True
-        assert cell.value_text == "[ on  ]"
+        assert cell.value_text == "● on "
         assert "on" in str(cell.query_one(Static).render())
 
 

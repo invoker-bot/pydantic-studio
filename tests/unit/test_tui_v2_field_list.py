@@ -80,7 +80,7 @@ async def test_field_list_initial_cursor_is_zero() -> None:
         await pilot.pause()
         assert view.cursor == 0
         rows = list(view.query(FieldRow))
-        assert rows[0].marker_text == "▸"
+        assert rows[0].marker_text == "▎"
         assert rows[1].marker_text == " "
 
 
@@ -95,7 +95,7 @@ async def test_field_list_down_advances_cursor() -> None:
         assert view.cursor == 1
         rows = list(view.query(FieldRow))
         assert rows[0].marker_text == " "
-        assert rows[1].marker_text == "▸"
+        assert rows[1].marker_text == "▎"
 
 
 @pytest.mark.asyncio
