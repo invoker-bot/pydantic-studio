@@ -200,3 +200,27 @@ class SecretBuilder:
             value=existing_v if existing_v is not None else default,
             default=default,
         )
+
+
+class NoneBuilder:
+    """``None`` annotations (``field: None = None``) — a constant-null field.
+
+    Builds an ``AnyValueNode`` pinned to null mode so the tree round-trips
+    the only legal value instead of raising ``NoBuilderError``. Editing the
+    value to anything non-None is rejected at submit by the schema itself.
+    """
+
+    def matches(self, type_: type) -> bool:
+        return strip_annotated(type_) is type(None)
+
+    def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
+        del type_, existing  # the only legal value is None
+        from pydantic_studio.tree.nodes import AnyValueNode
+
+        return AnyValueNode(
+            name=field_info.alias or "<unnamed>",
+            description=field_info.description,
+            required=field_info.is_required(),
+            mode="null",
+            value=None,
+        )

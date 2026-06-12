@@ -941,6 +941,14 @@ class GroupNode(FormNode):
     kind: Literal["group"] = "group"
     schema_class: type[BaseModel]
     fields: "list[AnyNode]"  # forward ref; rebuilt at module bottom
+    # An ``Optional[Model]`` field defaulting to None starts *omitted*:
+    # children carry their schema defaults for display, but ``to_python``
+    # resolves the whole group to None until the user activates it by
+    # editing any descendant (``FormTree.set_value`` clears the flag on
+    # every group it walks through). Without this, an untouched optional
+    # nested model materializes as a fully-defaulted instance on submit
+    # instead of round-tripping None.
+    omitted: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
@@ -1008,7 +1016,13 @@ class GroupNode(FormNode):
         Known v0.1 limitation: users cannot save an Optional[T] field as
         explicit None once the subtree has values — that requires v0.2's
         explicit-null toggle.
+
+        An *omitted* optional group short-circuits to ``None`` regardless
+        of its children: their pre-filled schema defaults are presentation
+        only until the user activates the group (see ``GroupNode.omitted``).
         """
+        if self.omitted and not self.required:
+            return None
         out: dict[str, Any] = {}
         for f in self.fields:
             v = f.to_python()
@@ -1271,9 +1285,16 @@ class FormTree(BaseModel):
             raise ValueError(msg)
 
         # Walk all but the last segment, pivoting on the current node's type.
+        # Collect the GroupNodes on the way so a successful write can
+        # activate any *omitted* optional group the edit passed through.
         node: Any = self.root
+        walked_groups: list[GroupNode] = []
         for seg in path_obj.segments[:-1]:
+            if isinstance(node, GroupNode):
+                walked_groups.append(node)
             node = self._descend(node, seg)
+        if isinstance(node, GroupNode):
+            walked_groups.append(node)
 
         # Resolve the terminal segment to a target node.
         last = path_obj.segments[-1]
@@ -1298,6 +1319,11 @@ class FormTree(BaseModel):
         self._push_snapshot(_snap.take(self.root))
         write_target.value = value
         write_target.error = None
+        # Editing any descendant activates omitted optional groups on the
+        # path — from now on the group materializes instead of None.
+        for group in walked_groups:
+            if group.omitted:
+                group.omitted = False
         if isinstance(target, UnionNode):
             target.error = None
         if self.draft_path is not None:
