@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.tree.nodes import LiteralNode
+from pydantic_studio.tree.nodes import LiteralNode, SequenceNode
 from tests.fixtures.schemas import WithLogLevel
 
 
@@ -78,3 +78,48 @@ def test_literal_with_none_member() -> None:
     # required=True (no default), choices contains None — None must be valid.
     result = tree.set_value("flag", None)
     assert result.ok is True, result.errors
+
+
+def test_add_item_to_list_of_literal_round_trips() -> None:
+    """Regression (Sentry hft-python #13 — ``NoBuilderError: typing.Literal``):
+    adding an item to a ``list[Literal[...]]`` must rebuild the *parametrized*
+    Literal. The container only persists ``item_type_name`` as a string, and the
+    old encoding collapsed ``Literal['a', 'b']`` to the bare ``typing.Literal``
+    (choices dropped) → ``add_item`` raised NoBuilderError at registry lookup."""
+    from typing import Literal as _Literal
+
+    from pydantic import BaseModel
+
+    class S(BaseModel):
+        modes: list[_Literal["fast", "slow", "auto"]] = []
+
+    tree = build_form_tree(S)
+    result = tree.add_item("modes")
+    assert result.ok is True, result.errors
+    modes = tree.root.find("modes")
+    assert isinstance(modes, SequenceNode)
+    assert len(modes.items) == 1
+    child = modes.items[0]
+    assert isinstance(child, LiteralNode)
+    assert child.choices == ["fast", "slow", "auto"]
+
+
+def test_fq_resolve_round_trip_for_literal() -> None:
+    """``_fq`` ∘ ``_resolve_type_name`` is identity for Literal types so a
+    container's persisted ``item_type_name`` rebuilds the exact parametrized
+    Literal (choices intact) after JSON serialization to the web client.
+    Covers the JSON-encodable member kinds (str / int / bool / None) and
+    members containing ``.`` (must not be split like a dotted module path)."""
+    from typing import Literal as _Literal
+
+    from pydantic_studio.tree.nodes import _resolve_type_name
+    from pydantic_studio.types.utils import _fq
+
+    for typ in (
+        _Literal["a", "b", "c"],
+        _Literal[1, 2, 3],
+        _Literal[True, False],
+        _Literal[None, "off"],
+        _Literal["a.b", "c.d"],
+    ):
+        assert _resolve_type_name(_fq(typ)) == typ, _fq(typ)

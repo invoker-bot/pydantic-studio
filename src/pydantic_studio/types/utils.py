@@ -1,15 +1,19 @@
 """Shared helpers for type builders.
 
-Currently exports ``field_default`` — the canonical "give me the field's
-default, normalized to None if Pydantic considers it undefined" function
-that every builder needs.
+Exports ``field_default`` (the field's default normalized to None when
+Pydantic considers it undefined) and ``_fq`` (the fully-qualified,
+round-trippable type-name encoder every container builder uses to persist
+its element types).
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import json
+from typing import TYPE_CHECKING, Any, get_args
 
 from pydantic_core import PydanticUndefined
+
+from pydantic_studio.types.annotated import is_literal_type, strip_annotated
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -25,3 +29,25 @@ def field_default(field_info: FieldInfo) -> Any:
     """
     d = field_info.get_default(call_default_factory=True)
     return None if d is PydanticUndefined else d
+
+
+def _fq(t: Any) -> str:
+    """Fully-qualified, round-trippable name of a type.
+
+    Most types serialize as ``module.Qualname`` and rebuild via ``getattr``.
+    ``Literal[...]`` is special: its bare name is just ``typing.Literal`` —
+    the choices are lost, so the registry can't rebuild a LiteralNode and
+    raises NoBuilderError when adding into a ``list[Literal[...]]``. We
+    preserve the arguments as JSON (``typing.Literal["a", "b"]``);
+    ``_resolve_type_name`` parses them back into the parametrized form. Exotic
+    members JSON can't encode (bytes, enum) fall back to the bare name.
+    """
+    stripped = strip_annotated(t)
+    if is_literal_type(stripped):
+        try:
+            payload = json.dumps(list(get_args(stripped)))
+        except TypeError:
+            pass  # unencodable member — fall through to the bare name
+        else:
+            return f"typing.Literal{payload}"
+    return f"{getattr(t, '__module__', 'builtins')}.{getattr(t, '__qualname__', repr(t))}"

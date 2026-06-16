@@ -7,17 +7,12 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from pydantic_studio.tree.nodes import SequenceNode
 from pydantic_studio.types.annotated import strip_annotated
 from pydantic_studio.types.metadata import extract_constraints
-from pydantic_studio.types.utils import field_default
+from pydantic_studio.types.utils import _fq, field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
     from pydantic_studio.types.registry import Registry
-
-
-def _fq(t: Any) -> str:
-    """Fully-qualified name of a type, for registry round-trip."""
-    return f"{getattr(t, '__module__', 'builtins')}.{getattr(t, '__qualname__', repr(t))}"
 
 
 def _build_items(

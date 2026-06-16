@@ -7,6 +7,7 @@ the abstract base ``FormNode``.
 
 from __future__ import annotations
 
+import json
 import sys
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
@@ -32,8 +33,18 @@ def _resolve_type_name(name: str) -> Any:
     """Look up a fully-qualified type name (``module.Qualname``).
 
     Handles ``builtins.str`` etc. specially so unit tests don't need to
-    import builtins. Raises ValueError on miss with a diagnostic message.
+    import builtins. ``typing.Literal[...]`` is rebuilt from its JSON-encoded
+    arguments (the inverse of ``_fq``'s Literal encoding) so containers of
+    ``Literal`` restore the parametrized form instead of the choice-less bare
+    ``typing.Literal``. Raises ValueError on miss with a diagnostic message.
     """
+    if name.startswith("typing.Literal[") and name.endswith("]"):
+        try:
+            choices = json.loads(name[len("typing.Literal") :])
+        except ValueError as exc:
+            msg = f"cannot reconstruct Literal choices from {name!r}"
+            raise ValueError(msg) from exc
+        return Literal[tuple(choices)]  # type: ignore[misc]
     parts = name.rsplit(".", 1)
     if len(parts) != 2:
         msg = f"malformed type name {name!r} (expected 'module.Qualname')"

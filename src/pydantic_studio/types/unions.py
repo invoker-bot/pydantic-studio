@@ -18,16 +18,12 @@ from pydantic_studio.types.annotated import (
     is_union_type,
     strip_annotated,
 )
-from pydantic_studio.types.utils import field_default
+from pydantic_studio.types.utils import _fq, field_default
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
     from pydantic_studio.types.registry import Registry
-
-
-def _fq(t: Any) -> str:
-    return f"{getattr(t, '__module__', 'builtins')}.{getattr(t, '__qualname__', repr(t))}"
 
 
 class UnionBuilder:
