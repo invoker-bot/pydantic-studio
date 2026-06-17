@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.tree.nodes import IntNode, StringNode, UnionNode
+from pydantic_studio.tree.nodes import BoolNode, IntNode, StringNode, UnionNode
 from tests.fixtures.schemas import WithOptional, WithUnion
 
 
@@ -144,3 +144,31 @@ def test_discriminated_union_in_list_preserves_inner_field_values() -> None:
     assert instance.notifiers[0].address == "ops@example.com"
     assert isinstance(instance.notifiers[1], _DUSlack)
     assert instance.notifiers[1].channel == "#ops"
+
+
+def test_select_variant_with_annotated_variant() -> None:
+    """Regression (Sentry hft-python #15 — ``NoBuilderError: typing.Annotated``):
+    selecting a union variant that is itself ``Annotated[T, ...]`` must build
+    T's node, not crash. ``variant_type_names`` stored each variant via ``_fq``,
+    which collapsed ``Annotated[bool, Strict()]`` (``pydantic.StrictBool``) to the
+    bare ``typing.Annotated`` — the inner type lost — so ``select_variant``
+    raised NoBuilderError at registry lookup. Mirrors ``hft``'s
+    ``condition: Optional[Union[StrictBool, str]]`` executor field that crashed
+    ``hft config gen executor --web``.
+    """
+    from pydantic import StrictBool
+
+    class M(BaseModel):
+        condition: StrictBool | str | None = None
+
+    tree = build_form_tree(M)
+    union = tree.root.find("condition")
+    assert isinstance(union, UnionNode)
+    # The StrictBool variant must not collapse to the builder-less special form.
+    assert "typing.Annotated" not in union.variant_type_names
+    result = tree.select_variant("condition", 0)  # the StrictBool (bool) variant
+    assert result.ok is True, result.errors
+    union = tree.root.find("condition")
+    assert isinstance(union, UnionNode)
+    assert union.selected_index == 0
+    assert isinstance(union.selected, BoolNode)

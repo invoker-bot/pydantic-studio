@@ -84,3 +84,31 @@ def test_predicates_unwrap_annotated() -> None:
     assert is_literal_type(Annotated[Literal["a", "b"], "meta"]) is True
     assert is_enum_type(Annotated[Color, "meta"]) is True
     assert is_pydantic_model(Annotated[Inner, "meta"]) is True
+
+
+def test_fq_strips_annotated_for_round_trip() -> None:
+    """Regression (Sentry hft-python #15 — ``NoBuilderError: typing.Annotated``):
+    ``_fq`` must encode an ``Annotated[T, ...]`` variant/element type as T's
+    fully-qualified name. A union variant typed ``Annotated[T, ...]`` (e.g.
+    Pydantic's ``StrictBool == Annotated[bool, Strict()]``) otherwise collapsed
+    to the bare ``typing.Annotated`` (the inner type lost), and
+    ``_resolve_type_name`` rebuilt the builder-less special form — so
+    ``select_variant`` raised NoBuilderError at registry lookup. Metadata can't
+    survive string serialization anyway, and every builder strips Annotated
+    internally, so the round-trippable name is the *inner* type's name.
+    """
+    from pydantic import StrictBool
+
+    from pydantic_studio.tree.nodes import _resolve_type_name
+    from pydantic_studio.types.utils import _fq
+
+    assert _fq(StrictBool) == "builtins.bool"
+    assert _resolve_type_name(_fq(StrictBool)) is bool
+    assert _fq(Annotated[int, Field(ge=0)]) == "builtins.int"
+    assert _resolve_type_name(_fq(Annotated[int, Field(ge=0)])) is int
+    # plain (non-Annotated) types are unaffected by the strip.
+    assert _fq(str) == "builtins.str"
+    assert _fq(Inner) == f"{Inner.__module__}.{Inner.__qualname__}"
+    # Annotated wrapping a Literal still round-trips the parametrized Literal
+    # (the strip composes with the Literal JSON encoding).
+    assert _resolve_type_name(_fq(Annotated[Literal["x", "y"], Field()])) == Literal["x", "y"]

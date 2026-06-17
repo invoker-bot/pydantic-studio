@@ -34,13 +34,22 @@ def field_default(field_info: FieldInfo) -> Any:
 def _fq(t: Any) -> str:
     """Fully-qualified, round-trippable name of a type.
 
-    Most types serialize as ``module.Qualname`` and rebuild via ``getattr``.
-    ``Literal[...]`` is special: its bare name is just ``typing.Literal`` —
-    the choices are lost, so the registry can't rebuild a LiteralNode and
-    raises NoBuilderError when adding into a ``list[Literal[...]]``. We
-    preserve the arguments as JSON (``typing.Literal["a", "b"]``);
-    ``_resolve_type_name`` parses them back into the parametrized form. Exotic
-    members JSON can't encode (bytes, enum) fall back to the bare name.
+    ``Annotated[T, ...]`` is unwrapped to ``T`` first: the bare alias's name is
+    just ``typing.Annotated`` (the inner type lost), so the registry can't
+    rebuild it and raises NoBuilderError — e.g. a union variant typed
+    ``StrictBool`` (``Annotated[bool, Strict()]``) crashed ``select_variant``
+    (Sentry hft-python #15). The metadata can't survive string serialization
+    anyway, and every builder strips ``Annotated`` internally, so the
+    round-trippable name is the inner type's name.
+
+    Most types then serialize as ``module.Qualname`` and rebuild via
+    ``getattr``. ``Literal[...]`` is special: its bare name is just
+    ``typing.Literal`` — the choices are lost, so the registry can't rebuild a
+    LiteralNode and raises NoBuilderError when adding into a
+    ``list[Literal[...]]`` (Sentry hft-python #13). We preserve the arguments as
+    JSON (``typing.Literal["a", "b"]``); ``_resolve_type_name`` parses them back
+    into the parametrized form. Exotic members JSON can't encode (bytes, enum)
+    fall back to the bare name.
     """
     stripped = strip_annotated(t)
     if is_literal_type(stripped):
@@ -50,4 +59,7 @@ def _fq(t: Any) -> str:
             pass  # unencodable member — fall through to the bare name
         else:
             return f"typing.Literal{payload}"
-    return f"{getattr(t, '__module__', 'builtins')}.{getattr(t, '__qualname__', repr(t))}"
+    return (
+        f"{getattr(stripped, '__module__', 'builtins')}."
+        f"{getattr(stripped, '__qualname__', repr(stripped))}"
+    )
