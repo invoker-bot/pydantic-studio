@@ -6,12 +6,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from pydantic_studio import build_form_tree
+from pydantic_studio import build_form_tree, load_yaml
 from pydantic_studio.renderers.html.serialize import (
     dispatch_mutation,
     tree_to_json,
     validation_envelope,
 )
+from tests.fixtures.schemas import WithColor
 
 
 class _Primitive(BaseModel):
@@ -137,6 +138,22 @@ def test_tree_to_json_mapping_renders_as_mapping_node_with_entries() -> None:
     assert env["kind"] == "mapping"
     pairs = [(k["value"], v["value"]) for k, v in env["entries"]]
     assert pairs == [("TZ", "UTC"), ("LOG", "info")]
+
+
+def test_tree_to_json_load_yaml_enum_value_matches_choice_name(tmp_path) -> None:
+    src = tmp_path / "config.yaml"
+    src.write_text("favorite: red\n", encoding="utf-8")
+
+    tree = load_yaml(src, WithColor)
+    data = tree_to_json(tree)
+
+    favorite = next(f for f in data["root"]["fields"] if f["name"] == "favorite")
+    assert favorite["value"] == "RED"
+    assert favorite["choices"] == [
+        ["RED", "RED"],
+        ["GREEN", "GREEN"],
+        ["BLUE", "BLUE"],
+    ]
 
 
 def test_tree_to_json_union_renders_with_selected_variant() -> None:

@@ -763,11 +763,11 @@ class EnumNode(FormNode):
 
     @model_validator(mode="after")
     def _rehydrate_members(self) -> EnumNode:
-        """After JSON load, ``value`` / ``default`` / ``choices[i][1]`` may
-        be strings (member names). Look up the Enum class and convert back.
+        """After JSON/YAML load, ``value`` / ``default`` / ``choices[i][1]`` may
+        be raw strings or numbers. Look up the Enum class and convert back.
 
         This runs on every validation including initial construction, but
-        only mutates when the field is a string — Enum members short-circuit.
+        Enum members short-circuit.
         """
         from enum import Enum
 
@@ -779,12 +779,17 @@ class EnumNode(FormNode):
             return self
 
         def to_member(v: Any) -> Any:
-            if isinstance(v, str) and not isinstance(v, Enum):
+            if isinstance(v, Enum):
+                return v
+            if isinstance(v, str):
                 try:
                     return enum_cls[v]
                 except KeyError:
-                    return v
-            return v
+                    pass
+            try:
+                return enum_cls(v)
+            except (TypeError, ValueError):
+                return v
 
         self.value = to_member(self.value)
         self.default = to_member(self.default)
