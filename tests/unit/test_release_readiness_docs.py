@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("840", "817 default"),
-        "CLAUDE.md": ("840", "817 default"),
+        "README.md": ("841", "818 default"),
+        "CLAUDE.md": ("841", "818 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -289,8 +289,16 @@ def test_distribution_smoke_tests_start_from_clean_virtualenvs() -> None:
         )
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    assert "rm -rf .dist-smoke-wheel\npython -m venv .dist-smoke-wheel" in guide
-    assert "rm -rf .dist-smoke-sdist\npython -m venv .dist-smoke-sdist" in guide
+    assert "rm -rf .dist-smoke-wheel\nuv run python -m venv .dist-smoke-wheel" in guide
+    assert "rm -rf .dist-smoke-sdist\nuv run python -m venv .dist-smoke-sdist" in guide
+
+
+def test_release_guide_uses_uv_python_for_local_smoke_virtualenvs() -> None:
+    lines = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8").splitlines()
+
+    for env_name in ("wheel", "sdist", "email"):
+        assert f"uv run python -m venv .dist-smoke-{env_name}" in lines
+        assert f"python -m venv .dist-smoke-{env_name}" not in lines
 
 
 def test_distribution_smoke_tests_verify_typed_marker_and_frontend_bundle() -> None:

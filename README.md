@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-840%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-841%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,7 +77,7 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 840 tests: 817 default unit/integration/TUI/web smoke tests plus 23
+by 841 tests: 818 default unit/integration/TUI/web smoke tests plus 23
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
@@ -406,7 +406,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 817 default tests; skips tests/e2e/
+uv run pytest -q                          # 818 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint
@@ -420,10 +420,10 @@ uv run mkdocs build --strict              # also covered by test_docs_build.py
 # Packaging
 uv build
 uv run twine check dist/*
-python -m venv .dist-smoke-wheel
+uv run python -m venv .dist-smoke-wheel
 .dist-smoke-wheel/bin/python -m pip install dist/*.whl
 .dist-smoke-wheel/bin/pydantic-studio version
-python -m venv .dist-smoke-sdist
+uv run python -m venv .dist-smoke-sdist
 .dist-smoke-sdist/bin/python -m pip install dist/*.tar.gz
 .dist-smoke-sdist/bin/pydantic-studio version
 ```

@@ -86,7 +86,7 @@ rm -rf dist
 uv build
 uv run twine check dist/*
 rm -rf .dist-smoke-wheel
-python -m venv .dist-smoke-wheel
+uv run python -m venv .dist-smoke-wheel
 .dist-smoke-wheel/bin/python -m pip install dist/*.whl
 .dist-smoke-wheel/bin/pydantic-studio version
 .dist-smoke-wheel/bin/python - <<'PY'
@@ -101,7 +101,7 @@ assert resources.files("pydantic_studio").joinpath(
 ).is_file()
 PY
 rm -rf .dist-smoke-sdist
-python -m venv .dist-smoke-sdist
+uv run python -m venv .dist-smoke-sdist
 .dist-smoke-sdist/bin/python -m pip install dist/*.tar.gz
 .dist-smoke-sdist/bin/pydantic-studio version
 .dist-smoke-sdist/bin/python - <<'PY'
@@ -117,7 +117,7 @@ assert resources.files("pydantic_studio").joinpath(
 PY
 # Smoke-test email extra install
 rm -rf .dist-smoke-email
-python -m venv .dist-smoke-email
+uv run python -m venv .dist-smoke-email
 wheel=$(
   python - <<'PY'
 from pathlib import Path
