@@ -29,6 +29,10 @@ def test_web_embedding_exports():
     assert hasattr(ps, "mount_html_app")
 
 
+def test_tui_embedding_exports():
+    assert hasattr(ps, "StudioScreen")
+
+
 def test_register_builder_is_callable_and_affects_default_registry():
     from pydantic_studio.tree.builder import default_registry
 

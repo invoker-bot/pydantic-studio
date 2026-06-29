@@ -10,5 +10,6 @@ Public exports:
 from __future__ import annotations
 
 from pydantic_studio.renderers.textual_.app import StudioApp, run_app
+from pydantic_studio.renderers.textual_.studio_screen import StudioScreen
 
-__all__ = ["StudioApp", "run_app"]
+__all__ = ["StudioApp", "StudioScreen", "run_app"]
