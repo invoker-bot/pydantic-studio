@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("827", "804 default"),
-        "CLAUDE.md": ("827", "804 default"),
+        "README.md": ("828", "805 default"),
+        "CLAUDE.md": ("828", "805 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -82,6 +82,28 @@ def test_workflows_do_not_persist_checkout_credentials() -> None:
                 assert step["with"] == {
                     "persist-credentials": False
                 }, f"{workflow_name}:{job_name} must not persist checkout credentials"
+
+
+def test_dependabot_keeps_github_actions_current() -> None:
+    dependabot = YAML(typ="safe").load(ROOT / ".github" / "dependabot.yml")
+
+    assert dependabot == {
+        "version": 2,
+        "updates": [
+            {
+                "package-ecosystem": "github-actions",
+                "directory": "/",
+                "schedule": {
+                    "interval": "weekly",
+                    "day": "monday",
+                    "time": "07:00",
+                    "timezone": "Etc/UTC",
+                },
+                "open-pull-requests-limit": 5,
+                "commit-message": {"prefix": "ci"},
+            }
+        ],
+    }
 
 
 def test_publish_workflow_uses_package_name_and_read_only_default_token() -> None:
