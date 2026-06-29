@@ -71,10 +71,32 @@ rm -rf .dist-smoke-wheel
 python -m venv .dist-smoke-wheel
 .dist-smoke-wheel/bin/python -m pip install dist/*.whl
 .dist-smoke-wheel/bin/pydantic-studio version
+.dist-smoke-wheel/bin/python - <<'PY'
+from importlib import resources
+
+import pydantic_studio as ps
+
+assert ps.__version__
+assert resources.files("pydantic_studio").joinpath("py.typed").is_file()
+assert resources.files("pydantic_studio").joinpath(
+    "renderers/html/static/dist/index.html"
+).is_file()
+PY
 rm -rf .dist-smoke-sdist
 python -m venv .dist-smoke-sdist
 .dist-smoke-sdist/bin/python -m pip install dist/*.tar.gz
 .dist-smoke-sdist/bin/pydantic-studio version
+.dist-smoke-sdist/bin/python - <<'PY'
+from importlib import resources
+
+import pydantic_studio as ps
+
+assert ps.__version__
+assert resources.files("pydantic_studio").joinpath("py.typed").is_file()
+assert resources.files("pydantic_studio").joinpath(
+    "renderers/html/static/dist/index.html"
+).is_file()
+PY
 rm -rf .dist-smoke-wheel .dist-smoke-sdist
 ```
 

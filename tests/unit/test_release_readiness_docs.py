@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("830", "807 default"),
-        "CLAUDE.md": ("830", "807 default"),
+        "README.md": ("831", "808 default"),
+        "CLAUDE.md": ("831", "808 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -241,6 +241,34 @@ def test_distribution_smoke_tests_start_from_clean_virtualenvs() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "rm -rf .dist-smoke-wheel\npython -m venv .dist-smoke-wheel" in guide
     assert "rm -rf .dist-smoke-sdist\npython -m venv .dist-smoke-sdist" in guide
+
+
+def test_distribution_smoke_tests_verify_typed_marker_and_frontend_bundle() -> None:
+    workflow_jobs = {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }
+    required_snippets = [
+        'resources.files("pydantic_studio").joinpath("py.typed").is_file()',
+        '"renderers/html/static/dist/index.html"',
+    ]
+    for workflow_name, job_name in workflow_jobs.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        smoke_steps = [
+            step["run"] for step in steps if "Smoke-test" in step.get("name", "")
+        ]
+
+        assert len(smoke_steps) == 2
+        for run in smoke_steps:
+            for snippet in required_snippets:
+                assert snippet in run
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert ".dist-smoke-wheel/bin/python - <<'PY'" in guide
+    assert ".dist-smoke-sdist/bin/python - <<'PY'" in guide
+    for snippet in required_snippets:
+        assert snippet in guide
 
 
 def test_package_metadata_exposes_support_project_urls() -> None:
