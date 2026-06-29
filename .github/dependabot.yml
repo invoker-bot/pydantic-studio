@@ -10,3 +10,13 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: ci
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:15"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(frontend)

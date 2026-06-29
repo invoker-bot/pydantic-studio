@@ -84,7 +84,7 @@ def test_workflows_do_not_persist_checkout_credentials() -> None:
                 }, f"{workflow_name}:{job_name} must not persist checkout credentials"
 
 
-def test_dependabot_keeps_github_actions_current() -> None:
+def test_dependabot_keeps_automation_and_frontend_dependencies_current() -> None:
     dependabot = YAML(typ="safe").load(ROOT / ".github" / "dependabot.yml")
 
     assert dependabot == {
@@ -101,7 +101,19 @@ def test_dependabot_keeps_github_actions_current() -> None:
                 },
                 "open-pull-requests-limit": 5,
                 "commit-message": {"prefix": "ci"},
-            }
+            },
+            {
+                "package-ecosystem": "npm",
+                "directory": "/frontend",
+                "schedule": {
+                    "interval": "weekly",
+                    "day": "monday",
+                    "time": "07:15",
+                    "timezone": "Etc/UTC",
+                },
+                "open-pull-requests-limit": 5,
+                "commit-message": {"prefix": "chore(frontend)"},
+            },
         ],
     }
 
