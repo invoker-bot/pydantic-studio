@@ -25,6 +25,7 @@ from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.console import run_console_app
 from pydantic_studio.renderers.html import StudioServer, run_html_app
 from pydantic_studio.renderers.textual_ import StudioApp, run_app
+from pydantic_studio.session import EditSession, SubmitResult
 from pydantic_studio.tree.builder import (
     NodeBuilder,
     Registry,
@@ -87,6 +88,7 @@ __all__ = [
     "DatetimeNode",
     "DecimalNode",
     "EditOutcome",
+    "EditSession",
     "EmailNode",
     "EnumNode",
     "FloatNode",
@@ -109,6 +111,7 @@ __all__ = [
     "StringNode",
     "StudioApp",
     "StudioServer",
+    "SubmitResult",
     "TimeNode",
     "TimedeltaNode",
     "UnionNode",

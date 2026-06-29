@@ -20,6 +20,11 @@ def test_top_level_imports():
     assert hasattr(ps, "ValidationFailedError")
 
 
+def test_embeddable_session_exports():
+    assert hasattr(ps, "EditSession")
+    assert hasattr(ps, "SubmitResult")
+
+
 def test_register_builder_is_callable_and_affects_default_registry():
     from pydantic_studio.tree.builder import default_registry
 
