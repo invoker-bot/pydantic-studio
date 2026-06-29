@@ -12,15 +12,16 @@
 `pydantic-studio` already supports being called from Python as a blocking
 subprogram: `run_app(...)` and `run_html_app(...)` launch a complete editing
 session and return `EditOutcome`. The Web renderer also exposes
-`StudioServer.app`, so advanced callers can manually run the FastAPI app.
+`StudioServer.app`, so advanced callers can manually run the ASGI app.
 
 This design turns that accidental support into a first-class embedding API.
 The work is intentionally split:
 
-1. **Phase 1: Web-first embedding.** External FastAPI/Starlette applications can
-   mount pydantic-studio under a path such as `/studio`, serve the bundled React
-   app with the correct asset/API prefix, and observe the same submit/cancel
-   outcome without `run_html_app` owning the event loop, port, or browser.
+1. **Phase 1: Web-first embedding.** External ASGI applications can mount
+   pydantic-studio under a path such as `/studio`, serve the bundled React app
+   with the correct asset/API prefix, and observe the same submit/cancel outcome
+   without `run_html_app` owning the event loop, port, or browser. FastAPI and
+   Starlette are first-class examples, not the only supported hosts.
 2. **Phase 2: TUI screen embedding.** External Textual applications can push a
    pydantic-studio editor screen and receive submit/cancel as a screen result or
    message, while the standalone `StudioApp` remains a convenience launcher.
@@ -129,10 +130,11 @@ Compatibility properties on `StudioServer` (`tree`, `save_path`, `submitted`,
 The stable embedding surface is:
 
 ```python
-from fastapi import FastAPI
+from starlette.applications import Starlette
+
 from pydantic_studio import StudioServer, mount_html_app
 
-host = FastAPI()
+host = Starlette()
 server = StudioServer(tree=tree, save_path=None, base_path="/studio")
 host.mount("/studio", server.app)
 
@@ -159,6 +161,16 @@ server = mount_html_app(
 When callers use `mount_html_app(...)`, the helper sets `base_path` from the
 mount path. Callers only need to pass both values manually when constructing a
 `StudioServer` themselves before calling `host.mount(...)`.
+
+`mount_html_app(...)` accepts any ASGI host object with a Starlette-compatible
+`mount(path, app, ...)` method. FastAPI qualifies because it inherits
+Starlette's mounting behavior. Hosts without a compatible helper can still use
+`StudioServer(...).app` directly as a plain ASGI application and mount it through
+their framework's native composition mechanism.
+
+The implementation may continue using FastAPI internally for route declaration;
+that is an implementation detail. The public contract is ASGI: callers receive a
+mountable ASGI app plus the `StudioServer` / `EditSession` state object.
 
 `run_html_app(...)` remains public and keeps the current blocking behavior. Its
 implementation changes to use the same `StudioServer` and session underneath:
@@ -362,9 +374,11 @@ The `StudioApp.outcome` property remains meaningful after `run()`.
 ### Web integration tests
 
 - `TestClient(StudioServer(tree, base_path="/studio").app)` serves `/`.
-- When mounted under a host app at `/studio`, `/studio/`,
+- When mounted under a Starlette host app at `/studio`, `/studio/`,
   `/studio/static/dist/...`, `/studio/api/tree`, `/studio/api/mutations`,
   `/studio/api/submit`, `/studio/api/cancel`, and `/studio/api/heartbeat` work.
+- The same mounted route smoke test runs against a FastAPI host to prevent
+  accidental FastAPI-only or Starlette-only assumptions.
 - React source tests or lightweight build checks cover `studioUrl(...)` for root
   and subpath bases.
 - Existing e2e tests continue to pass in standalone root mode.
@@ -390,7 +404,7 @@ Phase 1 documentation:
 - `docs/site/architecture.md`: distinguish standalone launchers from embedded
   renderer adapters.
 - `docs/site/tutorial.md` or a new `docs/site/embedding.md`: show a minimal
-  FastAPI host app.
+  ASGI host app, with FastAPI and Starlette snippets.
 
 Phase 2 documentation:
 
@@ -403,7 +417,7 @@ Phase 2 documentation:
 1. Add `EditSession` and `SubmitResult`; route current TUI and Web submit/cancel
    through it without behavior changes.
 2. Add Web `base_path`, dynamic SPA index rendering, and React API URL helper.
-3. Add `mount_html_app(...)` and mounted FastAPI tests.
+3. Add `mount_html_app(...)` and mounted Starlette/FastAPI tests.
 4. Refactor `run_html_app(...)` to use the shared Web builder.
 5. Update docs for Web embedding.
 6. Add `StudioScreen(session)` for Textual embedding.
