@@ -133,6 +133,7 @@ if [ "$tag_version" != "$pkg_version" ]; then
   exit 1
 fi
 git tag "$RELEASE_TAG"
+git push origin "$RELEASE_TAG"
 ```
 
 Pushing `v0.4.0` starts `.github/workflows/publish.yml`. The `build` job

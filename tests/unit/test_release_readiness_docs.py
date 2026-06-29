@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("836", "813 default"),
-        "CLAUDE.md": ("836", "813 default"),
+        "README.md": ("837", "814 default"),
+        "CLAUDE.md": ("837", "814 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -394,6 +394,16 @@ def test_release_guide_checks_tag_matches_package_version_before_tagging() -> No
     assert text.index('if [ "$tag_version" != "$pkg_version" ]; then') < text.index(
         'git tag "$RELEASE_TAG"'
     )
+
+
+def test_release_guide_pushes_verified_release_tag_after_tagging() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    tag = 'git tag "$RELEASE_TAG"'
+    push = 'git push origin "$RELEASE_TAG"'
+    workflow = "Pushing `v0.4.0` starts `.github/workflows/publish.yml`"
+
+    assert push in text
+    assert text.index(tag) < text.index(push) < text.index(workflow)
 
 
 def test_release_guide_installs_playwright_browser_before_e2e() -> None:
