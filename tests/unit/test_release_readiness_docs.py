@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("828", "805 default"),
-        "CLAUDE.md": ("828", "805 default"),
+        "README.md": ("829", "806 default"),
+        "CLAUDE.md": ("829", "806 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -299,6 +299,15 @@ def test_release_guide_documents_external_trusted_publisher_setup() -> None:
 
     mkdocs = YAML(typ="safe").load(ROOT / "mkdocs.yml")
     assert {"Release": "release.md"} in mkdocs["nav"]
+
+
+def test_release_guide_installs_playwright_browser_before_e2e() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    install = "uv run playwright install chromium"
+    e2e = 'uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"'
+
+    assert install in text
+    assert text.index(install) < text.index(e2e)
 
 
 def test_release_guide_documents_independent_piesource_publish() -> None:
