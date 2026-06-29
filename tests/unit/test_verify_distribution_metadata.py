@@ -51,6 +51,9 @@ def _write_sdist(
 def _write_pyproject(root: Path) -> None:
     root.joinpath("pyproject.toml").write_text(
         """[project.urls]
+Source = "https://example.invalid/pydantic-studio"
+Documentation = "https://example.invalid/docs"
+Issues = "https://example.invalid/issues"
 Changelog = "https://example.invalid/CHANGELOG.md"
 Security = "https://example.invalid/SECURITY.md"
 Contributing = "https://example.invalid/CONTRIBUTING.md"
@@ -62,14 +65,18 @@ source-include = ["CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md"]
     )
 
 
-def _metadata(*, include_contributing: bool = True) -> str:
+def _metadata(*, omit: str | None = None) -> str:
     lines = [
-        "Project-URL: Changelog, https://example.invalid/CHANGELOG.md",
-        "Project-URL: Security, https://example.invalid/SECURITY.md",
+        ("Source", "https://example.invalid/pydantic-studio"),
+        ("Documentation", "https://example.invalid/docs"),
+        ("Issues", "https://example.invalid/issues"),
+        ("Changelog", "https://example.invalid/CHANGELOG.md"),
+        ("Security", "https://example.invalid/SECURITY.md"),
+        ("Contributing", "https://example.invalid/CONTRIBUTING.md"),
     ]
-    if include_contributing:
-        lines.append("Project-URL: Contributing, https://example.invalid/CONTRIBUTING.md")
-    return "\n".join(lines)
+    return "\n".join(
+        f"Project-URL: {label}, {url}" for label, url in lines if label != omit
+    )
 
 
 def test_verify_distribution_metadata_accepts_expected_release_files(tmp_path: Path) -> None:
@@ -106,7 +113,7 @@ def test_verify_distribution_metadata_rejects_missing_project_url(tmp_path: Path
     dist = tmp_path / "dist"
     dist.mkdir()
     _write_pyproject(tmp_path)
-    metadata = _metadata(include_contributing=False)
+    metadata = _metadata(omit="Contributing")
     _write_wheel(dist, metadata)
     _write_sdist(
         dist,
@@ -115,6 +122,25 @@ def test_verify_distribution_metadata_rejects_missing_project_url(tmp_path: Path
     )
 
     with pytest.raises(RuntimeError, match=r"Contributing"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_declared_project_url(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata(omit="Source")
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=_metadata(),
+    )
+
+    with pytest.raises(RuntimeError, match=r"Source"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
@@ -129,7 +155,7 @@ def test_verify_distribution_metadata_rejects_missing_sdist_project_url(
     _write_sdist(
         dist,
         ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
-        metadata=_metadata(include_contributing=False),
+        metadata=_metadata(omit="Contributing"),
     )
 
     with pytest.raises(RuntimeError, match=r"Contributing"):

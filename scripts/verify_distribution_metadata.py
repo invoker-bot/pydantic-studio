@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-REQUIRED_PROJECT_URL_LABELS = ("Changelog", "Security", "Contributing")
+SUPPORT_PROJECT_URL_LABELS = ("Changelog", "Security", "Contributing")
 
 
 def _single_file(dist_dir: Path, pattern: str) -> Path:
@@ -68,21 +68,16 @@ def _project_urls(pyproject: dict[str, object]) -> dict[str, str]:
     project = _table(pyproject, "project", "project")
     urls = _table(project, "urls", "project.urls")
 
-    missing = [label for label in REQUIRED_PROJECT_URL_LABELS if label not in urls]
+    missing = [label for label in SUPPORT_PROJECT_URL_LABELS if label not in urls]
     if missing:
         raise RuntimeError(f"pyproject.toml missing project URLs: {missing!r}")
 
-    invalid = [
-        label
-        for label in REQUIRED_PROJECT_URL_LABELS
-        if not isinstance(urls.get(label), str)
-    ]
+    invalid = [label for label, url in urls.items() if not isinstance(url, str)]
     if invalid:
         raise RuntimeError(f"pyproject.toml project URLs must be strings: {invalid!r}")
 
     project_urls: dict[str, str] = {}
-    for label in REQUIRED_PROJECT_URL_LABELS:
-        value = urls[label]
+    for label, value in urls.items():
         if isinstance(value, str):
             project_urls[label] = value
     return project_urls
@@ -109,13 +104,13 @@ def _filename_from_url(label: str, url: str) -> str:
 
 def _expected_project_urls(pyproject: dict[str, object]) -> tuple[str, ...]:
     urls = _project_urls(pyproject)
-    return tuple(f"Project-URL: {label}, {urls[label]}" for label in REQUIRED_PROJECT_URL_LABELS)
+    return tuple(f"Project-URL: {label}, {url}" for label, url in urls.items())
 
 
 def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
     urls = _project_urls(pyproject)
     filenames = tuple(
-        _filename_from_url(label, urls[label]) for label in REQUIRED_PROJECT_URL_LABELS
+        _filename_from_url(label, urls[label]) for label in SUPPORT_PROJECT_URL_LABELS
     )
     source_include = _source_include(pyproject)
     missing_source_include = [
