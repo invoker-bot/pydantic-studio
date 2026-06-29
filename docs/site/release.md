@@ -9,6 +9,8 @@ The artifact upload fails immediately if no distributions are present and
 retains that artifact for 30 days for release troubleshooting.
 The package metadata exposes Source, Documentation, and Issues project URLs
 so registry pages have clear support and navigation links.
+It also includes the MIT license classifier and PyPI search keywords for
+registry discovery.
 
 ## PyPI trusted publisher
 

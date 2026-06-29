@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("822", "799 default"),
-        "CLAUDE.md": ("822", "799 default"),
+        "README.md": ("823", "800 default"),
+        "CLAUDE.md": ("823", "800 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -145,6 +145,25 @@ def test_package_metadata_exposes_support_project_urls() -> None:
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "Source, Documentation, and Issues project URLs" in guide
+
+
+def test_package_metadata_exposes_license_and_discovery_terms() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject["project"]
+
+    assert project["license"] == "MIT"
+    assert project["license-files"] == ["LICENSE"]
+    assert "License :: OSI Approved :: MIT License" in project["classifiers"]
+    assert project["keywords"] == [
+        "config",
+        "editor",
+        "fastapi",
+        "pydantic",
+        "textual",
+    ]
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "MIT license classifier and PyPI search keywords" in guide
 
 
 def test_release_guide_documents_external_trusted_publisher_setup() -> None:
