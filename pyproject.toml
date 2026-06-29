@@ -40,6 +40,8 @@ email = ["email-validator>=2"]
 
 [project.urls]
 Source = "https://github.com/invoker-bot/pydantic-studio"
+Documentation = "https://github.com/invoker-bot/pydantic-studio/tree/main/docs/site"
+Issues = "https://github.com/invoker-bot/pydantic-studio/issues"
 
 [dependency-groups]
 dev = [

@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("821", "798 default"),
-        "CLAUDE.md": ("821", "798 default"),
+        "README.md": ("822", "799 default"),
+        "CLAUDE.md": ("822", "799 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -131,6 +131,20 @@ def test_publish_workflow_uploads_release_artifact_strictly() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "fails immediately if no distributions are present" in guide
     assert "retains that artifact for 30 days" in guide
+
+
+def test_package_metadata_exposes_support_project_urls() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    urls = pyproject["project"]["urls"]
+
+    assert urls == {
+        "Source": "https://github.com/invoker-bot/pydantic-studio",
+        "Documentation": "https://github.com/invoker-bot/pydantic-studio/tree/main/docs/site",
+        "Issues": "https://github.com/invoker-bot/pydantic-studio/issues",
+    }
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "Source, Documentation, and Issues project URLs" in guide
 
 
 def test_release_guide_documents_external_trusted_publisher_setup() -> None:
