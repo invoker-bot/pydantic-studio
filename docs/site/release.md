@@ -62,9 +62,11 @@ uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
 rm -rf dist
 uv build
 uv run twine check dist/*
+rm -rf .dist-smoke-wheel
 python -m venv .dist-smoke-wheel
 .dist-smoke-wheel/bin/python -m pip install dist/*.whl
 .dist-smoke-wheel/bin/pydantic-studio version
+rm -rf .dist-smoke-sdist
 python -m venv .dist-smoke-sdist
 .dist-smoke-sdist/bin/python -m pip install dist/*.tar.gz
 .dist-smoke-sdist/bin/pydantic-studio version

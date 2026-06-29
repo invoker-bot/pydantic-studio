@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("824", "801 default"),
-        "CLAUDE.md": ("824", "801 default"),
+        "README.md": ("825", "802 default"),
+        "CLAUDE.md": ("825", "802 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -148,6 +148,32 @@ def test_distribution_build_steps_start_from_clean_dist_directory() -> None:
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "rm -rf dist\nuv build" in guide
+
+
+def test_distribution_smoke_tests_start_from_clean_virtualenvs() -> None:
+    workflow_jobs = {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }
+    for workflow_name, job_name in workflow_jobs.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        smoke_steps = {
+            step.get("name"): step["run"]
+            for step in steps
+            if "Smoke-test" in step.get("name", "")
+        }
+
+        assert smoke_steps["Smoke-test wheel install"].startswith(
+            "rm -rf .dist-smoke-wheel\npython -m venv .dist-smoke-wheel\n"
+        )
+        assert smoke_steps["Smoke-test source distribution install"].startswith(
+            "rm -rf .dist-smoke-sdist\npython -m venv .dist-smoke-sdist\n"
+        )
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "rm -rf .dist-smoke-wheel\npython -m venv .dist-smoke-wheel" in guide
+    assert "rm -rf .dist-smoke-sdist\npython -m venv .dist-smoke-sdist" in guide
 
 
 def test_package_metadata_exposes_support_project_urls() -> None:

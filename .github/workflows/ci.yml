@@ -136,6 +136,7 @@ jobs:
 
       - name: Smoke-test wheel install
         run: |
+          rm -rf .dist-smoke-wheel
           python -m venv .dist-smoke-wheel
           .dist-smoke-wheel/bin/python -m pip install dist/*.whl
           .dist-smoke-wheel/bin/pydantic-studio version
@@ -153,6 +154,7 @@ jobs:
 
       - name: Smoke-test source distribution install
         run: |
+          rm -rf .dist-smoke-sdist
           python -m venv .dist-smoke-sdist
           .dist-smoke-sdist/bin/python -m pip install dist/*.tar.gz
           .dist-smoke-sdist/bin/pydantic-studio version
