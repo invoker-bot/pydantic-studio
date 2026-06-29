@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("826", "803 default"),
-        "CLAUDE.md": ("826", "803 default"),
+        "README.md": ("827", "804 default"),
+        "CLAUDE.md": ("827", "804 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -35,6 +35,26 @@ def test_workflow_jobs_have_timeout_limits() -> None:
             assert "timeout-minutes" in job, f"{workflow_name}:{job_name} needs a timeout"
             assert isinstance(job["timeout-minutes"], int)
             assert 1 <= job["timeout-minutes"] <= 60
+
+
+def test_workflows_install_dependencies_from_locked_resolution() -> None:
+    expected_install_commands = {
+        ("ci.yml", "python"): "uv sync --locked --python ${{ matrix.python-version }}",
+        ("ci.yml", "release-gate"): "uv sync --locked --python 3.13",
+        ("publish.yml", "build"): "uv sync --locked --all-extras --python 3.13",
+    }
+    for (workflow_name, job_name), expected in expected_install_commands.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        install_steps = [
+            step for step in steps if step.get("name") == "Install Python dependencies"
+        ]
+
+        assert len(install_steps) == 1
+        assert install_steps[0]["run"] == expected
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "uv sync --locked" in guide
 
 
 def test_workflows_define_concurrency_policies() -> None:
