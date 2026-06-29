@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("844", "821 default"),
-        "CLAUDE.md": ("844", "821 default"),
+        "README.md": ("845", "822 default"),
+        "CLAUDE.md": ("845", "822 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -265,6 +265,35 @@ def test_distribution_build_steps_start_from_clean_dist_directory() -> None:
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "rm -rf dist\nuv build" in guide
+
+
+def test_distribution_release_metadata_is_verified_before_install_smokes() -> None:
+    workflow_jobs = {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }
+    required_snippets = [
+        "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
+        "zipfile.ZipFile(wheel)",
+        "tarfile.open(sdist)",
+        "CHANGELOG.md",
+    ]
+    for workflow_name, job_name in workflow_jobs.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        names = [step.get("name") for step in steps]
+        verify_index = names.index("Verify distribution release metadata")
+        wheel_smoke_index = names.index("Smoke-test wheel install")
+        verify_step = steps[verify_index]
+
+        assert names.index("Check distribution metadata") < verify_index < wheel_smoke_index
+        for snippet in required_snippets:
+            assert snippet in verify_step["run"]
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert guide.index("uv run twine check dist/*") < guide.index(
+        "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md"
+    ) < guide.index("rm -rf .dist-smoke-wheel")
 
 
 def test_distribution_smoke_tests_start_from_clean_virtualenvs() -> None:

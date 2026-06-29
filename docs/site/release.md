@@ -86,6 +86,26 @@ uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
 rm -rf dist
 uv build
 uv run twine check dist/*
+uv run python - <<'PY'
+import tarfile
+import zipfile
+from pathlib import Path
+
+expected_changelog = "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md"
+wheels = sorted(Path("dist").glob("*.whl"))
+sdists = sorted(Path("dist").glob("*.tar.gz"))
+assert len(wheels) == 1, wheels
+assert len(sdists) == 1, sdists
+wheel = wheels[0]
+sdist = sdists[0]
+with zipfile.ZipFile(wheel) as zf:
+    metadata_name = next(name for name in zf.namelist() if name.endswith("METADATA"))
+    metadata = zf.read(metadata_name).decode("utf-8")
+    assert expected_changelog in metadata
+with tarfile.open(sdist) as tf:
+    names = tf.getnames()
+    assert any(name.endswith("/CHANGELOG.md") for name in names), names
+PY
 rm -rf .dist-smoke-wheel
 uv run python -m venv .dist-smoke-wheel
 .dist-smoke-wheel/bin/python -m pip install dist/*.whl
