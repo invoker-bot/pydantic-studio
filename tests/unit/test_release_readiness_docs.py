@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("846", "823 default"),
-        "CLAUDE.md": ("846", "823 default"),
+        "README.md": ("847", "824 default"),
+        "CLAUDE.md": ("847", "824 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -275,10 +275,12 @@ def test_distribution_release_metadata_is_verified_before_install_smokes() -> No
     required_snippets = [
         "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
         "Project-URL: Security, https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
+        "Project-URL: Contributing, https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md",
         "zipfile.ZipFile(wheel)",
         "tarfile.open(sdist)",
         "CHANGELOG.md",
         "SECURITY.md",
+        "CONTRIBUTING.md",
     ]
     for workflow_name, job_name in workflow_jobs.items():
         workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
@@ -411,10 +413,11 @@ def test_package_metadata_exposes_support_project_urls() -> None:
         "Issues": "https://github.com/invoker-bot/pydantic-studio/issues",
         "Changelog": "https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
         "Security": "https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
+        "Contributing": "https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md",
     }
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    assert "Source, Documentation, Issues, Changelog, and" in guide
+    assert "Source, Documentation, Issues, Changelog," in guide
 
 
 def test_package_metadata_exposes_changelog_and_release_notes() -> None:
@@ -465,6 +468,27 @@ def test_package_metadata_exposes_security_policy() -> None:
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "Security project URL" in guide
+
+
+def test_package_metadata_exposes_contributing_guide() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["project"]["urls"]["Contributing"] == (
+        "https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md"
+    )
+    assert "CONTRIBUTING.md" in pyproject["tool"]["uv"]["build-backend"]["source-include"]
+
+    guide = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    for snippet in (
+        "# Contributing",
+        "uv sync",
+        "uv run pytest -q",
+        "Do not push to origin without maintainer confirmation",
+    ):
+        assert snippet in guide
+
+    release = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "Contributing project URL" in release
 
 
 def test_package_metadata_exposes_license_and_discovery_terms() -> None:

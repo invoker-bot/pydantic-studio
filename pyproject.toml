@@ -46,6 +46,7 @@ Documentation = "https://github.com/invoker-bot/pydantic-studio/tree/main/docs/s
 Issues = "https://github.com/invoker-bot/pydantic-studio/issues"
 Changelog = "https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md"
 Security = "https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md"
+Contributing = "https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md"
 
 [dependency-groups]
 dev = [
@@ -110,4 +111,4 @@ exclude = [
 default-groups = ["dev", "lint"]
 
 [tool.uv.build-backend]
-source-include = ["CHANGELOG.md", "SECURITY.md"]
+source-include = ["CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md"]
