@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("825", "802 default"),
-        "CLAUDE.md": ("825", "802 default"),
+        "README.md": ("826", "803 default"),
+        "CLAUDE.md": ("826", "803 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -49,6 +49,19 @@ def test_workflows_define_concurrency_policies() -> None:
         "group": "${{ github.workflow }}-${{ github.ref }}",
         "cancel-in-progress": False,
     }
+
+
+def test_workflows_do_not_persist_checkout_credentials() -> None:
+    for workflow_name in ("ci.yml", "publish.yml"):
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        for job_name, job in workflow["jobs"].items():
+            checkout_steps = [
+                step for step in job.get("steps", []) if step.get("uses") == "actions/checkout@v4"
+            ]
+            for step in checkout_steps:
+                assert step["with"] == {
+                    "persist-credentials": False
+                }, f"{workflow_name}:{job_name} must not persist checkout credentials"
 
 
 def test_publish_workflow_uses_package_name_and_read_only_default_token() -> None:
