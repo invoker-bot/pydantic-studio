@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("819", "796 default"),
-        "CLAUDE.md": ("819", "796 default"),
+        "README.md": ("820", "797 default"),
+        "CLAUDE.md": ("820", "797 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -49,6 +49,13 @@ def test_workflows_define_concurrency_policies() -> None:
         "group": "${{ github.workflow }}-${{ github.ref }}",
         "cancel-in-progress": False,
     }
+
+
+def test_publish_workflow_uses_package_name_and_read_only_default_token() -> None:
+    workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
+
+    assert workflow["name"] == "Publish packages"
+    assert workflow["permissions"] == {"contents": "read"}
 
 
 def test_publish_workflow_uses_trusted_publishing_without_api_token_secret() -> None:
