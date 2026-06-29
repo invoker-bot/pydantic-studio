@@ -137,6 +137,8 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
+          if-no-files-found: error
+          retention-days: 30
 
   publish-pypi:
     runs-on: ubuntu-latest

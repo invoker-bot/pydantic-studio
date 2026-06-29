@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("820", "797 default"),
-        "CLAUDE.md": ("820", "797 default"),
+        "README.md": ("821", "798 default"),
+        "CLAUDE.md": ("821", "798 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -111,6 +111,26 @@ def test_publish_workflow_reports_registry_publish_failures_after_both_attempts(
     assert result_job["needs"] == ["publish-pypi", "publish-piesource"]
     assert result_job["if"] == "${{ always() }}"
     assert "One or more registry publishes failed" in result_job["steps"][0]["run"]
+
+
+def test_publish_workflow_uploads_release_artifact_strictly() -> None:
+    workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
+    build_steps = workflow["jobs"]["build"]["steps"]
+
+    upload_steps = [
+        step for step in build_steps if step.get("uses") == "actions/upload-artifact@v4"
+    ]
+    assert len(upload_steps) == 1
+    assert upload_steps[0]["with"] == {
+        "name": "python-package-distributions",
+        "path": "dist/",
+        "if-no-files-found": "error",
+        "retention-days": 30,
+    }
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "fails immediately if no distributions are present" in guide
+    assert "retains that artifact for 30 days" in guide
 
 
 def test_release_guide_documents_external_trusted_publisher_setup() -> None:

@@ -5,6 +5,8 @@ workflow builds the frontend bundle, runs the Python/browser/package gates,
 checks the tag against `pydantic_studio.__version__`, builds both package
 formats, smoke-tests wheel and sdist installs, uploads the distributions as
 one release artifact, and then publishes that artifact to PyPI and piesource.
+The artifact upload fails immediately if no distributions are present and
+retains that artifact for 30 days for release troubleshooting.
 
 ## PyPI trusted publisher
 
