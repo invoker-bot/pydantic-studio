@@ -102,7 +102,7 @@ class HostNetwork(IPv4Network):
     """Subclass of IPv4Network — restricted network range."""
 
 
-class ProjectPath(Path):
+class ProjectPath(type(Path())):
     """Subclass of Path — project-relative path."""
 
 

@@ -30,11 +30,13 @@ def test_release_gate_docs_use_current_test_counts() -> None:
 
 def test_publish_workflow_uses_trusted_publishing_without_api_token_secret() -> None:
     workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
-    publish_job = workflow["jobs"]["publish"]
+    build_job = workflow["jobs"]["build"]
+    publish_job = workflow["jobs"]["publish-pypi"]
 
+    assert build_job["permissions"] == {"contents": "read"}
     assert publish_job["environment"]["name"] == "pypi"
     assert publish_job["environment"]["url"] == "https://pypi.org/p/pydantic-studio"
-    assert publish_job["permissions"] == {"contents": "read", "id-token": "write"}
+    assert publish_job["permissions"] == {"id-token": "write"}
 
     publish_steps = [
         step
@@ -43,6 +45,26 @@ def test_publish_workflow_uses_trusted_publishing_without_api_token_secret() -> 
     ]
     assert len(publish_steps) == 1
     assert "with" not in publish_steps[0]
+    assert publish_steps[0]["continue-on-error"] is True
+
+
+def test_publish_workflow_pushes_to_piesource_independently() -> None:
+    workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
+    publish_job = workflow["jobs"]["publish-piesource"]
+
+    assert publish_job["needs"] == "build"
+    publish_steps = [
+        step
+        for step in publish_job["steps"]
+        if step.get("uses") == "pypa/gh-action-pypi-publish@release/v1"
+    ]
+    assert len(publish_steps) == 1
+    assert publish_steps[0]["continue-on-error"] is True
+    assert publish_steps[0]["with"] == {
+        "repository-url": "${{ secrets.PIESOURCE_REPOSITORY_URL }}",
+        "user": "${{ secrets.PIESOURCE_USERNAME }}",
+        "password": "${{ secrets.PIESOURCE_PASSWORD }}",
+    }
 
 
 def test_release_guide_documents_external_trusted_publisher_setup() -> None:
