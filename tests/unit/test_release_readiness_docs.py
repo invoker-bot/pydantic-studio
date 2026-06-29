@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("847", "824 default"),
-        "CLAUDE.md": ("847", "824 default"),
+        "README.md": ("850", "827 default"),
+        "CLAUDE.md": ("850", "827 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -272,16 +272,7 @@ def test_distribution_release_metadata_is_verified_before_install_smokes() -> No
         "ci.yml": "release-gate",
         "publish.yml": "build",
     }
-    required_snippets = [
-        "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
-        "Project-URL: Security, https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
-        "Project-URL: Contributing, https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md",
-        "zipfile.ZipFile(wheel)",
-        "tarfile.open(sdist)",
-        "CHANGELOG.md",
-        "SECURITY.md",
-        "CONTRIBUTING.md",
-    ]
+    command = "uv run python scripts/verify_distribution_metadata.py dist"
     for workflow_name, job_name in workflow_jobs.items():
         workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
         steps = workflow["jobs"][job_name]["steps"]
@@ -291,13 +282,35 @@ def test_distribution_release_metadata_is_verified_before_install_smokes() -> No
         verify_step = steps[verify_index]
 
         assert names.index("Check distribution metadata") < verify_index < wheel_smoke_index
-        for snippet in required_snippets:
-            assert snippet in verify_step["run"]
+        assert verify_step["run"] == command
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    assert guide.index("uv run twine check dist/*") < guide.index(
-        "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md"
-    ) < guide.index("rm -rf .dist-smoke-wheel")
+    assert guide.index("uv run twine check dist/*") < guide.index(command) < guide.index(
+        "rm -rf .dist-smoke-wheel"
+    )
+
+
+def test_distribution_release_metadata_uses_shared_verifier_script() -> None:
+    command = "uv run python scripts/verify_distribution_metadata.py dist"
+
+    assert (ROOT / "scripts" / "verify_distribution_metadata.py").is_file()
+
+    for workflow_name, job_name in {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        verify_steps = [
+            step for step in steps if step.get("name") == "Verify distribution release metadata"
+        ]
+
+        assert len(verify_steps) == 1
+        assert verify_steps[0]["run"] == command
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert command in guide
+    assert "zipfile.ZipFile(wheel)" not in guide
 
 
 def test_distribution_smoke_tests_start_from_clean_virtualenvs() -> None:
