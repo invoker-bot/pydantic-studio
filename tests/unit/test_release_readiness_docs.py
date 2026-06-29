@@ -40,7 +40,7 @@ def test_workflow_jobs_have_timeout_limits() -> None:
 def test_workflows_install_dependencies_from_locked_resolution() -> None:
     expected_install_commands = {
         ("ci.yml", "python"): "uv sync --locked --python ${{ matrix.python-version }}",
-        ("ci.yml", "release-gate"): "uv sync --locked --python 3.13",
+        ("ci.yml", "release-gate"): "uv sync --locked --all-extras --python 3.13",
         ("publish.yml", "build"): "uv sync --locked --all-extras --python 3.13",
     }
     for (workflow_name, job_name), expected in expected_install_commands.items():
