@@ -482,7 +482,7 @@ def test_release_guide_pushes_verified_release_tag_after_tagging() -> None:
 
 def test_release_guide_installs_playwright_browser_before_e2e() -> None:
     text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    install = "uv run playwright install chromium"
+    install = "uv run playwright install --with-deps chromium"
     e2e = 'uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"'
 
     assert install in text
