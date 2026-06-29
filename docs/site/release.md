@@ -62,6 +62,7 @@ cd frontend
 pnpm install --frozen-lockfile
 pnpm build
 cd ..
+git diff --exit-code -- src/pydantic_studio/renderers/html/static/dist
 uv run playwright install chromium
 uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
 rm -rf dist

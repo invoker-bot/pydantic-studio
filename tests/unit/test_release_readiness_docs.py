@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("832", "809 default"),
-        "CLAUDE.md": ("832", "809 default"),
+        "README.md": ("833", "810 default"),
+        "CLAUDE.md": ("833", "810 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -354,6 +354,16 @@ def test_release_guide_installs_frontend_dependencies_before_bundle_build() -> N
 
     assert install in text
     assert text.index(install) < text.index(build)
+
+
+def test_release_guide_checks_committed_frontend_bundle_after_build() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    build = "pnpm build"
+    drift_check = "git diff --exit-code -- src/pydantic_studio/renderers/html/static/dist"
+    e2e = 'uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"'
+
+    assert drift_check in text
+    assert text.index(build) < text.index(drift_check) < text.index(e2e)
 
 
 def test_release_guide_documents_independent_piesource_publish() -> None:
