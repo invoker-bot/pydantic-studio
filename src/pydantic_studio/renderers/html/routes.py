@@ -2,20 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs
 
 from fastapi import Request  # noqa: TC002 (FastAPI introspects this at runtime)
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from pydantic_studio.renderers.html.server import StudioServer
-
-
-_SPA_INDEX = Path(__file__).parent / "static" / "dist" / "index.html"
 
 
 def _parse_for_kind(kind: str, raw: str) -> tuple[bool, Any]:
@@ -185,8 +181,8 @@ def register(app: FastAPI, server: StudioServer) -> None:
     """Wire all routes onto the FastAPI app."""
 
     @app.get("/")
-    async def index() -> FileResponse:
-        return FileResponse(_SPA_INDEX, media_type="text/html")
+    async def index() -> HTMLResponse:
+        return server.render_spa_index()
 
     @app.post("/field/{path:path}", response_class=HTMLResponse)
     async def field_update(path: str, request: Request) -> HTMLResponse:

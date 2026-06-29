@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import html
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -15,13 +18,20 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from fastapi import Request
-    from fastapi.responses import HTMLResponse
 
     from pydantic_studio.tree.nodes import FormTree
 
 _HERE = Path(__file__).parent
 _TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
+_SPA_INDEX = _STATIC_DIR / "dist" / "index.html"
+
+
+def normalize_base_path(base_path: str) -> str:
+    stripped = base_path.strip()
+    if stripped in {"", "/"}:
+        return ""
+    return "/" + stripped.strip("/")
 
 
 class StudioServer:
@@ -39,6 +49,7 @@ class StudioServer:
         heartbeat_timeout_seconds: float = 30.0,
         readonly_paths: Iterable[str] = (),
         session: EditSession | None = None,
+        base_path: str = "",
     ) -> None:
         if session is None:
             if tree is None:
@@ -49,6 +60,7 @@ class StudioServer:
                 readonly_paths=readonly_paths,
             )
         self.session = session
+        self.base_path = normalize_base_path(base_path)
         self.app = FastAPI()
         self.templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
         self.last_heartbeat_ts: float = 0.0
@@ -102,6 +114,27 @@ class StudioServer:
         from pydantic_studio.renderers.html import routes
 
         routes.register(self.app, self)
+
+    def render_spa_index(self) -> HTMLResponse:
+        """Serve the built SPA index with runtime mount-path config."""
+        index = _SPA_INDEX.read_text(encoding="utf-8")
+        if self.base_path:
+            index = index.replace(
+                'src="/static/dist/',
+                f'src="{self.base_path}/static/dist/',
+            )
+            index = index.replace(
+                'href="/static/dist/',
+                f'href="{self.base_path}/static/dist/',
+            )
+        config = json.dumps({"basePath": self.base_path})
+        script = (
+            "<script>"
+            f"window.__PYDANTIC_STUDIO__ = {html.escape(config, quote=False)};"
+            "</script>"
+        )
+        index = index.replace("</head>", f"    {script}\n  </head>")
+        return HTMLResponse(index)
 
     def render_index(self, request: Request) -> HTMLResponse:
         """Render the index page."""

@@ -5,6 +5,7 @@
 // server-side state.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { studioUrl } from "@/api/base";
 import { FormTreeSchema, type FormTree } from "@/api/schemas";
 
 // Discriminated union mirroring spec §3.2. Phase 3 wires set_value
@@ -27,7 +28,7 @@ export interface MutationResponse {
 }
 
 export async function applyMutation(mutation: Mutation): Promise<MutationResponse> {
-  const response = await fetch("/api/mutations", {
+  const response = await fetch(studioUrl("/api/mutations"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(mutation),
