@@ -8,6 +8,10 @@
 
 ::: pydantic_studio.FormNode
 
+::: pydantic_studio.EditSession
+
+::: pydantic_studio.SubmitResult
+
 ## I/O
 
 ::: pydantic_studio.load_config
@@ -32,8 +36,10 @@
 
 ::: pydantic_studio.run_console_app
 ::: pydantic_studio.StudioApp
+::: pydantic_studio.StudioScreen
 ::: pydantic_studio.run_app
 ::: pydantic_studio.StudioServer
+::: pydantic_studio.mount_html_app
 ::: pydantic_studio.run_html_app
 
 ## Registry
