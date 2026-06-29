@@ -164,6 +164,33 @@ class StudioServer:
         )
 
 
+def mount_html_app(
+    host_app,
+    path: str,
+    *,
+    tree: FormTree | None = None,
+    save_path: str | Path | None = None,
+    heartbeat_timeout_seconds: float = 30.0,
+    readonly_paths: Iterable[str] = (),
+    session: EditSession | None = None,
+) -> StudioServer:
+    """Mount pydantic-studio into a Starlette-compatible ASGI host."""
+    mount = getattr(host_app, "mount", None)
+    if mount is None:
+        raise TypeError("mount_html_app requires a host app with mount(path, app)")
+    base_path = normalize_base_path(path)
+    server = StudioServer(
+        tree=tree,
+        save_path=save_path,
+        heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+        readonly_paths=readonly_paths,
+        session=session,
+        base_path=base_path,
+    )
+    mount(base_path or "/", server.app)
+    return server
+
+
 def run_html_app(
     tree: FormTree,
     save_path: str | Path | None = None,
