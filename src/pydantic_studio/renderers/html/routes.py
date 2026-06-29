@@ -273,28 +273,19 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.post("/submit", response_class=HTMLResponse)
     async def submit() -> HTMLResponse:
-        from pydantic import ValidationError
-
-        from pydantic_studio import save_yaml
-        from pydantic_studio.exceptions import ValidationFailedError
-
-        try:
-            server.tree.to_instance()
-        except (ValidationError, ValidationFailedError) as e:
+        result = server.session.submit()
+        if not result.ok:
             return HTMLResponse(
-                content=f"<pre>Validation failed: {e}</pre>",
+                content=f"<pre>Validation failed: {'; '.join(result.errors)}</pre>",
                 status_code=200,
             )
-        if server.save_path is not None:
-            save_yaml(server.tree, server.save_path)
-        server.submitted = True
         return HTMLResponse(
             content="<h2>Done — you can close this tab.</h2>",
         )
 
     @app.post("/cancel", response_class=HTMLResponse)
     async def cancel() -> HTMLResponse:
-        server.cancelled = True
+        server.session.cancel()
         return HTMLResponse(
             content="<h2>Cancelled — you can close this tab.</h2>",
         )
@@ -363,29 +354,26 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.post("/api/submit", response_class=JSONResponse)
     async def api_submit() -> JSONResponse:
-        from pydantic import ValidationError
-
-        from pydantic_studio import save_yaml
-        from pydantic_studio.exceptions import ValidationFailedError
-
-        try:
-            server.tree.to_instance()
-        except (ValidationError, ValidationFailedError):
+        result = server.session.submit()
+        if not result.ok:
+            errors = [
+                {"path": path, "message": message}
+                for path, message in zip(result.paths, result.errors, strict=False)
+            ]
+            if not errors:
+                errors = validation_envelope(server.tree)["errors"]
             return JSONResponse(
                 status_code=400,
                 content={
                     "ok": False,
-                    "errors": validation_envelope(server.tree)["errors"],
+                    "errors": errors,
                 },
             )
-        if server.save_path is not None:
-            save_yaml(server.tree, server.save_path)
-        server.submitted = True
         return JSONResponse(content={"ok": True})
 
     @app.post("/api/cancel", response_class=JSONResponse)
     async def api_cancel() -> JSONResponse:
-        server.cancelled = True
+        server.session.cancel()
         return JSONResponse(content={"ok": True})
 
     @app.get("/api/heartbeat", response_class=JSONResponse)

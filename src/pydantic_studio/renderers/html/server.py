@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from pydantic_studio.session import EditSession
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -32,22 +34,47 @@ class StudioServer:
 
     def __init__(
         self,
-        tree: FormTree,
+        tree: FormTree | None = None,
         save_path: str | Path | None = None,
         heartbeat_timeout_seconds: float = 30.0,
         readonly_paths: Iterable[str] = (),
+        session: EditSession | None = None,
     ) -> None:
-        self.tree = tree
-        self.save_path = Path(save_path) if save_path is not None else None
-        self.readonly_paths = frozenset(readonly_paths)
+        if session is None:
+            if tree is None:
+                raise TypeError("StudioServer requires either tree or session")
+            session = EditSession(
+                tree=tree,
+                save_path=save_path,
+                readonly_paths=readonly_paths,
+            )
+        self.session = session
         self.app = FastAPI()
         self.templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
-        self.submitted = False
-        self.cancelled = False
         self.last_heartbeat_ts: float = 0.0
         self.heartbeat_timeout_seconds = heartbeat_timeout_seconds
         self._mount_static()
         self._register_routes()
+
+    @property
+    def tree(self) -> FormTree:
+        return self.session.tree
+
+    @property
+    def save_path(self) -> Path | None:
+        return self.session.save_path
+
+    @property
+    def readonly_paths(self) -> frozenset[str]:
+        return self.session.readonly_paths
+
+    @property
+    def submitted(self) -> bool:
+        return self.session.submitted
+
+    @property
+    def cancelled(self) -> bool:
+        return self.session.cancelled
 
     def _check_heartbeat_timeout(self) -> None:
         """Mark cancelled if heartbeat is older than the timeout.
@@ -61,7 +88,7 @@ class StudioServer:
             return
         elapsed = time.time() - self.last_heartbeat_ts
         if elapsed > self.heartbeat_timeout_seconds:
-            self.cancelled = True
+            self.session.cancel()
 
     def _mount_static(self) -> None:
         if _STATIC_DIR.exists():
@@ -171,7 +198,7 @@ def run_html_app(
         while not server.should_exit:
             await asyncio.sleep(1.0)
             studio_server._check_heartbeat_timeout()
-            if studio_server.submitted or studio_server.cancelled:
+            if studio_server.session.done:
                 server.should_exit = True
 
     async def main() -> None:
@@ -183,12 +210,12 @@ def run_html_app(
 
     asyncio.run(main())
 
-    if studio_server.submitted:
+    outcome = studio_server.session.outcome
+    if outcome is not None and outcome.submitted:
         if save_path is not None:
             print(f"saved to {save_path}", file=sys.stdout)
         else:
             print("submitted (no save path configured)", file=sys.stdout)
-        return EditOutcome(status="submitted")
-    if studio_server.cancelled:
-        print("cancelled", file=sys.stdout)
+        return outcome
+    print("cancelled", file=sys.stdout)
     return EditOutcome(status="cancelled")
