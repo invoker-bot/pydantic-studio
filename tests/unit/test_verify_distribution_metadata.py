@@ -39,32 +39,70 @@ def _write_sdist(dist: Path, filenames: tuple[str, ...]) -> None:
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
 
 
+def _write_pyproject(root: Path) -> None:
+    root.joinpath("pyproject.toml").write_text(
+        """[project.urls]
+Changelog = "https://example.invalid/CHANGELOG.md"
+Security = "https://example.invalid/SECURITY.md"
+Contributing = "https://example.invalid/CONTRIBUTING.md"
+
+[tool.uv.build-backend]
+source-include = ["CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md"]
+""",
+        encoding="utf-8",
+    )
+
+
 def test_verify_distribution_metadata_accepts_expected_release_files(tmp_path: Path) -> None:
     verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
     metadata = "\n".join(
         [
-            "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
-            "Project-URL: Security, https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
-            "Project-URL: Contributing, https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md",
+            "Project-URL: Changelog, https://example.invalid/CHANGELOG.md",
+            "Project-URL: Security, https://example.invalid/SECURITY.md",
+            "Project-URL: Contributing, https://example.invalid/CONTRIBUTING.md",
         ]
     )
-    _write_wheel(tmp_path, metadata)
-    _write_sdist(tmp_path, ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"))
+    _write_wheel(dist, metadata)
+    _write_sdist(dist, ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"))
 
-    verifier.verify_distribution_metadata(tmp_path)
+    verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
 def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path) -> None:
     verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
     metadata = "\n".join(
         [
-            "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
-            "Project-URL: Security, https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
-            "Project-URL: Contributing, https://github.com/invoker-bot/pydantic-studio/blob/main/CONTRIBUTING.md",
+            "Project-URL: Changelog, https://example.invalid/CHANGELOG.md",
+            "Project-URL: Security, https://example.invalid/SECURITY.md",
+            "Project-URL: Contributing, https://example.invalid/CONTRIBUTING.md",
         ]
     )
-    _write_wheel(tmp_path, metadata)
-    _write_sdist(tmp_path, ("CHANGELOG.md", "SECURITY.md"))
+    _write_wheel(dist, metadata)
+    _write_sdist(dist, ("CHANGELOG.md", "SECURITY.md"))
 
     with pytest.raises(RuntimeError, match=r"CONTRIBUTING\.md"):
-        verifier.verify_distribution_metadata(tmp_path)
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_project_url(tmp_path: Path) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = "\n".join(
+        [
+            "Project-URL: Changelog, https://example.invalid/CHANGELOG.md",
+            "Project-URL: Security, https://example.invalid/SECURITY.md",
+        ]
+    )
+    _write_wheel(dist, metadata)
+    _write_sdist(dist, ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"))
+
+    with pytest.raises(RuntimeError, match=r"Contributing"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
