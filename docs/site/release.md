@@ -119,7 +119,7 @@ PY
 rm -rf .dist-smoke-email
 uv run python -m venv .dist-smoke-email
 wheel=$(
-  python - <<'PY'
+  uv run python - <<'PY'
 from pathlib import Path
 
 wheels = sorted(Path("dist").glob("*.whl"))
