@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("835", "812 default"),
-        "CLAUDE.md": ("835", "812 default"),
+        "README.md": ("836", "813 default"),
+        "CLAUDE.md": ("836", "813 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -64,6 +64,16 @@ def test_release_guide_uses_publish_python_environment_for_local_preflight() -> 
 
     assert install in guide
     assert guide.index(install) < guide.index(default_tests)
+
+
+def test_release_guide_verifies_uv_python_before_local_preflight_gates() -> None:
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    install = "uv sync --locked --all-extras --python 3.13"
+    version_check = "assert sys.version_info[:2] == (3, 13), sys.version"
+    default_tests = "uv run pytest -q"
+
+    assert version_check in guide
+    assert guide.index(install) < guide.index(version_check) < guide.index(default_tests)
 
 
 def test_release_gates_verify_project_metadata_version_matches_runtime() -> None:

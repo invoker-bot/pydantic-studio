@@ -55,6 +55,11 @@ Run the same gates before tagging:
 ```bash
 uv sync --locked --all-extras --python 3.13
 uv run python - <<'PY'
+import sys
+
+assert sys.version_info[:2] == (3, 13), sys.version
+PY
+uv run python - <<'PY'
 from pathlib import Path
 import tomllib
 
