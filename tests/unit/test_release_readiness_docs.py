@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("831", "808 default"),
-        "CLAUDE.md": ("831", "808 default"),
+        "README.md": ("832", "809 default"),
+        "CLAUDE.md": ("832", "809 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -55,6 +55,15 @@ def test_workflows_install_dependencies_from_locked_resolution() -> None:
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "uv sync --locked" in guide
+
+
+def test_release_guide_uses_publish_python_environment_for_local_preflight() -> None:
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    install = "uv sync --locked --all-extras --python 3.13"
+    default_tests = "uv run pytest -q"
+
+    assert install in guide
+    assert guide.index(install) < guide.index(default_tests)
 
 
 def test_workflows_define_concurrency_policies() -> None:

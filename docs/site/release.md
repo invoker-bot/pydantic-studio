@@ -53,7 +53,7 @@ publish, `publish-result` reads their outcomes and fails the workflow with
 Run the same gates before tagging:
 
 ```bash
-uv sync --locked
+uv sync --locked --all-extras --python 3.13
 uv run pytest -q
 uv run ruff check
 uv run pyright src/pydantic_studio
