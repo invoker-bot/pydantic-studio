@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("829", "806 default"),
-        "CLAUDE.md": ("829", "806 default"),
+        "README.md": ("830", "807 default"),
+        "CLAUDE.md": ("830", "807 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -308,6 +308,15 @@ def test_release_guide_installs_playwright_browser_before_e2e() -> None:
 
     assert install in text
     assert text.index(install) < text.index(e2e)
+
+
+def test_release_guide_installs_frontend_dependencies_before_bundle_build() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    install = "pnpm install --frozen-lockfile"
+    build = "pnpm build"
+
+    assert install in text
+    assert text.index(install) < text.index(build)
 
 
 def test_release_guide_documents_independent_piesource_publish() -> None:

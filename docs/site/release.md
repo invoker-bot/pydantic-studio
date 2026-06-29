@@ -58,7 +58,10 @@ uv run pytest -q
 uv run ruff check
 uv run pyright src/pydantic_studio
 uv run mkdocs build --strict
-cd frontend && pnpm build && cd ..
+cd frontend
+pnpm install --frozen-lockfile
+pnpm build
+cd ..
 uv run playwright install chromium
 uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
 rm -rf dist
