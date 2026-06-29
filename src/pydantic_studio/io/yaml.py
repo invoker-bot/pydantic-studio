@@ -13,7 +13,9 @@ stashed source (preserving user comments) or from ``FieldInfo.description``
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -48,8 +50,7 @@ def load_yaml(path: str | Path, schema: type[BaseModel]) -> FormTree:
     Returns:
         FormTree with values populated from the file. Fields absent from
         the file get their schema defaults. Fields in the file but not in
-        the schema are dropped (silent in v0.0.4; per spec O-1 future
-        versions will warn to stderr or fail under ``--strict``).
+        the schema are dropped with a stderr warning.
         ``tree.yaml_source`` carries the parsed CommentedMap for save_yaml's
         comment-preservation pass.
 
@@ -63,6 +64,7 @@ def load_yaml(path: str | Path, schema: type[BaseModel]) -> FormTree:
         cm: Any = yaml.load(f)
     if cm is None:  # empty file
         cm = {}
+    _warn_unknown_yaml_fields(_unknown_key_paths(cm, schema))
     # CommentedMap is a dict subclass — pass directly to build_form_tree.
     # Unknown keys are filtered automatically because GroupBuilder iterates
     # only over schema fields.
@@ -83,8 +85,7 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
     User comments from the source are preserved verbatim on fields that
     still exist in the schema (per spec §10.1 rule #3). New fields get
     description comments from ``FieldInfo.description``. Fields removed
-    from the schema are dropped silently in v0.0.4 (rule #4 — stderr
-    warning is deferred to v0.0.5).
+    from the schema are dropped with a stderr warning.
 
     The tree is first materialized via ``tree.to_instance()`` so that
     schema defaults are resolved into the output (a fresh tree with all
@@ -127,6 +128,7 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
     # Run through validation so schema defaults are resolved into concrete
     # values, with root-variant output metadata injected when configured.
     data = tree.to_output_python()
+    _warn_unknown_yaml_fields(_dropped_source_key_paths(source, data, schema))
     cm = _build_commented_map(data, schema, source)
     yaml = _yaml()
 
@@ -241,3 +243,71 @@ def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         return annotation
     return None
+
+
+def _unknown_key_paths(
+    data: Mapping[Any, Any],
+    schema: type[BaseModel],
+    prefix: str = "",
+) -> list[str]:
+    """Return YAML keys that would be ignored by ``build_form_tree``."""
+    paths: list[str] = []
+    for key, value in data.items():
+        key_str = str(key)
+        path = f"{prefix}{key_str}"
+        field_info = schema.model_fields.get(key_str)
+        if field_info is None:
+            paths.append(path)
+            continue
+        nested_schema = _nested_schema_class(field_info)
+        if nested_schema is not None and isinstance(value, Mapping):
+            paths.extend(_unknown_key_paths(value, nested_schema, f"{path}."))
+    return paths
+
+
+def _dropped_source_key_paths(
+    source: Mapping[Any, Any] | None,
+    data: Mapping[str, Any],
+    schema: type[BaseModel],
+    prefix: str = "",
+) -> list[str]:
+    """Return source keys that will not be written back by ``save_yaml``."""
+    if source is None:
+        return []
+
+    paths: list[str] = []
+    for key, value in source.items():
+        key_str = str(key)
+        path = f"{prefix}{key_str}"
+        field_info = schema.model_fields.get(key_str)
+        if field_info is None:
+            if key_str not in data:
+                paths.append(path)
+            continue
+
+        nested_schema = _nested_schema_class(field_info)
+        nested_data = data.get(key_str)
+        if (
+            nested_schema is not None
+            and isinstance(value, Mapping)
+            and isinstance(nested_data, Mapping)
+        ):
+            paths.extend(
+                _dropped_source_key_paths(
+                    value,
+                    nested_data,
+                    nested_schema,
+                    f"{path}.",
+                )
+            )
+    return paths
+
+
+def _warn_unknown_yaml_fields(paths: list[str]) -> None:
+    if not paths:
+        return
+    joined = ", ".join(sorted(paths))
+    print(
+        f"pydantic-studio: dropping unknown YAML field(s) {joined}",
+        file=sys.stderr,
+    )

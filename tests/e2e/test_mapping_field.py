@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 
 
 def test_add_entry_rename_key(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     # env starts empty - click + Add Entry under the env field

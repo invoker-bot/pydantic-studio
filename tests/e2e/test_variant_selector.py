@@ -40,6 +40,7 @@ def _serve_tree(tree) -> Iterator[str]:
         host="127.0.0.1",
         port=port,
         log_level="warning",
+        ws="none",
     )
     uvi = uvicorn.Server(config)
     thread = threading.Thread(target=uvi.run, daemon=True)
@@ -76,7 +77,7 @@ def test_web_variant_selector_switches_root_model(page: Page) -> None:
     )
 
     with _serve_tree(tree) as base_url:
-        page.goto(f"{base_url}/static/dist/index.html")
+        page.goto(f"{base_url}/")
         page.get_by_label("Variant").click()
         page.get_by_role("option", name="Slack").click()
 

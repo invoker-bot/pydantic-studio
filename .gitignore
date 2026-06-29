@@ -8,6 +8,7 @@ build/
 /dist/
 *.egg-info/
 .venv/
+.dist-smoke*/
 .eggs/
 
 # Frontend (Vite + pnpm) - frontend/.gitignore is authoritative,
@@ -54,3 +55,6 @@ verify_spec.py
 
 # Superpowers brainstorming mockups
 .superpowers/
+
+# Codex desktop local environment metadata. Keep tracked .codex assets explicit.
+.codex/environments/

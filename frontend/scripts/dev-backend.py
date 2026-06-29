@@ -40,7 +40,7 @@ class Demo(BaseModel):
 def main() -> None:
     tree = build_form_tree(Demo, existing={"name": "frontend-dev", "workers": 8})
     server = StudioServer(tree=tree, save_path=None)
-    uvicorn.run(server.app, host="127.0.0.1", port=8000, log_level="warning")
+    uvicorn.run(server.app, host="127.0.0.1", port=8000, log_level="warning", ws="none")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from playwright.sync_api import Page, expect
 
 
 def test_edit_url_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     homepage = page.get_by_label("homepage", exact=True)
@@ -31,7 +31,7 @@ def test_edit_url_field_updates_tree(page: Page, fastapi_url: str) -> None:
 
 
 def test_edit_email_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     contact = page.get_by_label("contact", exact=True)
@@ -50,7 +50,7 @@ def test_edit_email_field_updates_tree(page: Page, fastapi_url: str) -> None:
 
 
 def test_edit_ip_address_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     bind_ip = page.get_by_label("bind_ip", exact=True)

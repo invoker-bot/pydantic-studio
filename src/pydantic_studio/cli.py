@@ -230,7 +230,7 @@ def edit(
         "console",
         "--frontend",
         "-f",
-        help="UI to launch: 'console', 'tui' (Textual), or 'web' (FastAPI+HTMX).",
+        help="UI to launch: 'console', 'tui' (Textual), or 'web' (FastAPI + React).",
     ),
 ) -> None:
     """Launch an editor for a Pydantic schema."""

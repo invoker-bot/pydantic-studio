@@ -10,19 +10,15 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from pydantic_studio.session import EditSession
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from fastapi import Request
-
     from pydantic_studio.tree.nodes import FormTree
 
 _HERE = Path(__file__).parent
-_TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
 _SPA_INDEX = _STATIC_DIR / "dist" / "index.html"
 
@@ -62,7 +58,6 @@ class StudioServer:
         self.session = session
         self.base_path = normalize_base_path(base_path)
         self.app = FastAPI()
-        self.templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
         self.last_heartbeat_ts: float = 0.0
         self.heartbeat_timeout_seconds = heartbeat_timeout_seconds
         self._mount_static()
@@ -135,33 +130,6 @@ class StudioServer:
         )
         index = index.replace("</head>", f"    {script}\n  </head>")
         return HTMLResponse(index)
-
-    def render_index(self, request: Request) -> HTMLResponse:
-        """Render the index page."""
-        from pydantic_studio.renderers.html.render import (
-            initial_value_str,
-            list_groups,
-            list_root_fields,
-            render_yaml_preview,
-        )
-
-        schema_name = (
-            self.tree.schema_name.split(":")[-1]
-            if ":" in self.tree.schema_name
-            else self.tree.schema_name
-        )
-        return self.templates.TemplateResponse(
-            request,
-            "base.html.jinja",
-            {
-                "schema_name": schema_name,
-                "tree": self.tree,
-                "fields": list_root_fields(self.tree),
-                "groups": list_groups(self.tree),
-                "preview": render_yaml_preview(self.tree),
-                "initial_value_str": initial_value_str,
-            },
-        )
 
 
 def mount_html_app(
@@ -250,7 +218,11 @@ def run_html_app(
     webbrowser.open(url)
 
     config = uvicorn.Config(
-        studio_server.app, host="127.0.0.1", port=port, log_level="warning"
+        studio_server.app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        ws="none",
     )
     server = uvicorn.Server(config)
 

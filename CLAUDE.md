@@ -9,12 +9,19 @@ immediately.
 
 - **What**: Interactive editor for Pydantic models. Generate and edit
   YAML / TOML / JSON config files against a strongly-typed schema.
-- **Status**: v0.3.0 alpha — all 9 implementation phases + the
-  task-oriented overhaul + TUI form mode (focus = edit) shipped on
-  master. 744 tests passing. ruff clean. `mkdocs build --strict`
-  clean.
-- **Three frontends**: Textual TUI, FastAPI+HTMX browser app, CLI
-  (`fill`/`run`/`check`/`edit`/`show`/`version`).
+- **Status**: v0.4.0 alpha — all 9 implementation phases, the
+  task-oriented overhaul, TUI form mode, the React-backed web app, and
+  root model variants are merged on master. Current local gate: 814
+  tests: 791 default tests plus 23 explicit Playwright browser e2e tests, ruff
+  clean, pyright clean for production code, `mkdocs build --strict`
+  clean, frontend bundle build clean, `uv build` clean, `twine check`
+  clean, and wheel/sdist install smoke clean. CI runs the default suite
+  on Python 3.11-3.14; browser/package gates run on Python 3.13 and
+  include wheel and sdist install smoke gates. Tag-triggered PyPI
+  publishing uses GitHub OIDC Trusted Publishing with the `pypi`
+  environment, not a repository API-token secret.
+- **Three frontends**: Textual TUI, FastAPI + bundled React browser app,
+  and CLI/console (`fill`/`run`/`check`/`edit`/`show`/`version`).
 - **Three formats**: YAML (full round-trip), TOML, JSON.
 - **The spec lives at** `docs/superpowers/specs/2026-05-05-pydantic-studio-design.md`.
 - **Phase-by-phase plans live at** `docs/superpowers/plans/`.
@@ -41,6 +48,7 @@ src/pydantic_studio/
 ├── types/
 │   ├── registry.py          # NodeBuilder Protocol + Registry class
 │   ├── primitives.py        # Str/Int/Float/Bool/Decimal builders
+│   ├── anyfield.py          # Any builder
 │   ├── temporal.py          # date/datetime/time/timedelta builders
 │   ├── network.py           # IP/URL/Email builders
 │   ├── special.py           # Path/UUID/Secret/Pattern/Bytes builders
@@ -49,6 +57,7 @@ src/pydantic_studio/
 │   ├── mapping.py           # Dict builder
 │   ├── unions.py            # Union builder (with model_validate fallback)
 │   ├── models.py            # GroupBuilder for nested BaseModel
+│   ├── core_schema_fallback.py # fallback builder for supported core schemas
 │   ├── annotated.py         # Annotated[...] traversal helpers
 │   ├── metadata.py          # constraint extraction (ge, le, etc.)
 │   └── utils.py             # field_default helper
@@ -61,15 +70,21 @@ src/pydantic_studio/
 └── renderers/
     ├── textual_/            # Textual TUI
     │   ├── app.py           # StudioApp
-    │   ├── screens.py       # EditorScreen + bindings
-    │   └── widgets/         # Sidebar, EditorPane, NodeEditor + scalars/containers
-    └── html/                # FastAPI + HTMX
+    │   ├── studio_screen.py # embeddable StudioScreen
+    │   ├── screens.py       # support/legacy screens
+    │   └── widgets/         # FieldList + per-kind cells
+    └── html/                # FastAPI + React SPA
         ├── server.py        # StudioServer + run_html_app
-        ├── routes.py        # 9 routes (field/seq/map/union/submit/cancel/heartbeat)
-        ├── render.py        # YAML preview + helpers
-        ├── templates/       # Jinja2 (base + form)
-        └── static/          # vendored htmx.min.js + studio.css
+        ├── routes.py        # SPA shell + /api/* JSON routes
+        ├── serialize.py     # FormTree <-> JSON contract for the SPA
+        ├── render.py        # legacy YAML preview helpers
+        └── static/dist/     # committed Vite production bundle
 ```
+
+The React/Vite source lives under `frontend/src/`. The committed
+production bundle lives under
+`src/pydantic_studio/renderers/html/static/dist/` and must be rebuilt
+with `cd frontend && pnpm build` whenever SPA source changes.
 
 ## Core invariants — DO NOT BREAK
 
@@ -232,15 +247,31 @@ ruff knows the rule and won't complain.
 
 ## Test patterns
 
-- **`uv run pytest -q`** runs the whole suite (416 tests).
+- **`uv run pytest -q`** runs the default suite (791 tests at v0.4.0).
+  This intentionally skips `tests/e2e/` and disables the pytest-playwright
+  plugin because plugin registration interferes with Textual
+  `App.run_test()` under `asyncio_mode="auto"`.
+- **Browser e2e** runs explicitly:
+  `uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"`.
+  Install Chromium first with `uv run playwright install chromium` on a
+  developer machine, or `uv run playwright install --with-deps chromium`
+  in Linux CI.
+- **CI split**: `.github/workflows/ci.yml` runs the default test suite
+  on Python 3.11, 3.12, 3.13, and 3.14. The browser, frontend bundle,
+  wheel/sdist, `twine check`, and wheel and sdist install smoke gates run
+  once on Python 3.13 after the matrix passes. Every CI job passes the
+  intended version to `uv sync --python` and asserts `sys.version_info`
+  before running tests.
 - **TUI tests**: use `App.run_test()` which returns a `Pilot` async
   context. Always `await pilot.pause()` before DOM queries — `on_mount`
   pushes the `EditorScreen` asynchronously, and the screen isn't active
   until the event loop yields once. Use **`app.screen.query_one(...)`**
   not `app.query_one(...)` — the latter searches the base screen.
-- **HTMX tests**: use `fastapi.testclient.TestClient`. The HTML
-  renderer's routes use `urllib.parse.parse_qs` (via `_read_form_field`)
-  for form bodies — that avoids requiring `python-multipart`.
+- **Web API tests**: use `fastapi.testclient.TestClient` for the JSON
+  `/api/*` routes and Playwright for the bundled SPA. The React SPA's
+  canonical path is JSON over `/api/tree`, `/api/mutations`,
+  `/api/submit`, `/api/cancel`, and `/api/heartbeat`; legacy form-post
+  routes and HTMX/Jinja assets are intentionally absent.
 - **TDD discipline**: write the failing test first, run it, see the
   failure, write the minimal code, see it pass, commit. Phase
   implementations earned strong test coverage by following this every
@@ -358,23 +389,21 @@ issues) compound with the higher-capability model.
 | CLI reference | `docs/site/cli.md` |
 | FormTree mutations | `src/pydantic_studio/tree/nodes.py` (search for `def set_value`) |
 | Type registry | `src/pydantic_studio/tree/builder.py` |
-| YAML round-trip | `src/pydantic_studio/io/yaml.py` (`_build_commented_map`, `_copy_comment_if_present`) |
-| TUI widget dispatch | `src/pydantic_studio/renderers/textual_/widgets/editor.py` (`NodeEditor.dispatch`) |
-| HTML routes | `src/pydantic_studio/renderers/html/routes.py` |
+| YAML round-trip | `src/pydantic_studio/io/yaml.py` |
+| TUI widget dispatch | `src/pydantic_studio/renderers/textual_/widgets/field_list.py` |
+| Web JSON API | `src/pydantic_studio/renderers/html/routes.py` and `serialize.py` |
+| Web SPA source | `frontend/src/` |
+| Committed Web bundle | `src/pydantic_studio/renderers/html/static/dist/` |
 
-## Things v0.1 deliberately doesn't do
+## Deferred items
 
-These are post-v0.1 nice-to-haves. Don't add them unless asked:
+These are still deliberate non-goals unless the user asks for them:
 
 - Markdown rendering of `Field(description=...)` in the UIs
-- Constraint badges (`ge=1`) shown next to fields
 - Light-theme toggle / custom `theme.css` for Textual
-- Tailwind CSS pipeline + Alpine.js vendoring for the HTML renderer
 - mkdocs publishing to GitHub Pages
 - Demo gif/screencast
 - Status-bar widget for inline error display in TUI
-- Stderr warnings for fields dropped on YAML save (currently silent —
-  spec §10.1 #4)
 - LLM-assisted defaults (`fill_with_llm`)
 - Multi-profile management (dev/staging/prod overlays)
 
@@ -382,13 +411,13 @@ These are post-v0.1 nice-to-haves. Don't add them unless asked:
 
 | Symptom | First check |
 |---|---|
-| `ruamel.yaml.representer.RepresenterError` on save | `model_dump(mode=...)` — should be `"json"` not `"python"` |
-| Pilot DOM query returns None | `await pilot.pause()` after app starts; use `app.screen.query_one` |
-| Widget id collision | `_sanitize_id(path)` produced the same id for two paths — pre-escape underscores |
-| HTMX swap returns wrong content | Check `hx-target` matches the response's outer wrapper id |
-| save_yaml raises ValidationFailedError | Tree has unset required fields — use `save_draft_yaml` for partial saves |
-| pyright reports many errors in renderer | Renderer is excluded; check `[tool.pyright] exclude` is intact |
-| Test asserting `node.value` is None | Default-seeding was removed in Phase 6 housekeeping; use `tree.set_value(path, default)` to seed |
+| YAML representer error on save | `model_dump(mode=...)` should be `"json"` |
+| Pilot DOM query returns None | `await pilot.pause()`, then use `app.screen.query_one` |
+| Widget id collision | Check `_sanitize_id(path)` for pre-escaped underscores |
+| Web field does not update | Check `/api/mutations`, `mutation_result`, and Query cache |
+| save_yaml raises ValidationFailedError | Unset required fields need `save_draft_yaml` |
+| pyright reports many renderer errors | Check `[tool.pyright] exclude` is intact |
+| Test asserting `node.value` is None | Default-seeding was removed; seed with `tree.set_value` |
 
 ## Final note
 

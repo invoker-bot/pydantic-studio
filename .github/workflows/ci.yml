@@ -1,19 +1,63 @@
-name: Publish to PyPI
+name: CI
 
 on:
+  pull_request:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
 
 jobs:
-  publish:
+  python:
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/pydantic-studio
-    permissions:
-      contents: read
-      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --python ${{ matrix.python-version }}
+
+      - name: Verify uv environment Python
+        env:
+          EXPECTED_PYTHON: ${{ matrix.python-version }}
+        run: |
+          uv run python - <<'PY'
+          import os
+          import sys
+
+          expected = tuple(map(int, os.environ["EXPECTED_PYTHON"].split(".")))
+          assert sys.version_info[:2] == expected, sys.version
+          PY
+
+      - name: Run default tests
+        run: uv run pytest -q
+
+  release-gate:
+    name: Browser and package gate
+    runs-on: ubuntu-latest
+    needs: python
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +84,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install Python dependencies
-        run: uv sync --all-extras --python 3.13
+        run: uv sync --python 3.13
 
       - name: Verify uv environment Python
         run: |
@@ -70,23 +114,11 @@ jobs:
       - name: Verify committed frontend bundle is current
         run: git diff --exit-code -- src/pydantic_studio/renderers/html/static/dist
 
-      - name: Run default tests
-        run: uv run pytest -q
-
       - name: Install Playwright Chromium
         run: uv run playwright install --with-deps chromium
 
       - name: Run browser e2e tests
         run: uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
-
-      - name: Verify tag matches package version
-        run: |
-          tag_version="${GITHUB_REF_NAME#v}"
-          pkg_version=$(uv run python -c 'import pydantic_studio as ps; print(ps.__version__)')
-          if [ "$tag_version" != "$pkg_version" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} (${tag_version}) != package ${pkg_version}"
-            exit 1
-          fi
 
       - name: Build distributions
         run: uv build
@@ -127,6 +159,3 @@ jobs:
               "renderers/html/static/dist/index.html"
           ).is_file()
           PY
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1

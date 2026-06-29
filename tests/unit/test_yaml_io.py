@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from pydantic_studio import load_yaml
 from pydantic_studio.tree.builder import build_form_tree
-from tests.fixtures.schemas import Server
+from tests.fixtures.schemas import Person, Server
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -49,20 +49,38 @@ class TestLoadYaml:
         assert tree.yaml_source is not None
         assert tree.yaml_source.get("name") == "alpha"
 
-    def test_load_unknown_field_is_dropped_silently(
-        self, tmp_path: Path
+    def test_load_unknown_field_warns_and_drops(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Per spec O-1: unknown fields drop with a stderr warning by default.
-        For now we drop silently in v0.0.4; --strict mode comes in a later
-        release. Verify the unknown field doesn't reach the FormTree."""
+        """Unknown YAML fields warn to stderr and do not reach the FormTree."""
         src = tmp_path / "config.yaml"
         src.write_text(
             "name: prod\nport: 8080\nunknown_field: ignored\n",
             encoding="utf-8",
         )
         tree = load_yaml(src, Server)
+        captured = capsys.readouterr()
         # FormTree only knows about schema fields.
         assert {f.name for f in tree.root.fields} == {"name", "port", "debug"}
+        assert "dropping unknown YAML field(s) unknown_field" in captured.err
+
+    def test_load_nested_unknown_field_warns_with_path(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        src = tmp_path / "person.yaml"
+        src.write_text(
+            "name: Ada\n"
+            "address:\n"
+            "  street: Example Road\n"
+            "  city: London\n"
+            "  obsolete_zip: SW1A\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, Person)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().address.city == "London"
+        assert "address.obsolete_zip" in captured.err
 
     def test_load_missing_file_raises(self, tmp_path: Path) -> None:
         src = tmp_path / "nonexistent.yaml"
@@ -186,9 +204,11 @@ class TestSaveYamlPreservesComments:
         assert "9090" in content
         assert "8080" not in content
 
-    def test_unknown_field_is_dropped_on_save(self, tmp_path: Path) -> None:
+    def test_unknown_field_warns_and_is_dropped_on_save(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Per spec §10.1 rule #4 — fields no longer in the schema get
-        dropped on save."""
+        dropped on save with a stderr warning."""
         from pydantic_studio import save_yaml
 
         src = tmp_path / "config.yaml"
@@ -199,10 +219,36 @@ class TestSaveYamlPreservesComments:
             encoding="utf-8",
         )
         tree = load_yaml(src, Server)
+        capsys.readouterr()
         save_yaml(tree, src)
+        captured = capsys.readouterr()
         content = src.read_text(encoding="utf-8")
         assert "obsolete_field" not in content
         assert "gone" not in content
+        assert "dropping unknown YAML field(s) obsolete_field" in captured.err
+
+    def test_nested_unknown_field_warns_and_is_dropped_on_save(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pydantic_studio import save_yaml
+
+        src = tmp_path / "person.yaml"
+        src.write_text(
+            "name: Ada\n"
+            "address:\n"
+            "  street: Example Road\n"
+            "  city: London\n"
+            "  obsolete_zip: SW1A\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, Person)
+        capsys.readouterr()
+        save_yaml(tree, src)
+        captured = capsys.readouterr()
+
+        content = src.read_text(encoding="utf-8")
+        assert "obsolete_zip" not in content
+        assert "address.obsolete_zip" in captured.err
 
     def test_save_to_existing_file_without_load(self, tmp_path: Path) -> None:
         """If the user calls save_yaml with a tree that was NOT loaded from

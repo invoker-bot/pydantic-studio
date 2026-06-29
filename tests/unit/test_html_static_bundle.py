@@ -1,16 +1,22 @@
-"""Smoke test: the committed Vite bundle is reachable via FastAPI's
-existing /static mount. Phase 5 / 6 will move the SPA's index.html
-to be served at / directly; for Phase 2 we only verify it's
-reachable AT ALL via the path the static mount already provides.
-"""
+"""Smoke tests for the committed Vite bundle served by FastAPI."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.html import StudioServer
+
+HTML_RENDERER_DIR = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "pydantic_studio"
+    / "renderers"
+    / "html"
+)
 
 
 class _Demo(BaseModel):
@@ -87,3 +93,12 @@ def test_static_dist_asset_uses_static_prefixed_path() -> None:
         f"found a non-prefixed /assets/*.js reference in built HTML; "
         f"base path may not have taken effect:\n{html}"
     )
+
+
+def test_legacy_htmx_assets_and_templates_are_not_packaged() -> None:
+    legacy_paths = [
+        HTML_RENDERER_DIR / "static" / "htmx.min.js",
+        HTML_RENDERER_DIR / "static" / "studio.css",
+        HTML_RENDERER_DIR / "templates",
+    ]
+    assert [path for path in legacy_paths if path.exists()] == []

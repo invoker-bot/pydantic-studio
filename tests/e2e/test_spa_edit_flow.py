@@ -13,7 +13,7 @@ from playwright.sync_api import Page, expect
 def test_edit_string_field_updates_tree_and_preview(
     page: Page, fastapi_url: str
 ) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
 
     # Wait for React to mount the form. The 'name' input is the first
     # primitive field in _DemoSchema (see conftest.py).
@@ -51,7 +51,7 @@ def test_live_preview_renders_yaml_not_formtree_dump(
     a Phase-5 gap where App.tsx was JSON.stringify(data) of the raw
     FormTree response.
     """
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
     preview = page.get_by_test_id("tree-preview")
     text = preview.inner_text()

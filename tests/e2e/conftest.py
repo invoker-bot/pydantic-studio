@@ -174,6 +174,7 @@ def fastapi_url() -> Iterator[str]:
         host="127.0.0.1",
         port=port,
         log_level="warning",
+        ws="none",
     )
     uvi = uvicorn.Server(config)
     thread = threading.Thread(target=uvi.run, daemon=True)

@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-767%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-814%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,11 +77,17 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 760+ tests (unit + integration + TUI/web smoke). The editing
-session now has an explicit submit/cancel contract (`run_app` returns
-`EditOutcome`), and loading is symmetric with saving (existing values
-run through field validators — see
+by 814 tests: 791 default unit/integration/TUI/web smoke tests plus 23
+explicit Playwright browser e2e tests. The editing session now has an
+explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
+loading is symmetric with saving (existing values run through field validators — see
 `docs/superpowers/specs/2026-06-11-task-oriented-editing-design.md`).
+CI runs the default suite on Python 3.11, 3.12, 3.13, and 3.14; the
+browser, frontend bundle, wheel and sdist install smoke gates, and
+metadata checks run on Python 3.13.
+Tag-triggered PyPI publishing uses GitHub OIDC Trusted Publishing with
+the `pypi` environment, not a repository API-token secret; see
+`docs/site/release.md` for the required PyPI-side publisher setup.
 
 ## Install
 
@@ -393,12 +399,12 @@ The full architecture doc is at `docs/site/architecture.md`. Run
 ## Development
 
 ```bash
-git clone https://github.com/pydantic-studio/pydantic-studio
+git clone https://github.com/invoker-bot/pydantic-studio
 cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 670 tests
+uv run pytest -q                          # 791 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint
@@ -408,7 +414,20 @@ uv run pyright src/pydantic_studio       # production code only
 # Docs
 uv run mkdocs serve                       # 127.0.0.1:8000
 uv run mkdocs build --strict              # also covered by test_docs_build.py
+
+# Packaging
+uv build
+uv run twine check dist/*
+python -m venv .dist-smoke-wheel
+.dist-smoke-wheel/bin/python -m pip install dist/*.whl
+.dist-smoke-wheel/bin/pydantic-studio version
+python -m venv .dist-smoke-sdist
+.dist-smoke-sdist/bin/python -m pip install dist/*.tar.gz
+.dist-smoke-sdist/bin/pydantic-studio version
 ```
+
+GitHub Actions mirrors this split: the default suite runs across Python
+3.11-3.14, while browser and packaging gates run once on Python 3.13.
 
 Project conventions are documented in [`CLAUDE.md`](CLAUDE.md) — the
 guide for AI-assisted development sessions, but useful for any
@@ -453,7 +472,7 @@ The unit-test default skips `tests/e2e/` and disables the `pytest-playwright` pl
 
 ```bash
 uv run playwright install chromium                                  # one-time, ~150 MB
-uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
+uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"    # 23 browser tests
 ```
 
 ## License

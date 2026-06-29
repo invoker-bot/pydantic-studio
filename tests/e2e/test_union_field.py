@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Page, expect
 
 
 def test_switch_union_variant(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     # The notifier field has a default of EmailNotifier so the email
@@ -28,13 +30,26 @@ def test_switch_union_variant(page: Page, fastapi_url: str) -> None:
     # The selected GroupNode's schema_class short name should be SlackNotifier
     assert "Slack" in selected["schema_class"]
 
-    # The YAML preview includes the notifier key. Asserting on the
-    # inner variant content (e.g. "kind: slack") is currently blocked
-    # by two known FormTree gaps: Phase-6 housekeeping left Literal
-    # discriminators unseeded so to_python omits them, and _descend
-    # has no rule for (UnionNode, str), so set_value("notifier.channel",
-    # ...) crashes. Both are tracked for Phase-6 polish; for now the
-    # /api/tree assertions above already prove the variant switch
-    # round-tripped, so the preview check is left as a presence smoke.
+    group_toggle = page.get_by_role("button", name=re.compile(r"^group\s+_SlackNotifier\b"))
+    expect(group_toggle).to_be_visible(timeout=5000)
+    group_toggle.click()
+
+    channel_input = page.get_by_label("channel", exact=True)
+    expect(channel_input).to_be_visible(timeout=5000)
+    channel_input.fill("#alerts")
+    channel_input.blur()
+
     preview = page.get_by_test_id("tree-preview")
     expect(preview).to_contain_text("notifier:", timeout=5000)
+    expect(preview).to_contain_text("kind: slack", timeout=5000)
+    expect(preview).to_contain_text("channel: '#alerts'", timeout=5000)
+
+    response = page.context.request.get(f"{fastapi_url}/api/tree")
+    body = response.json()
+    notifier_field = next(
+        f for f in body["root"]["fields"] if f["name"] == "notifier"
+    )
+    channel = next(
+        f for f in notifier_field["selected"]["fields"] if f["name"] == "channel"
+    )
+    assert channel["value"] == "#alerts"

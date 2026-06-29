@@ -1,0 +1,37 @@
+"""Accessibility regressions for the React-backed web form."""
+
+from __future__ import annotations
+
+from playwright.sync_api import Page, expect
+
+
+def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> None:
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_role("heading", name="_DemoSchema")).to_be_visible(timeout=5000)
+
+    broken = page.evaluate(
+        """() => {
+            const labelableTags = new Set([
+                "BUTTON",
+                "INPUT",
+                "METER",
+                "OUTPUT",
+                "PROGRESS",
+                "SELECT",
+                "TEXTAREA",
+            ]);
+            return Array.from(document.querySelectorAll("label[for]"))
+                .map((label) => {
+                    const targetId = label.getAttribute("for");
+                    const target = targetId ? document.getElementById(targetId) : null;
+                    return {
+                        label: label.textContent?.trim() ?? "",
+                        targetId,
+                        tagName: target?.tagName ?? null,
+                    };
+                })
+                .filter((entry) => !entry.tagName || !labelableTags.has(entry.tagName));
+        }"""
+    )
+
+    assert broken == []

@@ -10,7 +10,7 @@ from playwright.sync_api import Page, expect
 def test_add_remove_and_edit_sequence_item(
     page: Page, fastapi_url: str
 ) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     # Wait for the SPA to render the form
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 

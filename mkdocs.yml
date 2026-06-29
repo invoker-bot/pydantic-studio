@@ -1,7 +1,6 @@
 site_name: pydantic-studio
 site_description: Interactive editor for Pydantic models
-site_url: https://pydantic-studio.example
-repo_url: https://github.com/pydantic-studio/pydantic-studio
+repo_url: https://github.com/invoker-bot/pydantic-studio
 docs_dir: docs/site
 
 theme:
@@ -29,6 +28,7 @@ nav:
   - Home: index.md
   - Tutorial: tutorial.md
   - Embedding: embedding.md
+  - Release: release.md
   - Architecture: architecture.md
   - CLI: cli.md
   - Examples:

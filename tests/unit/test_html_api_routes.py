@@ -180,3 +180,20 @@ def test_run_html_app_signature_matches_run_app_contract() -> None:
 
     signature = inspect.signature(run_html_app)
     assert "readonly_paths" in signature.parameters
+
+
+def test_legacy_form_routes_are_not_registered() -> None:
+    """The web renderer is now the React SPA plus JSON API only."""
+    client = _client({"name": "alpha", "workers": 4})
+
+    for method, path in (
+        ("post", "/field/name"),
+        ("post", "/seq/tags/add"),
+        ("post", "/map/env/add"),
+        ("post", "/union/notifier/select"),
+        ("post", "/submit"),
+        ("post", "/cancel"),
+        ("get", "/heartbeat"),
+    ):
+        response = getattr(client, method)(path)
+        assert response.status_code == 404, path

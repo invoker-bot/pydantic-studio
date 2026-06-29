@@ -38,7 +38,7 @@ export function isReadonly(flags: FormFlags, path: string): boolean {
 }
 
 export function fieldAnchorId(path: string): string {
-  return `field-${path}`;
+  return `field-anchor-${path}`;
 }
 
 /** Scroll to a field anchor; falls back to the nearest existing

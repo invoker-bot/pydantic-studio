@@ -12,7 +12,7 @@ from playwright.sync_api import Page, expect
 
 
 def test_edit_date_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     starts_on = page.get_by_label("starts_on", exact=True)
@@ -29,7 +29,7 @@ def test_edit_date_field_updates_tree(page: Page, fastapi_url: str) -> None:
 
 
 def test_edit_datetime_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     last_run = page.get_by_label("last_run", exact=True)
@@ -48,7 +48,7 @@ def test_edit_datetime_field_updates_tree(page: Page, fastapi_url: str) -> None:
 
 
 def test_edit_time_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     cron_at = page.get_by_label("cron_at", exact=True)
@@ -64,7 +64,7 @@ def test_edit_time_field_updates_tree(page: Page, fastapi_url: str) -> None:
 
 
 def test_edit_timedelta_field_updates_tree(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     ttl_input = page.get_by_label("ttl", exact=True)

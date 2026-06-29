@@ -137,7 +137,8 @@ $ uv run pydantic-studio edit --frontend web mypkg.config:AppSettings config.yam
 
 A FastAPI app opens on `127.0.0.1:<random_free_port>`, your default
 browser navigates to it, and the page renders the same three-region
-layout. Edits POST to HTMX endpoints; the preview pane updates live.
+layout. The bundled React SPA sends edits to the JSON API, and the
+preview pane updates live from the server-side form tree.
 
 ## Next steps
 

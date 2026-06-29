@@ -1,5 +1,5 @@
 // Dispatcher: switch on node.kind to render the right field component.
-// Every field renders inside an anchored wrapper (id="field-<path>") so
+// Every field renders inside an anchored wrapper so
 // submit errors can scroll-to and highlight it; readonly paths render
 // inside a disabled fieldset (native form disabling, no per-field code).
 

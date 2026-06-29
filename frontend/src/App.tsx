@@ -108,14 +108,16 @@ export default function App() {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-8 p-8 font-sans min-h-screen bg-white">
-      <section className="space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
+    <div className="grid min-h-screen grid-cols-1 gap-6 bg-white p-4 font-sans sm:p-6 lg:grid-cols-2 lg:gap-8 lg:p-8">
+      <section className="min-w-0 space-y-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold">{schemaName}</h1>
-            <p className="text-xs text-zinc-500 mt-1">{data.schema_name}</p>
+            <p className="mt-1 break-words text-xs text-zinc-500">
+              {data.schema_name}
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
             {missingRequired.length > 0 && (
               <button
                 type="button"
@@ -179,13 +181,13 @@ export default function App() {
           <FormField node={data.root} path="" />
         </FormFlagsContext.Provider>
       </section>
-      <section className="space-y-2">
+      <section className="min-w-0 space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
           Live YAML preview
         </h2>
         <pre
           data-testid="tree-preview"
-          className="bg-zinc-100 p-4 rounded text-xs overflow-auto max-h-[80vh] font-mono"
+          className="max-h-[60vh] overflow-auto rounded bg-zinc-100 p-4 font-mono text-xs whitespace-pre-wrap break-words lg:max-h-[80vh]"
         >
           {data.preview}
         </pre>

@@ -1,4 +1,4 @@
-"""Server-side render helpers for FormTree → HTML widgets."""
+"""Server-side preview helpers for the React-backed web renderer."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import io
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from pydantic_studio.tree.nodes import AnyNode, FormTree, GroupNode
+    from pydantic_studio.tree.nodes import FormTree
 
 
 def render_yaml_preview(tree: FormTree) -> str:
@@ -75,47 +75,3 @@ def _coerce_to_yaml_safe(obj: Any) -> Any:
     ):
         return obj
     return str(obj)
-
-
-def list_root_fields(tree: FormTree) -> list[tuple[str, AnyNode]]:
-    """Return [(path, node)] for non-group children of the root group."""
-    from pydantic_studio.tree.nodes import GroupNode
-
-    out: list[tuple[str, AnyNode]] = []
-    for child in tree.root.fields:
-        if isinstance(child, GroupNode):
-            continue
-        out.append((child.name, child))
-    return out
-
-
-def list_groups(tree: FormTree) -> list[tuple[str, str]]:
-    """Return [(path, label)] for all GroupNodes (sidebar nav)."""
-    from pydantic_studio.tree.nodes import GroupNode
-
-    out: list[tuple[str, str]] = [("", "<root>")]
-
-    def walk(group: GroupNode, base_path: str) -> None:
-        for child in group.fields:
-            if isinstance(child, GroupNode):
-                child_path = f"{base_path}.{child.name}".lstrip(".")
-                out.append((child_path, child.name or "?"))
-                walk(child, child_path)
-
-    walk(tree.root, "")
-    return out
-
-
-def initial_value_str(node: AnyNode) -> str:
-    """Stringify the node's current value for HTML input default.
-
-    Falls back to ``node.default`` when value is None.
-    """
-    v = getattr(node, "value", None)
-    if v is None:
-        v = getattr(node, "default", None)
-    if v is None:
-        return ""
-    if node.kind == "bytes" and isinstance(v, (bytes, bytearray)):
-        return bytes(v).hex()
-    return str(v)

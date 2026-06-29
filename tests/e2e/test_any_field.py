@@ -9,7 +9,7 @@ from playwright.sync_api import Page, expect
 def test_any_field_parses_json_value(
     page: Page, fastapi_url: str
 ) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     # metadata starts empty. Add an entry via the metadata's +Add button.

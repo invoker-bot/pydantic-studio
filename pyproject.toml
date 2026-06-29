@@ -29,8 +29,6 @@ dependencies = [
   "textual>=0.85",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
-  "jinja2>=3.1",
-  "httpx>=0.27",
   "tomlkit>=0.13",
 ]
 
@@ -52,6 +50,8 @@ dev = [
   "email-validator>=2",
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
+  "httpx2>=2.5.0",
+  "twine>=6.2",
 ]
 lint = [
   "ruff",

@@ -13,7 +13,7 @@ from playwright.sync_api import Page, expect
 
 
 def test_save_and_cancel_buttons_visible(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
     expect(page.get_by_role("button", name="Save")).to_be_visible()
     expect(page.get_by_role("button", name="Cancel")).to_be_visible()
@@ -22,7 +22,7 @@ def test_save_and_cancel_buttons_visible(page: Page, fastapi_url: str) -> None:
 def test_save_click_marks_submitted_and_shows_success(
     page: Page, fastapi_url: str
 ) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     page.get_by_role("button", name="Save").click()
@@ -32,7 +32,7 @@ def test_save_click_marks_submitted_and_shows_success(
 
 
 def test_cancel_click_shows_cancelled_state(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     page.get_by_role("button", name="Cancel").click()

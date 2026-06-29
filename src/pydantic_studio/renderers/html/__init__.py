@@ -1,6 +1,6 @@
 """HTML renderer for pydantic-studio.
 
-A local FastAPI app that serves an HTMX-driven editor in the browser.
+A local FastAPI app that serves the bundled React SPA and JSON API.
 """
 
 from __future__ import annotations

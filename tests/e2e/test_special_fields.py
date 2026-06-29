@@ -10,7 +10,7 @@ from playwright.sync_api import Page, expect
 def test_uuid_regenerate_button_updates_value(
     page: Page, fastapi_url: str
 ) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     request_id = page.get_by_label("request_id", exact=True)
@@ -45,7 +45,7 @@ def test_uuid_regenerate_button_updates_value(
 def test_secret_show_toggle_reveals_input_type(
     page: Page, fastapi_url: str
 ) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     api_key = page.get_by_label("api_key", exact=True)
@@ -66,7 +66,7 @@ def test_secret_show_toggle_reveals_input_type(
 
 
 def test_secret_edit_round_trips_value(page: Page, fastapi_url: str) -> None:
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     api_key = page.get_by_label("api_key", exact=True)
@@ -91,7 +91,7 @@ def test_pattern_field_renders_flag_chips(
     """The default pattern_field has re.IGNORECASE set; the component
     derives an 'i' chip from the flags bitmask (= 2). This test asserts
     the chip is rendered and read-only (no toggle button)."""
-    page.goto(f"{fastapi_url}/static/dist/index.html")
+    page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     pattern_input = page.get_by_label("pattern_field", exact=True)
