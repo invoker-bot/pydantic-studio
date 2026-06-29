@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import copy
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual.app import App
 from textual.binding import Binding
 
 from pydantic_studio.outcome import EditOutcome
+from pydantic_studio.session import EditSession
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
     from collections.abc import Iterable
+    from pathlib import Path
     from typing import ClassVar
 
     from textual.app import AutopilotCallbackType
@@ -63,26 +63,40 @@ class StudioApp(App):
 
     def __init__(
         self,
-        tree: FormTree,
+        tree: FormTree | None = None,
         save_path: str | Path | None = None,
         readonly_paths: Iterable[str] = (),
+        session: EditSession | None = None,
     ) -> None:
         super().__init__()
-        self._tree = tree
-        self.save_path = Path(save_path) if save_path is not None else None
-        self.readonly_paths = frozenset(readonly_paths)
+        if session is None:
+            if tree is None:
+                raise TypeError("StudioApp requires either tree or session")
+            session = EditSession(
+                tree=tree,
+                save_path=save_path,
+                readonly_paths=readonly_paths,
+            )
+        self.session = session
         self._outcome = EditOutcome(status="cancelled")
-        self._initial_state = copy.deepcopy(tree.to_python())
 
     @property
     def outcome(self) -> EditOutcome:
         """How the session ended. Meaningful after :meth:`run` returns."""
-        return self._outcome
+        return self.session.outcome or self._outcome
 
     @property
     def dirty(self) -> bool:
         """True iff the tree's data differs from the session start."""
-        return self._tree.to_python() != self._initial_state
+        return self.session.dirty
+
+    @property
+    def readonly_paths(self) -> frozenset[str]:
+        return self.session.readonly_paths
+
+    @property
+    def save_path(self) -> Path | None:
+        return self.session.save_path
 
     @property
     def tree(self) -> FormTree:  # type: ignore[override]
@@ -91,27 +105,16 @@ class StudioApp(App):
         Overrides Textual's read-only ``App.tree`` (a Rich DOM
         renderable) with our editable form tree.
         """
-        return self._tree
+        return self.session.tree
 
     @tree.setter
     def tree(self, value: FormTree) -> None:
-        self._tree = value
+        self.session.tree = value
 
     def on_mount(self) -> None:
-        from pydantic_studio.renderers.textual_.screens import ConfigScreen
+        from pydantic_studio.renderers.textual_.studio_screen import StudioScreen
 
-        short_name = (
-            self.tree.schema_name.split(":")[-1]
-            if ":" in self.tree.schema_name
-            else self.tree.schema_name
-        )
-        self.push_screen(
-            ConfigScreen(
-                group=self.tree.root,
-                form_tree=self.tree,
-                breadcrumb_parts=[short_name],
-            )
-        )
+        self.push_screen(StudioScreen(self.session, dismiss_on_finish=False))
 
     def run(
         self,
@@ -143,6 +146,18 @@ class StudioApp(App):
         self._outcome = EditOutcome(status=status)  # type: ignore[arg-type]
         self.exit()
 
+    def _studio_screen(self):
+        from pydantic_studio.renderers.textual_.studio_screen import StudioScreen
+
+        for screen in reversed(self.screen_stack):
+            if isinstance(screen, StudioScreen):
+                return screen
+        return None
+
+    def on_studio_session_ended(self, event) -> None:
+        self._outcome = event.outcome
+        self.exit()
+
     async def action_quit(self) -> None:  # type: ignore[override]
         """Ctrl+C — cancel the session.
 
@@ -151,19 +166,15 @@ class StudioApp(App):
         second Ctrl+C while that screen is up force-discards, so the
         muscle-memory double Ctrl+C still quits.
         """
-        from pydantic_studio.renderers.textual_.screens import ConfirmExitScreen
-
-        if isinstance(self.screen, ConfirmExitScreen):
-            self._finish("cancelled")
-            return
-        if not self.dirty:
-            self._finish("cancelled")
-            return
-        self.push_screen(ConfirmExitScreen())
+        screen = self._studio_screen()
+        if screen is not None:
+            await screen.action_quit()
 
     def action_cancel_session(self) -> None:
         """Cancel requested from a screen (Esc on the root ConfigScreen)."""
-        self.call_next(self.action_quit)
+        screen = self._studio_screen()
+        if screen is not None:
+            screen.action_cancel_session()
 
     def action_save(self) -> None:
         """Ctrl+S — submit the session.
@@ -177,7 +188,9 @@ class StudioApp(App):
         ``save_yaml`` stays strict (core invariant §5): a partial tree
         never reaches the disk.
         """
-        self._submit()
+        screen = self._studio_screen()
+        if screen is not None:
+            screen.action_save()
 
     def _submit(self) -> bool:
         """Shared submit path for Ctrl+S and ConfirmExitScreen's Save.
@@ -185,62 +198,8 @@ class StudioApp(App):
         Returns True when the session ended (valid tree); False when
         validation failed and the user was sent back to fix things.
         """
-        from pydantic_studio import save_yaml
-        from pydantic_studio.exceptions import ValidationFailedError
-        from pydantic_studio.renderers.textual_.screens import (
-            ConfirmExitScreen,
-            ErrorsScreen,
-        )
-        from pydantic_studio.renderers.textual_.widgets.field_list import (
-            FieldListView,
-        )
-
-        # Form mode: flush the focused field's pending text first —
-        # Ctrl+S right after typing must save what the user sees.
-        try:
-            view = self.screen.query_one(FieldListView)
-        except Exception:
-            view = None
-        if view is not None and not view._commit_gate():
-            self.notify(
-                "fix the highlighted field first",
-                severity="error",
-                title="Save",
-            )
-            return False
-
-        try:
-            if self.save_path is not None:
-                save_yaml(self.tree, self.save_path)
-            else:
-                self.tree.to_instance()
-        except ValidationFailedError as exc:
-            if isinstance(self.screen, ConfirmExitScreen):
-                self.pop_screen()
-            n = len(exc.errors)
-            self.notify(
-                f"{n} validation error{'s' if n != 1 else ''} — fix before saving",
-                severity="error",
-                title="Save failed",
-            )
-            self.push_screen(ErrorsScreen(errors=exc.errors, paths=exc.paths))
-            return False
-        except Exception as exc:
-            self.notify(
-                f"{type(exc).__name__}: {exc}",
-                severity="error",
-                title="Save failed",
-            )
-            return False
-
-        if self.save_path is not None:
-            self.notify(
-                f"Saved to {self.save_path}",
-                severity="information",
-                title="Save",
-            )
-        self._finish("submitted")
-        return True
+        screen = self._studio_screen()
+        return False if screen is None else screen._submit()
 
 
 def run_app(
@@ -253,6 +212,7 @@ def run_app(
     Returns the session's :class:`EditOutcome` — callers persist the
     tree only when ``outcome.submitted`` is true.
     """
-    app = StudioApp(tree=tree, save_path=save_path, readonly_paths=readonly_paths)
+    session = EditSession(tree=tree, save_path=save_path, readonly_paths=readonly_paths)
+    app = StudioApp(session=session)
     app.run()
-    return app.outcome
+    return session.outcome or app.outcome

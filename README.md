@@ -218,6 +218,21 @@ triggers a 30-second heartbeat timeout (configurable via
 `run_html_app(..., heartbeat_timeout_seconds=...)`) and the server
 shuts down with a `cancelled` outcome.
 
+### Embedding
+
+The Web renderer is ASGI-first and can be mounted into a larger host app:
+
+```python
+from fastapi import FastAPI
+from pydantic_studio import build_form_tree, mount_html_app
+
+app = FastAPI()
+server = mount_html_app(app, "/studio", tree=build_form_tree(AppSettings))
+```
+
+Use `StudioScreen(EditSession(...))` when embedding inside an existing Textual
+app; use `StudioApp` / `run_app` when pydantic-studio owns the terminal session.
+
 ## Type coverage
 
 | Family | Types |
@@ -276,9 +291,10 @@ from pydantic_studio import (
     save_draft, load_draft, delete_draft, find_draft, draft_newer_than,
     # Renderers
     run_console_app,              # sequential console prompts
-    StudioApp, run_app,           # Textual TUI (run_app -> EditOutcome)
+    EditSession, SubmitResult,    # shared renderer session lifecycle
+    StudioApp, StudioScreen, run_app,  # Textual TUI
     EditOutcome,                  # session result: submitted | cancelled
-    StudioServer, run_html_app,   # HTML / React SPA
+    StudioServer, mount_html_app, run_html_app,  # HTML / React SPA / ASGI
     # Registry
     Registry, NodeBuilder, register_builder,
     default_registry, reset_default_registry,

@@ -28,6 +28,7 @@ theme:
 nav:
   - Home: index.md
   - Tutorial: tutorial.md
+  - Embedding: embedding.md
   - Architecture: architecture.md
   - CLI: cli.md
   - Examples:

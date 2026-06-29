@@ -12,7 +12,7 @@ import sys
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from pydantic import (
@@ -27,6 +27,8 @@ from pydantic import (
 )
 
 from pydantic_studio.tree.validation import ValidationResult
+
+AnyValueMode = Literal["null", "str", "int", "float", "bool", "list", "dict"]
 
 
 def _resolve_type_name(name: str) -> Any:
@@ -1073,7 +1075,7 @@ class AnyValueNode(FormNode):
     """
 
     kind: Literal["any"] = "any"
-    mode: Literal["null", "str", "int", "float", "bool", "list", "dict"] = "null"
+    mode: AnyValueMode = "null"
     value: Any = None
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
@@ -1095,7 +1097,7 @@ class AnyValueNode(FormNode):
         return self.value
 
     @staticmethod
-    def infer_mode(value: Any) -> str:
+    def infer_mode(value: Any) -> AnyValueMode:
         """Map ``value``'s runtime type to one of the seven modes.
 
         ``bool`` is checked before ``int`` because ``bool`` is an int
@@ -1439,8 +1441,9 @@ class FormTree(BaseModel):
 
         # Validation passed: snapshot before mutating so undo can revert.
         self._push_snapshot(_snap.take(self.root))
-        write_target.value = value
-        write_target.error = None
+        editable_target = cast("Any", write_target)
+        editable_target.value = value
+        editable_target.error = None
         # Editing any descendant activates omitted optional groups on the
         # path — from now on the group materializes instead of None.
         for group in walked_groups:
@@ -1671,7 +1674,7 @@ class FormTree(BaseModel):
             return ValidationResult.fail(list(errors))
         # Validation passed — push snapshot and mutate.
         self._push_snapshot(_snap.take(self.root))
-        k_node.value = new_key
+        cast("Any", k_node).value = new_key
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()

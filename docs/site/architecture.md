@@ -39,11 +39,11 @@ mutation API:
 - **Console prompts** (`pydantic_studio.renderers.console`) — sequential
   stdin/stdout questions. Blank answers keep current values, and completion
   writes through the normal save dispatch.
-- **Textual TUI** (`pydantic_studio.renderers.textual_`) — `StudioApp` +
-  `EditorScreen` + per-node-kind widgets. Tested via `App.run_test()`
+- **Textual TUI** (`pydantic_studio.renderers.textual_`) — `StudioApp` /
+  `StudioScreen` + per-node-kind widgets. Tested via `App.run_test()`
   and `Pilot`.
-- **HTML browser** (`pydantic_studio.renderers.html`) — FastAPI server
-  + React/Vite SPA. Heartbeat polling detects abandoned tabs.
+- **HTML browser** (`pydantic_studio.renderers.html`) — ASGI app with a
+  bundled React SPA. Heartbeat polling detects abandoned tabs.
 - **CLI shorthand** (`pydantic_studio.cli`) — `fill`, `run`, `check`,
   `edit`, `show`, `version`. Uses typer.
 
@@ -70,6 +70,18 @@ row at the top of the root form and maps `←`/`→` to
 `select_root_variant()`. The web SPA renders a page-level selector and
 sends the same mutation. The selected model's fields are rebuilt through
 the regular builder registry, so this stays generic across domains.
+
+### Standalone launchers vs embedded adapters
+
+`run_app(...)` and `run_html_app(...)` own the process-facing lifecycle:
+terminal app startup, browser opening, loopback port binding, and blocking until
+`EditOutcome`.
+
+Embedded adapters expose the same editor inside a host lifecycle:
+`mount_html_app(...)` mounts the Web renderer into an ASGI host, and
+`StudioScreen(EditSession(...))` mounts the TUI renderer inside a Textual app.
+Both use the same `FormTree` mutation contract and the same `EditSession`
+submit/cancel outcome.
 
 ## Cross-frontend identity
 

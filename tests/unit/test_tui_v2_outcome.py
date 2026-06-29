@@ -185,3 +185,13 @@ def test_run_app_returns_outcome(monkeypatch) -> None:
     outcome = app_mod.run_app(tree)
     assert isinstance(outcome, EditOutcome)
     assert outcome.submitted is True
+
+
+def test_studio_app_accepts_session_keyword() -> None:
+    from pydantic_studio import EditSession
+
+    tree = build_form_tree(_Schema)
+    session = EditSession(tree=tree)
+    app = StudioApp(session=session)
+    assert app.session is session
+    assert app.tree is tree

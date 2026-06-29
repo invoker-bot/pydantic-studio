@@ -12,6 +12,7 @@
 // the server may already be gone.
 
 import { useMutation } from "@tanstack/react-query";
+import { studioUrl } from "@/api/base";
 
 export interface SubmitError {
   path: string;
@@ -24,7 +25,7 @@ export interface SubmitResponse {
 }
 
 export async function submitTree(): Promise<SubmitResponse> {
-  const response = await fetch("/api/submit", { method: "POST" });
+  const response = await fetch(studioUrl("/api/submit"), { method: "POST" });
   if (response.status === 400) {
     const body = (await response.json()) as { ok?: boolean; errors?: SubmitError[] };
     return { ok: false, errors: body.errors ?? [] };
@@ -36,7 +37,7 @@ export async function submitTree(): Promise<SubmitResponse> {
 }
 
 export async function cancelEdit(): Promise<void> {
-  const response = await fetch("/api/cancel", { method: "POST" });
+  const response = await fetch(studioUrl("/api/cancel"), { method: "POST" });
   if (!response.ok) {
     throw new Error(`POST /api/cancel failed: HTTP ${response.status}`);
   }

@@ -127,6 +127,29 @@ def test_api_heartbeat_returns_ok_and_records_timestamp() -> None:
     assert before <= server.last_heartbeat_ts <= after
 
 
+def test_studio_server_exposes_session_and_compat_flags() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+    assert server.session.tree is tree
+    assert server.submitted is False
+    assert server.cancelled is False
+
+    response = TestClient(server.app).post("/api/submit")
+    assert response.status_code == 200
+    assert server.session.submitted is True
+    assert server.submitted is True
+    assert server.cancelled is False
+
+
+def test_api_cancel_uses_session_outcome() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+    response = TestClient(server.app).post("/api/cancel")
+    assert response.status_code == 200
+    assert server.session.cancelled is True
+    assert server.cancelled is True
+
+
 def test_api_tree_includes_readonly_paths() -> None:
     """The server's readonly_paths reach the SPA via /api/tree — the
     frontend renders those fields inside a disabled fieldset."""

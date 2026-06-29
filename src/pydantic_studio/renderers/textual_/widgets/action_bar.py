@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class ActionBar(Horizontal):
-    """Two-button bar wired straight to the app's session actions."""
+    """Two-button bar wired to the current screen's session actions."""
 
     DEFAULT_CSS = ""
 
@@ -27,11 +27,17 @@ class ActionBar(Horizontal):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
-        app = self.app
+        screen = self.screen
         if event.button.id == "action-save":
-            app.action_save()  # type: ignore[attr-defined]
+            save = getattr(screen, "action_save", None)
+            if save is not None:
+                save()
             return
         if event.button.id == "action-cancel":
-            cancel = getattr(app, "action_cancel_session", None)
+            cancel = getattr(screen, "action_cancel_session", None)
             if cancel is not None:
                 cancel()
+                return
+            app_cancel = getattr(self.app, "action_cancel_session", None)
+            if app_cancel is not None:
+                app_cancel()
