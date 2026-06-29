@@ -6,14 +6,10 @@ on:
       - 'v*'
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/pydantic-studio
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -128,5 +124,57 @@ jobs:
           ).is_file()
           PY
 
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish-pypi:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pydantic-studio
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
       - name: Publish to PyPI
+        id: publish-pypi
         uses: pypa/gh-action-pypi-publish@release/v1
+        continue-on-error: true
+
+      - name: Warn if PyPI publish failed
+        if: ${{ steps.publish-pypi.outcome == 'failure' }}
+        run: |
+          echo "::warning::PyPI publish failed; piesource publish is independent and may still succeed."
+
+  publish-piesource:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish to piesource
+        id: publish-piesource
+        uses: pypa/gh-action-pypi-publish@release/v1
+        continue-on-error: true
+        with:
+          repository-url: ${{ secrets.PIESOURCE_REPOSITORY_URL }}
+          user: ${{ secrets.PIESOURCE_USERNAME }}
+          password: ${{ secrets.PIESOURCE_PASSWORD }}
+
+      - name: Warn if piesource publish failed
+        if: ${{ steps.publish-piesource.outcome == 'failure' }}
+        run: |
+          echo "::warning::piesource publish failed; PyPI publish is independent and may still succeed."
