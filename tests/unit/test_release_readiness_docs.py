@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("814", "791 default"),
-        "CLAUDE.md": ("814", "791 default"),
+        "README.md": ("817", "794 default"),
+        "CLAUDE.md": ("817", "794 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -67,6 +67,22 @@ def test_publish_workflow_pushes_to_piesource_independently() -> None:
     }
 
 
+def test_publish_workflow_reports_registry_publish_failures_after_both_attempts() -> None:
+    workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
+
+    assert workflow["jobs"]["publish-pypi"]["outputs"] == {
+        "publish-outcome": "${{ steps.publish-pypi.outcome }}"
+    }
+    assert workflow["jobs"]["publish-piesource"]["outputs"] == {
+        "publish-outcome": "${{ steps.publish-piesource.outcome }}"
+    }
+
+    result_job = workflow["jobs"]["publish-result"]
+    assert result_job["needs"] == ["publish-pypi", "publish-piesource"]
+    assert result_job["if"] == "${{ always() }}"
+    assert "One or more registry publishes failed" in result_job["steps"][0]["run"]
+
+
 def test_release_guide_documents_external_trusted_publisher_setup() -> None:
     guide = ROOT / "docs" / "site" / "release.md"
     text = guide.read_text(encoding="utf-8")
@@ -90,6 +106,25 @@ def test_release_guide_documents_external_trusted_publisher_setup() -> None:
 
     mkdocs = YAML(typ="safe").load(ROOT / "mkdocs.yml")
     assert {"Release": "release.md"} in mkdocs["nav"]
+
+
+def test_release_guide_documents_independent_piesource_publish() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+
+    required_snippets = [
+        "publish-pypi",
+        "publish-piesource",
+        "PIESOURCE_REPOSITORY_URL",
+        "PIESOURCE_USERNAME",
+        "PIESOURCE_PASSWORD",
+        "PyPI publish failed",
+        "piesource publish failed",
+        "publish-result",
+        "One or more registry publishes failed",
+        "independent",
+    ]
+    for snippet in required_snippets:
+        assert snippet in text
 
 
 def test_docs_site_metadata_matches_project_source_url_without_placeholders() -> None:

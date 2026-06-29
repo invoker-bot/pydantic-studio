@@ -11,15 +11,17 @@ immediately.
   YAML / TOML / JSON config files against a strongly-typed schema.
 - **Status**: v0.4.0 alpha — all 9 implementation phases, the
   task-oriented overhaul, TUI form mode, the React-backed web app, and
-  root model variants are merged on master. Current local gate: 814
-  tests: 791 default tests plus 23 explicit Playwright browser e2e tests, ruff
+  root model variants are merged on master. Current local gate: 817
+  tests: 794 default tests plus 23 explicit Playwright browser e2e tests, ruff
   clean, pyright clean for production code, `mkdocs build --strict`
   clean, frontend bundle build clean, `uv build` clean, `twine check`
   clean, and wheel/sdist install smoke clean. CI runs the default suite
   on Python 3.11-3.14; browser/package gates run on Python 3.13 and
   include wheel and sdist install smoke gates. Tag-triggered PyPI
   publishing uses GitHub OIDC Trusted Publishing with the `pypi`
-  environment, not a repository API-token secret.
+  environment, not a repository API-token secret. The same built
+  distributions are also published to piesource through an independent
+  publish job, then a final result job reports any registry failure.
 - **Three frontends**: Textual TUI, FastAPI + bundled React browser app,
   and CLI/console (`fill`/`run`/`check`/`edit`/`show`/`version`).
 - **Three formats**: YAML (full round-trip), TOML, JSON.
@@ -247,7 +249,7 @@ ruff knows the rule and won't complain.
 
 ## Test patterns
 
-- **`uv run pytest -q`** runs the default suite (791 tests at v0.4.0).
+- **`uv run pytest -q`** runs the default suite (794 tests at v0.4.0).
   This intentionally skips `tests/e2e/` and disables the pytest-playwright
   plugin because plugin registration interferes with Textual
   `App.run_test()` under `asyncio_mode="auto"`.

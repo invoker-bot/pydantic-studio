@@ -3,7 +3,8 @@
 This project publishes from Git tags through GitHub Actions. The release
 workflow builds the frontend bundle, runs the Python/browser/package gates,
 checks the tag against `pydantic_studio.__version__`, builds both package
-formats, smoke-tests wheel and sdist installs, and then publishes to PyPI.
+formats, smoke-tests wheel and sdist installs, uploads the distributions as
+one release artifact, and then publishes that artifact to PyPI and piesource.
 
 ## PyPI trusted publisher
 
@@ -21,6 +22,25 @@ creating a release tag. The publisher configuration must match the workflow:
 Do not create or store a `PYPI_API_TOKEN` repository secret. The workflow
 uses GitHub OIDC with `id-token: write`, and the publish action receives no
 username, password, or API token.
+
+## piesource publisher
+
+The `publish-piesource` job downloads the same distributions produced by the
+`build` job and publishes them to piesource. Configure these repository
+secrets before tagging:
+
+| Secret | Purpose |
+| --- | --- |
+| `PIESOURCE_REPOSITORY_URL` | Package index upload endpoint |
+| `PIESOURCE_USERNAME` | piesource upload username |
+| `PIESOURCE_PASSWORD` | piesource upload password or token |
+
+The `publish-pypi` and `publish-piesource` jobs are independent consumers of
+the `build` artifact. If PyPI publish failed, the workflow emits a warning and
+still lets piesource continue. If piesource publish failed, the workflow emits
+a warning and still lets PyPI continue. After both registry jobs attempt to
+publish, `publish-result` reads their outcomes and fails the workflow with
+`One or more registry publishes failed` if either registry publish failed.
 
 ## Local preflight
 
@@ -54,5 +74,8 @@ current package this is:
 git tag v0.4.0
 ```
 
-Pushing `v0.4.0` starts `.github/workflows/publish.yml`. The workflow aborts
-before publishing if the tag version differs from `pydantic_studio.__version__`.
+Pushing `v0.4.0` starts `.github/workflows/publish.yml`. The `build` job
+aborts before publishing if the tag version differs from
+`pydantic_studio.__version__`; `publish-pypi` and `publish-piesource` only run
+after that build artifact exists, and `publish-result` reports the final
+registry publish state.

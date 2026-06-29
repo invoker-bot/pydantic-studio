@@ -138,6 +138,8 @@ jobs:
       url: https://pypi.org/p/pydantic-studio
     permissions:
       id-token: write
+    outputs:
+      publish-outcome: ${{ steps.publish-pypi.outcome }}
     steps:
       - name: Download distributions
         uses: actions/download-artifact@v4
@@ -158,6 +160,8 @@ jobs:
   publish-piesource:
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      publish-outcome: ${{ steps.publish-piesource.outcome }}
     steps:
       - name: Download distributions
         uses: actions/download-artifact@v4
@@ -178,3 +182,22 @@ jobs:
         if: ${{ steps.publish-piesource.outcome == 'failure' }}
         run: |
           echo "::warning::piesource publish failed; PyPI publish is independent and may still succeed."
+
+  publish-result:
+    runs-on: ubuntu-latest
+    needs:
+      - publish-pypi
+      - publish-piesource
+    if: ${{ always() }}
+    steps:
+      - name: Fail if any registry publish failed
+        env:
+          PYPI_OUTCOME: ${{ needs.publish-pypi.outputs.publish-outcome }}
+          PIESOURCE_OUTCOME: ${{ needs.publish-piesource.outputs.publish-outcome }}
+        run: |
+          echo "PyPI publish outcome: ${PYPI_OUTCOME}"
+          echo "piesource publish outcome: ${PIESOURCE_OUTCOME}"
+          if [ "${PYPI_OUTCOME}" != "success" ] || [ "${PIESOURCE_OUTCOME}" != "success" ]; then
+            echo "::error::One or more registry publishes failed."
+            exit 1
+          fi
