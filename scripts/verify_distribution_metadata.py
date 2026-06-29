@@ -109,19 +109,19 @@ def _expected_project_urls(pyproject: dict[str, object]) -> tuple[str, ...]:
 
 def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
     urls = _project_urls(pyproject)
-    filenames = tuple(
+    support_filenames = tuple(
         _filename_from_url(label, urls[label]) for label in SUPPORT_PROJECT_URL_LABELS
     )
     source_include = _source_include(pyproject)
     missing_source_include = [
-        filename for filename in filenames if filename not in source_include
+        filename for filename in support_filenames if filename not in source_include
     ]
     if missing_source_include:
         raise RuntimeError(
             "pyproject.toml source-include missing support files: "
             f"{missing_source_include!r}"
         )
-    return filenames
+    return source_include
 
 
 def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = None) -> None:

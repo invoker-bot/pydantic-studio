@@ -48,9 +48,17 @@ def _write_sdist(
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
 
 
-def _write_pyproject(root: Path) -> None:
+def _write_pyproject(
+    root: Path,
+    *,
+    extra_source_include: tuple[str, ...] = (),
+) -> None:
+    source_include = (
+        '"CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md"'
+        + "".join(f', "{filename}"' for filename in extra_source_include)
+    )
     root.joinpath("pyproject.toml").write_text(
-        """[project.urls]
+        f"""[project.urls]
 Source = "https://example.invalid/pydantic-studio"
 Documentation = "https://example.invalid/docs"
 Issues = "https://example.invalid/issues"
@@ -59,7 +67,7 @@ Security = "https://example.invalid/SECURITY.md"
 Contributing = "https://example.invalid/CONTRIBUTING.md"
 
 [tool.uv.build-backend]
-source-include = ["CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md"]
+source-include = [{source_include}]
 """,
         encoding="utf-8",
     )
@@ -105,6 +113,25 @@ def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path)
     _write_sdist(dist, ("CHANGELOG.md", "SECURITY.md"), metadata=metadata)
 
     with pytest.raises(RuntimeError, match=r"CONTRIBUTING\.md"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_declared_source_include(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path, extra_source_include=("NOTICE.md",))
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"NOTICE\.md"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
