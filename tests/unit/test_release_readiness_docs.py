@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("833", "810 default"),
-        "CLAUDE.md": ("833", "810 default"),
+        "README.md": ("834", "811 default"),
+        "CLAUDE.md": ("834", "811 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -336,6 +336,23 @@ def test_release_guide_documents_external_trusted_publisher_setup() -> None:
 
     mkdocs = YAML(typ="safe").load(ROOT / "mkdocs.yml")
     assert {"Release": "release.md"} in mkdocs["nav"]
+
+
+def test_release_guide_checks_tag_matches_package_version_before_tagging() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    required_snippets = [
+        'RELEASE_TAG="v0.4.0"',
+        'tag_version="${RELEASE_TAG#v}"',
+        "pkg_version=$(uv run python -c 'import pydantic_studio as ps; print(ps.__version__)')",
+        'if [ "$tag_version" != "$pkg_version" ]; then',
+        'git tag "$RELEASE_TAG"',
+    ]
+    for snippet in required_snippets:
+        assert snippet in text
+
+    assert text.index('if [ "$tag_version" != "$pkg_version" ]; then') < text.index(
+        'git tag "$RELEASE_TAG"'
+    )
 
 
 def test_release_guide_installs_playwright_browser_before_e2e() -> None:

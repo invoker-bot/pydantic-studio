@@ -108,7 +108,14 @@ gate are green. The tag must match the package version exactly; for the
 current package this is:
 
 ```bash
-git tag v0.4.0
+RELEASE_TAG="v0.4.0"
+tag_version="${RELEASE_TAG#v}"
+pkg_version=$(uv run python -c 'import pydantic_studio as ps; print(ps.__version__)')
+if [ "$tag_version" != "$pkg_version" ]; then
+  echo "Tag ${RELEASE_TAG} (${tag_version}) != package ${pkg_version}"
+  exit 1
+fi
+git tag "$RELEASE_TAG"
 ```
 
 Pushing `v0.4.0` starts `.github/workflows/publish.yml`. The `build` job
