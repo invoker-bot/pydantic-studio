@@ -82,3 +82,28 @@ async def test_studio_screen_invalid_submit_shows_errors() -> None:
         await pilot.pause()
         assert isinstance(app.screen, ErrorsScreen)
     assert session.outcome is None
+
+
+@pytest.mark.asyncio
+async def test_action_bar_buttons_work_inside_embedded_screen() -> None:
+    session = EditSession(tree=build_form_tree(_Schema))
+    app = _Host(session)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#action-save")
+        await pilot.pause()
+    assert session.submitted is True
+
+
+@pytest.mark.asyncio
+async def test_confirm_discard_finishes_embedded_screen_cancelled() -> None:
+    session = EditSession(tree=build_form_tree(_Schema))
+    app = _Host(session)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        session.tree.set_value("name", "changed")
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+    assert session.cancelled is True

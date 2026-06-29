@@ -338,9 +338,19 @@ class ConfirmExitScreen(Screen):
         )
 
     def action_save_and_exit(self) -> None:
-        self.app._submit()  # type: ignore[attr-defined]
+        owner = self.app.screen_stack[-2] if len(self.app.screen_stack) >= 2 else self.app
+        submit = getattr(owner, "_submit", None)
+        if submit is None:
+            submit = getattr(self.app, "_submit", None)
+        if submit is not None:
+            submit()
 
     def action_discard(self) -> None:
+        owner = self.app.screen_stack[-2] if len(self.app.screen_stack) >= 2 else self.app
+        cancel = getattr(owner, "_cancel_from_confirm", None)
+        if cancel is not None:
+            cancel()
+            return
         self.app._finish("cancelled")  # type: ignore[attr-defined]
 
     def action_keep_editing(self) -> None:

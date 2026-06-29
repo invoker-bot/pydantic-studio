@@ -35,8 +35,9 @@ class StudioScreen(ConfigScreen):
         Binding("ctrl+c", "quit", "quit", priority=True),
     ]
 
-    def __init__(self, session: EditSession) -> None:
+    def __init__(self, session: EditSession, *, dismiss_on_finish: bool = True) -> None:
         self.session = session
+        self._dismiss_on_finish = dismiss_on_finish
         short_name = (
             session.tree.schema_name.split(":")[-1]
             if ":" in session.tree.schema_name
@@ -54,7 +55,12 @@ class StudioScreen(ConfigScreen):
 
     def _finish(self, outcome: EditOutcome) -> None:
         self.post_message(StudioSessionEnded(outcome))
-        self.dismiss(outcome)
+        if self._dismiss_on_finish:
+            self.dismiss(outcome)
+
+    def _cancel_from_confirm(self) -> None:
+        outcome = self.session.cancel()
+        self._finish(outcome)
 
     async def action_quit(self) -> None:  # type: ignore[override]
         if isinstance(self.app.screen, ConfirmExitScreen):
