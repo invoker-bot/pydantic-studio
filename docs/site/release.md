@@ -115,7 +115,25 @@ assert resources.files("pydantic_studio").joinpath(
     "renderers/html/static/dist/index.html"
 ).is_file()
 PY
-rm -rf .dist-smoke-wheel .dist-smoke-sdist
+# Smoke-test email extra install
+rm -rf .dist-smoke-email
+python -m venv .dist-smoke-email
+wheel=$(
+  python - <<'PY'
+from pathlib import Path
+
+wheels = sorted(Path("dist").glob("*.whl"))
+assert len(wheels) == 1, wheels
+print(wheels[0])
+PY
+)
+.dist-smoke-email/bin/python -m pip install "${wheel}[email]"
+.dist-smoke-email/bin/python - <<'PY'
+import email_validator
+
+assert email_validator
+PY
+rm -rf .dist-smoke-wheel .dist-smoke-sdist .dist-smoke-email
 ```
 
 ## Tagging

@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("839", "816 default"),
-        "CLAUDE.md": ("839", "816 default"),
+        "README.md": ("840", "817 default"),
+        "CLAUDE.md": ("840", "817 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -306,7 +306,13 @@ def test_distribution_smoke_tests_verify_typed_marker_and_frontend_bundle() -> N
         workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
         steps = workflow["jobs"][job_name]["steps"]
         smoke_steps = [
-            step["run"] for step in steps if "Smoke-test" in step.get("name", "")
+            step["run"]
+            for step in steps
+            if step.get("name")
+            in {
+                "Smoke-test wheel install",
+                "Smoke-test source distribution install",
+            }
         ]
 
         assert len(smoke_steps) == 2
@@ -317,6 +323,34 @@ def test_distribution_smoke_tests_verify_typed_marker_and_frontend_bundle() -> N
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert ".dist-smoke-wheel/bin/python - <<'PY'" in guide
     assert ".dist-smoke-sdist/bin/python - <<'PY'" in guide
+    for snippet in required_snippets:
+        assert snippet in guide
+
+
+def test_distribution_smoke_tests_verify_email_extra_install() -> None:
+    workflow_jobs = {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }
+    required_snippets = [
+        "Smoke-test email extra install",
+        "rm -rf .dist-smoke-email",
+        "python -m venv .dist-smoke-email",
+        'pip install "${wheel}[email]"',
+        "import email_validator",
+    ]
+    for workflow_name, job_name in workflow_jobs.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        email_steps = [
+            step for step in steps if step.get("name") == "Smoke-test email extra install"
+        ]
+
+        assert len(email_steps) == 1
+        for snippet in required_snippets[1:]:
+            assert snippet in email_steps[0]["run"]
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     for snippet in required_snippets:
         assert snippet in guide
 
