@@ -127,7 +127,9 @@ jobs:
         run: uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
 
       - name: Build distributions
-        run: uv build
+        run: |
+          rm -rf dist
+          uv build
 
       - name: Check distribution metadata
         run: uv run twine check dist/*

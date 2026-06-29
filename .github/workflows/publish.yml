@@ -93,7 +93,9 @@ jobs:
           fi
 
       - name: Build distributions
-        run: uv build
+        run: |
+          rm -rf dist
+          uv build
 
       - name: Check distribution metadata
         run: uv run twine check dist/*

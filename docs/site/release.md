@@ -59,6 +59,7 @@ uv run pyright src/pydantic_studio
 uv run mkdocs build --strict
 cd frontend && pnpm build && cd ..
 uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"
+rm -rf dist
 uv build
 uv run twine check dist/*
 python -m venv .dist-smoke-wheel

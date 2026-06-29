@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("823", "800 default"),
-        "CLAUDE.md": ("823", "800 default"),
+        "README.md": ("824", "801 default"),
+        "CLAUDE.md": ("824", "801 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -131,6 +131,23 @@ def test_publish_workflow_uploads_release_artifact_strictly() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
     assert "fails immediately if no distributions are present" in guide
     assert "retains that artifact for 30 days" in guide
+
+
+def test_distribution_build_steps_start_from_clean_dist_directory() -> None:
+    workflow_jobs = {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }
+    for workflow_name, job_name in workflow_jobs.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        build_steps = [step for step in steps if step.get("name") == "Build distributions"]
+
+        assert len(build_steps) == 1
+        assert build_steps[0]["run"] == "rm -rf dist\nuv build\n"
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "rm -rf dist\nuv build" in guide
 
 
 def test_package_metadata_exposes_support_project_urls() -> None:
