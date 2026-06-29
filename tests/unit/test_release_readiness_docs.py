@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("845", "822 default"),
-        "CLAUDE.md": ("845", "822 default"),
+        "README.md": ("846", "823 default"),
+        "CLAUDE.md": ("846", "823 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -274,9 +274,11 @@ def test_distribution_release_metadata_is_verified_before_install_smokes() -> No
     }
     required_snippets = [
         "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
+        "Project-URL: Security, https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
         "zipfile.ZipFile(wheel)",
         "tarfile.open(sdist)",
         "CHANGELOG.md",
+        "SECURITY.md",
     ]
     for workflow_name, job_name in workflow_jobs.items():
         workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
@@ -408,10 +410,11 @@ def test_package_metadata_exposes_support_project_urls() -> None:
         "Documentation": "https://github.com/invoker-bot/pydantic-studio/tree/main/docs/site",
         "Issues": "https://github.com/invoker-bot/pydantic-studio/issues",
         "Changelog": "https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
+        "Security": "https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md",
     }
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    assert "Source, Documentation, Issues, and Changelog" in guide
+    assert "Source, Documentation, Issues, Changelog, and" in guide
 
 
 def test_package_metadata_exposes_changelog_and_release_notes() -> None:
@@ -441,6 +444,27 @@ def test_source_distribution_includes_changelog_file() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
     assert "CHANGELOG.md" in pyproject["tool"]["uv"]["build-backend"]["source-include"]
+
+
+def test_package_metadata_exposes_security_policy() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["project"]["urls"]["Security"] == (
+        "https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md"
+    )
+    assert "SECURITY.md" in pyproject["tool"]["uv"]["build-backend"]["source-include"]
+
+    policy = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    for snippet in (
+        "# Security Policy",
+        "Supported Versions",
+        "Reporting a Vulnerability",
+        "Do not report suspected vulnerabilities in public issues",
+    ):
+        assert snippet in policy
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "Security project URL" in guide
 
 
 def test_package_metadata_exposes_license_and_discovery_terms() -> None:

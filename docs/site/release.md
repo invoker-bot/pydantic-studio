@@ -7,9 +7,10 @@ formats, smoke-tests wheel and sdist installs, uploads the distributions as
 one release artifact, and then publishes that artifact to PyPI and piesource.
 The artifact upload fails immediately if no distributions are present and
 retains that artifact for 30 days for release troubleshooting.
-The package metadata exposes Source, Documentation, Issues, and Changelog
-project URLs so registry pages have clear support, navigation, and release
-history links. The Changelog project URL points to `CHANGELOG.md`.
+The package metadata exposes Source, Documentation, Issues, Changelog, and
+Security project URLs so registry pages have clear support, navigation,
+release history, and vulnerability-reporting links. The Changelog project URL
+points to `CHANGELOG.md`; the Security project URL points to `SECURITY.md`.
 It also includes the MIT license classifier and PyPI search keywords for
 registry discovery.
 
@@ -92,6 +93,7 @@ import zipfile
 from pathlib import Path
 
 expected_changelog = "Project-URL: Changelog, https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md"
+expected_security = "Project-URL: Security, https://github.com/invoker-bot/pydantic-studio/blob/main/SECURITY.md"
 wheels = sorted(Path("dist").glob("*.whl"))
 sdists = sorted(Path("dist").glob("*.tar.gz"))
 assert len(wheels) == 1, wheels
@@ -102,9 +104,11 @@ with zipfile.ZipFile(wheel) as zf:
     metadata_name = next(name for name in zf.namelist() if name.endswith("METADATA"))
     metadata = zf.read(metadata_name).decode("utf-8")
     assert expected_changelog in metadata
+    assert expected_security in metadata
 with tarfile.open(sdist) as tf:
     names = tf.getnames()
     assert any(name.endswith("/CHANGELOG.md") for name in names), names
+    assert any(name.endswith("/SECURITY.md") for name in names), names
 PY
 rm -rf .dist-smoke-wheel
 uv run python -m venv .dist-smoke-wheel
