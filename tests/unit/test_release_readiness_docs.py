@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("842", "819 default"),
-        "CLAUDE.md": ("842", "819 default"),
+        "README.md": ("844", "821 default"),
+        "CLAUDE.md": ("844", "821 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -378,10 +378,40 @@ def test_package_metadata_exposes_support_project_urls() -> None:
         "Source": "https://github.com/invoker-bot/pydantic-studio",
         "Documentation": "https://github.com/invoker-bot/pydantic-studio/tree/main/docs/site",
         "Issues": "https://github.com/invoker-bot/pydantic-studio/issues",
+        "Changelog": "https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md",
     }
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    assert "Source, Documentation, and Issues project URLs" in guide
+    assert "Source, Documentation, Issues, and Changelog" in guide
+
+
+def test_package_metadata_exposes_changelog_and_release_notes() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    urls = pyproject["project"]["urls"]
+
+    assert urls["Changelog"] == (
+        "https://github.com/invoker-bot/pydantic-studio/blob/main/CHANGELOG.md"
+    )
+
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    required_snippets = [
+        "# Changelog",
+        "## 0.4.0",
+        "Interactive editor for Pydantic models",
+        "wheel and sdist install smoke gates",
+        "GitHub OIDC Trusted Publishing",
+    ]
+    for snippet in required_snippets:
+        assert snippet in changelog
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert "Changelog project URL" in guide
+
+
+def test_source_distribution_includes_changelog_file() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert "CHANGELOG.md" in pyproject["tool"]["uv"]["build-backend"]["source-include"]
 
 
 def test_package_metadata_exposes_license_and_discovery_terms() -> None:

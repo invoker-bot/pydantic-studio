@@ -7,8 +7,9 @@ formats, smoke-tests wheel and sdist installs, uploads the distributions as
 one release artifact, and then publishes that artifact to PyPI and piesource.
 The artifact upload fails immediately if no distributions are present and
 retains that artifact for 30 days for release troubleshooting.
-The package metadata exposes Source, Documentation, and Issues project URLs
-so registry pages have clear support and navigation links.
+The package metadata exposes Source, Documentation, Issues, and Changelog
+project URLs so registry pages have clear support, navigation, and release
+history links. The Changelog project URL points to `CHANGELOG.md`.
 It also includes the MIT license classifier and PyPI search keywords for
 registry discovery.
 
