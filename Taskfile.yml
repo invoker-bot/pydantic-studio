@@ -1,0 +1,20 @@
+version: "3"
+
+env:
+  UV_PROJECT_ENVIRONMENT: "{{.TASKFILE_DIR}}/.venv"
+
+tasks:
+  init:
+    desc: Create or update the worktree-local Python development environment.
+    cmds:
+      - uv sync
+
+  test:
+    desc: Run the Python unit test suite.
+    cmds:
+      - uv run python -m pytest tests/unit -q {{.CLI_ARGS}}
+
+  lint:
+    desc: Run Python lint and syntax checks.
+    cmds:
+      - uv run ruff check {{.CLI_ARGS}}
