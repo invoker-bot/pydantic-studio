@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("834", "811 default"),
-        "CLAUDE.md": ("834", "811 default"),
+        "README.md": ("835", "812 default"),
+        "CLAUDE.md": ("835", "812 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -64,6 +64,37 @@ def test_release_guide_uses_publish_python_environment_for_local_preflight() -> 
 
     assert install in guide
     assert guide.index(install) < guide.index(default_tests)
+
+
+def test_release_gates_verify_project_metadata_version_matches_runtime() -> None:
+    expected_run = """uv run python - <<'PY'
+from pathlib import Path
+import tomllib
+
+import pydantic_studio as ps
+
+pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+assert pyproject["project"]["version"] == ps.__version__, (
+    pyproject["project"]["version"],
+    ps.__version__,
+)
+PY
+"""
+    for workflow_name, job_name in {
+        "ci.yml": "release-gate",
+        "publish.yml": "build",
+    }.items():
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        steps = workflow["jobs"][job_name]["steps"]
+        metadata_steps = [
+            step for step in steps if step.get("name") == "Verify package metadata version"
+        ]
+
+        assert len(metadata_steps) == 1
+        assert metadata_steps[0]["run"] == expected_run
+
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    assert 'pyproject["project"]["version"] == ps.__version__' in guide
 
 
 def test_workflows_define_concurrency_policies() -> None:

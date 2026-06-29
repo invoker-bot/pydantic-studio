@@ -56,6 +56,21 @@ jobs:
           assert sys.version_info[:2] == (3, 13), sys.version
           PY
 
+      - name: Verify package metadata version
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          import pydantic_studio as ps
+
+          pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          assert pyproject["project"]["version"] == ps.__version__, (
+              pyproject["project"]["version"],
+              ps.__version__,
+          )
+          PY
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile

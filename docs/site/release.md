@@ -54,6 +54,18 @@ Run the same gates before tagging:
 
 ```bash
 uv sync --locked --all-extras --python 3.13
+uv run python - <<'PY'
+from pathlib import Path
+import tomllib
+
+import pydantic_studio as ps
+
+pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+assert pyproject["project"]["version"] == ps.__version__, (
+    pyproject["project"]["version"],
+    ps.__version__,
+)
+PY
 uv run pytest -q
 uv run ruff check
 uv run pyright src/pydantic_studio
