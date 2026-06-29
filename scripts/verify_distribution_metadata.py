@@ -38,6 +38,21 @@ def _sdist_names(sdist: Path) -> list[str]:
         return tf.getnames()
 
 
+def _sdist_metadata(sdist: Path) -> str:
+    with tarfile.open(sdist) as tf:
+        metadata_members = [
+            member for member in tf.getmembers() if member.name.endswith("/PKG-INFO")
+        ]
+        if len(metadata_members) != 1:
+            raise RuntimeError(
+                f"expected exactly one PKG-INFO file in {sdist}, got {metadata_members!r}"
+            )
+        metadata_file = tf.extractfile(metadata_members[0])
+        if metadata_file is None:
+            raise RuntimeError(f"could not read PKG-INFO file in {sdist}")
+        return metadata_file.read().decode("utf-8")
+
+
 def _load_pyproject(project_root: Path) -> dict[str, object]:
     return tomllib.loads(project_root.joinpath("pyproject.toml").read_text(encoding="utf-8"))
 
@@ -124,6 +139,13 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     missing_urls = [url for url in _expected_project_urls(pyproject) if url not in metadata]
     if missing_urls:
         raise RuntimeError(f"{wheel} missing project URL metadata: {missing_urls!r}")
+
+    sdist_metadata = _sdist_metadata(sdist)
+    missing_sdist_urls = [
+        url for url in _expected_project_urls(pyproject) if url not in sdist_metadata
+    ]
+    if missing_sdist_urls:
+        raise RuntimeError(f"{sdist} missing project URL metadata: {missing_sdist_urls!r}")
 
     names = _sdist_names(sdist)
     missing_files = [

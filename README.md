@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-851%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-852%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,14 +77,14 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 851 tests: 828 default unit/integration/TUI/web smoke tests plus 23
+by 852 tests: 829 default unit/integration/TUI/web smoke tests plus 23
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
 `docs/superpowers/specs/2026-06-11-task-oriented-editing-design.md`).
 CI runs the default suite on Python 3.11, 3.12, 3.13, and 3.14; the
 browser, frontend bundle, wheel and sdist install smoke gates, and
-metadata checks run on Python 3.13.
+metadata checks for both wheel and sdist run on Python 3.13.
 Tag-triggered PyPI publishing uses GitHub OIDC Trusted Publishing with
 the `pypi` environment, not a repository API-token secret. The same
 release artifact is also published to piesource with independent
@@ -408,7 +408,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 828 default tests; skips tests/e2e/
+uv run pytest -q                          # 829 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint
