@@ -14,6 +14,7 @@ import {
   type FormFlags,
 } from "@/components/form/errors";
 import { Button } from "@/components/ui/button";
+import { VariantSelector } from "@/components/form/VariantSelector";
 import { missingRequiredPaths } from "@/lib/required";
 
 type Status = "editing" | "saved" | "cancelled";
@@ -146,6 +147,7 @@ export default function App() {
             </Button>
           </div>
         </header>
+        {data.variant && <VariantSelector variant={data.variant} />}
         {submitErrors.length > 0 && (
           <div
             data-testid="submit-errors"

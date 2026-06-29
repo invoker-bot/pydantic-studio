@@ -46,8 +46,7 @@ def save_json(tree: FormTree, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    instance = tree.to_instance()
-    payload = instance.model_dump_json(indent=2, by_alias=True)
+    payload = json.dumps(tree.to_output_python(by_alias=True), indent=2)
 
     fd, tmp = tempfile.mkstemp(prefix=".tmp-json-", dir=str(path.parent))
     try:

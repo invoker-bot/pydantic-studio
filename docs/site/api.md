@@ -8,6 +8,14 @@
 
 ::: pydantic_studio.FormNode
 
+## Root model variants
+
+::: pydantic_studio.VariantSpec
+
+::: pydantic_studio.VariantRegistry
+
+::: pydantic_studio.build_variant_form_tree
+
 ## I/O
 
 ::: pydantic_studio.load_config

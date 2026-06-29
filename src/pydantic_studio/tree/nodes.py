@@ -1199,6 +1199,28 @@ def _collect_missing_required(node: Any, base: str, out: list[str]) -> None:
         out.append(base)
 
 
+class VariantOption(BaseModel):
+    """Serializable metadata for one selectable root model variant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+    description: str | None = None
+    model_type_name: str
+
+
+class VariantState(BaseModel):
+    """Root-level variant selector state for a FormTree."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    options: list[VariantOption]
+    selected_id: str
+    discriminator: str | None = None
+    persistence: Literal["metadata", "inline_discriminator", "model_field"] = "metadata"
+
+
 class FormTree(BaseModel):
     """Root container: schema reference, root group, and history (added later)."""
 
@@ -1212,6 +1234,7 @@ class FormTree(BaseModel):
     cursor: int = 0
     snapshot_limit: int = 50
     draft_path: FsPath | None = None
+    variant: VariantState | None = None
 
     # Stashed source CommentedMap for round-trip save (preserves comments).
     # Excluded from JSON snapshots — re-populated only via load_yaml.
@@ -1248,6 +1271,18 @@ class FormTree(BaseModel):
             paths = [".".join(str(p) for p in err["loc"]) for err in e.errors()]
             raise ValidationFailedError(errors, paths=paths) from e
 
+    def to_output_python(self, *, by_alias: bool = False) -> dict[str, Any]:
+        """Materialize and dump tree values, including configured variant metadata."""
+        instance = self.to_instance()
+        data = instance.model_dump(mode="json", by_alias=by_alias)
+        if (
+            self.variant is not None
+            and self.variant.persistence == "inline_discriminator"
+            and self.variant.discriminator
+        ):
+            data = {self.variant.discriminator: self.variant.selected_id, **data}
+        return data
+
     def missing_required_paths(self) -> list[str]:
         """Dotted paths of required leaves with no value, in field order.
 
@@ -1268,6 +1303,77 @@ class FormTree(BaseModel):
         if self.schema_class is None and info.context and "schema_class" in info.context:
             self.schema_class = info.context["schema_class"]
         return self
+
+    def attach_variant_registry(
+        self,
+        variants: Any,
+        *,
+        selected_id: str,
+        discriminator: str | None = None,
+        persistence: Literal[
+            "metadata", "inline_discriminator", "model_field"
+        ] = "metadata",
+    ) -> None:
+        """Attach caller-supplied root variant choices to this tree."""
+        options = [
+            VariantOption(
+                id=spec.id,
+                label=spec.display_label,
+                description=spec.description,
+                model_type_name=spec.model_type_name,
+            )
+            for spec in variants
+        ]
+        ids = {option.id for option in options}
+        if selected_id not in ids:
+            msg = f"selected variant {selected_id!r} is not in registry"
+            raise ValueError(msg)
+        self.variant = VariantState(
+            options=options,
+            selected_id=selected_id,
+            discriminator=discriminator,
+            persistence=persistence,
+        )
+
+    def select_root_variant(self, variant_id: str, seed: Any = None) -> ValidationResult:
+        """Switch the root model to a caller-supplied variant."""
+        if self.variant is None:
+            return ValidationResult.fail(["tree does not have root variants"])
+        option = next(
+            (candidate for candidate in self.variant.options if candidate.id == variant_id),
+            None,
+        )
+        if option is None:
+            known = ", ".join(candidate.id for candidate in self.variant.options)
+            return ValidationResult.fail(
+                [f"unknown variant id {variant_id!r}; known variants: {known}"]
+            )
+
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.builder import default_registry
+
+        model = _resolve_type_name(option.model_type_name)
+        builder = default_registry().find(model)
+        new_root = builder.build(model, FieldInfo(annotation=model), seed or {})
+        if not isinstance(new_root, GroupNode):
+            return ValidationResult.fail(
+                [f"variant {variant_id!r} did not build a group root"]
+            )
+
+        self.schema_class = model
+        self.schema_name = f"{model.__module__}:{model.__qualname__}"
+        self.root = new_root
+        self.variant.selected_id = variant_id
+        # Root variant switches replace the schema as well as values. Existing
+        # root-only snapshots belong to the old schema, so keeping them would
+        # let undo restore an incompatible root.
+        self.snapshots = []
+        self.cursor = 0
+        if self.draft_path is not None:
+            _snap.draft_save(self, self.draft_path)
+        return ValidationResult.ok()
 
     # ----- mutations -----
 

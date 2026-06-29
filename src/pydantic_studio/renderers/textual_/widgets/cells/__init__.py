@@ -21,6 +21,7 @@ from pydantic_studio.renderers.textual_.widgets.cells.bool_cell import BoolCell
 from pydantic_studio.renderers.textual_.widgets.cells.choice_cell import ChoiceCell
 from pydantic_studio.renderers.textual_.widgets.cells.container_cell import ContainerCell
 from pydantic_studio.renderers.textual_.widgets.cells.input_cell import InputCell
+from pydantic_studio.renderers.textual_.widgets.cells.root_variant_cell import RootVariantCell
 from pydantic_studio.renderers.textual_.widgets.cells.secret_cell import SecretCell
 from pydantic_studio.renderers.textual_.widgets.cells.text_cell import TextCell
 
@@ -53,6 +54,8 @@ def make_cell(node: AnyNode, path: str, form_tree: FormTree) -> Cell:
         return SecretCell(node=node, path=path, form_tree=form_tree)
     if kind == "any":
         return AnyCell(node=node, path=path, form_tree=form_tree)
+    if kind == "root_variant":
+        return RootVariantCell(node=node, path=path, form_tree=form_tree)
     if kind in ("group", "sequence", "mapping", "union"):
         return ContainerCell(node=node, path=path, form_tree=form_tree)
     return TextCell(node=node, path=path, form_tree=form_tree)
@@ -69,6 +72,7 @@ __all__ = [
     "EditModeEntered",
     "EditModeExited",
     "InputCell",
+    "RootVariantCell",
     "SecretCell",
     "TextCell",
     "make_cell",

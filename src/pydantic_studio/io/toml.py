@@ -55,8 +55,7 @@ def save_toml(tree: FormTree, path: str | Path) -> None:
         msg = "tree.schema_class is None; cannot derive description comments"
         raise ValueError(msg)
 
-    instance = tree.to_instance()
-    data = instance.model_dump(mode="json")
+    data = tree.to_output_python()
     doc = _build_document(data, schema)
 
     fd, tmp = tempfile.mkstemp(prefix=".tmp-toml-", dir=str(path.parent))
@@ -72,6 +71,10 @@ def save_toml(tree: FormTree, path: str | Path) -> None:
 def _build_document(data: dict[str, Any], schema: type[BaseModel]) -> Any:
     """Construct a tomlkit Document with description comments per key."""
     doc = document()
+    for field_name, value in data.items():
+        if field_name in schema.model_fields:
+            continue
+        doc.add(field_name, value)
     for field_name, field_info in schema.model_fields.items():
         if field_name not in data:
             continue

@@ -53,6 +53,20 @@ class _RowSpec:
     label: str | None = None
 
 
+@dataclass(frozen=True)
+class _RootVariantNode:
+    selected_id: str
+    options: tuple[Any, ...]
+    kind: str = "root_variant"
+    name: str = "variant"
+    description: str | None = "Select which root model this configuration edits."
+    required: bool = False
+    error: str | None = None
+
+    def to_python(self) -> str:
+        return self.selected_id
+
+
 @dataclass
 class CursorMoved(Message):
     """Posted whenever the focused row changes (incl. the initial one).
@@ -122,6 +136,8 @@ class FieldListView(VerticalScroll):
         self._apply_filter_visibility()
 
     def _filter_match(self, spec: _RowSpec) -> bool:
+        if getattr(spec.node, "kind", None) == "root_variant":
+            return True
         return not self._filter or self._filter in spec.node.name.lower()
 
     def _visible_indices(self) -> list[int]:
@@ -190,13 +206,27 @@ class FieldListView(VerticalScroll):
         """Return child rows for the container this view is scoped to."""
         node = self._group
         if node.kind == "group":
-            return [
+            specs = [
                 _RowSpec(
                     child,
                     self._join_path(self._base_path, child.name),
                 )
                 for child in node.fields
             ]
+            if self._base_path == "" and self._form_tree.variant is not None:
+                variant = self._form_tree.variant
+                specs.insert(
+                    0,
+                    _RowSpec(
+                        _RootVariantNode(
+                            selected_id=variant.selected_id,
+                            options=tuple(variant.options),
+                        ),
+                        "__variant__",
+                        "Variant",
+                    ),
+                )
+            return specs
         if node.kind == "sequence":
             return [
                 _RowSpec(child, self._join_path(self._base_path, idx))
@@ -534,6 +564,9 @@ class FieldListView(VerticalScroll):
             self._cycle_union(row.node, +1)
             row.refresh(recompose=True)
             return
+        if row is not None and row.node.kind == "root_variant":
+            self._cycle_root_variant(+1)
+            return
 
         cell = self._focused_cell()
         if isinstance(cell, BoolCell):
@@ -556,6 +589,9 @@ class FieldListView(VerticalScroll):
             self._cycle_union(row.node, -1)
             row.refresh(recompose=True)
             return
+        if row is not None and row.node.kind == "root_variant":
+            self._cycle_root_variant(-1)
+            return
 
         cell = self._focused_cell()
         if isinstance(cell, BoolCell):
@@ -572,6 +608,28 @@ class FieldListView(VerticalScroll):
         idx = 0 if current is None else current
         new_idx = (idx + delta) % len(names)
         self._form_tree.select_variant(self._base_path_for_node(node), new_idx)
+
+    def _cycle_root_variant(self, delta: int) -> None:
+        variant = self._form_tree.variant
+        if variant is None or not variant.options:
+            return
+        ids = [option.id for option in variant.options]
+        try:
+            idx = ids.index(variant.selected_id)
+        except ValueError:
+            idx = 0
+        new_id = ids[(idx + delta) % len(ids)]
+        result = self._form_tree.select_root_variant(new_id)
+        if not result.ok:
+            row = self._focused_row()
+            if row is not None:
+                row.set_error("; ".join(result.errors))
+            return
+        if self._base_path == "":
+            self._group = self._form_tree.root
+        self._cursor = 0
+        self._refresh_rows()
+        self.call_after_refresh(self._focus_cursor_cell)
 
     def _base_path_for_node(self, node: Any) -> str:
         if self._group is node:

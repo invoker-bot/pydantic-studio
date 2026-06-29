@@ -44,6 +44,7 @@ def run_console_app(
 
     try:
         print_func(f"Editing {tree.schema_name.split(':')[-1]}")
+        _prompt_root_variant(tree, input_func, print_func)
         _edit_group(
             tree=tree,
             group=tree.root,
@@ -63,6 +64,29 @@ def run_console_app(
 
     save_config(tree, save_path)
     print_func(f"saved to {Path(save_path)}")
+
+
+def _prompt_root_variant(
+    tree: Any,
+    input_func: InputFunc,
+    print_func: PrintFunc,
+) -> None:
+    variant = getattr(tree, "variant", None)
+    if variant is None:
+        return
+    labels = [option.id for option in variant.options]
+    current = variant.selected_id
+    while True:
+        raw = input_func(f"variant ({'/'.join(labels)}) [{current}]: ")
+        if raw == "":
+            return
+        if raw not in labels:
+            print_func(f"choose one of: {', '.join(labels)}")
+            continue
+        result = tree.select_root_variant(raw)
+        if result.ok:
+            return
+        print_func("; ".join(result.errors) or "invalid variant")
 
 
 def _edit_group(

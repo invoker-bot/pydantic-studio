@@ -12,6 +12,7 @@ from pydantic_studio.renderers.html.serialize import (
     tree_to_json,
     validation_envelope,
 )
+from pydantic_studio.variants import VariantRegistry, VariantSpec, build_variant_form_tree
 from tests.fixtures.schemas import WithColor
 
 
@@ -58,6 +59,14 @@ class _WithDict(BaseModel):
 
 class _UnionHolder(BaseModel):
     value: int | str
+
+
+class _VariantEmail(BaseModel):
+    address: str = "ops@example.com"
+
+
+class _VariantSlack(BaseModel):
+    channel: str = "#ops"
 
 
 def test_tree_to_json_returns_schema_name_and_root() -> None:
@@ -170,6 +179,26 @@ def test_tree_to_json_union_renders_with_selected_variant() -> None:
     assert address["value"] == "a@x"
 
 
+def test_tree_to_json_includes_root_variant_metadata() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail, label="Email"),
+                VariantSpec(id="slack", model=_VariantSlack, label="Slack"),
+            ]
+        ),
+        selected_id="email",
+        discriminator="class_name",
+        persistence="inline_discriminator",
+    )
+
+    data = tree_to_json(tree)
+
+    assert data["variant"]["selected_id"] == "email"
+    assert data["variant"]["options"][0]["label"] == "Email"
+    assert "class_name: email" in data["preview"]
+
+
 def test_validation_envelope_ok_for_complete_tree() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
     env = validation_envelope(tree)
@@ -271,6 +300,24 @@ def test_dispatch_select_variant_switches_to_indexed_branch() -> None:
     val = tree.root.find("value")
     assert val.selected_index == 1
     assert val.selected.kind == "string"
+
+
+def test_dispatch_select_root_variant_switches_root_model() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail),
+                VariantSpec(id="slack", model=_VariantSlack),
+            ]
+        ),
+        selected_id="email",
+    )
+
+    result = dispatch_mutation(tree, {"op": "select_root_variant", "variant_id": "slack"})
+
+    assert result.ok is True
+    assert tree.schema_class is _VariantSlack
+    assert tree.root.find("channel") is not None
 
 
 def test_dispatch_unknown_op_fails_without_mutating() -> None:

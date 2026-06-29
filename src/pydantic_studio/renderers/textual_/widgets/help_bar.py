@@ -32,6 +32,7 @@ _CONTAINER_HINTS = {
     "sequence": "Enter to open",
     "mapping": "Enter to open",
     "union": "Tab to switch variant, Enter to open",
+    "root_variant": "Left/Right to switch root model",
 }
 
 

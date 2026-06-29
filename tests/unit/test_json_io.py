@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel, Field
+
 from pydantic_studio import build_form_tree
 from tests.fixtures.schemas import Server
 
@@ -78,3 +80,16 @@ class TestSaveJson:
         save_json(tree, out)
         content = out.read_text(encoding="utf-8")
         assert "\n  " in content
+
+    def test_save_uses_field_aliases(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.json_ import save_json
+
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        out = tmp_path / "out.json"
+        tree = build_form_tree(AliasConfig)
+        save_json(tree, out)
+        content = out.read_text(encoding="utf-8")
+        assert '"api-key": "secret"' in content
+        assert "api_key" not in content

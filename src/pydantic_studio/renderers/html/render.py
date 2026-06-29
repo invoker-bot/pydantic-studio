@@ -28,8 +28,7 @@ def render_yaml_preview(tree: FormTree) -> str:
     if schema is None:
         return "<no schema>"
     try:
-        instance = tree.to_instance()
-        data = instance.model_dump(mode="json")
+        data = tree.to_output_python()
     except Exception:
         data = tree.to_python()
     if not data:

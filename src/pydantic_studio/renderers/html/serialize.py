@@ -36,6 +36,9 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     from pydantic_studio.renderers.html.render import render_yaml_preview
 
     data = tree.model_dump(mode="json", exclude=_TREE_EXCLUDE)
+    data["variant"] = (
+        tree.variant.model_dump(mode="json") if tree.variant is not None else None
+    )
     data["unsaved_count"] = len(tree.snapshots)
     data["preview"] = render_yaml_preview(tree)
     return data
@@ -251,6 +254,8 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
             )
         if op == "select_variant":
             return tree.select_variant(path, int(mutation["variant_index"]))
+        if op == "select_root_variant":
+            return tree.select_root_variant(str(mutation["variant_id"]))
     except (KeyError, ValueError, TypeError) as exc:
         return ValidationResult.fail([f"mutation failed: {exc}"])
     return ValidationResult.fail([f"unknown op: {op!r}"])

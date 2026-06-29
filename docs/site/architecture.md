@@ -43,13 +43,33 @@ mutation API:
   `EditorScreen` + per-node-kind widgets. Tested via `App.run_test()`
   and `Pilot`.
 - **HTML browser** (`pydantic_studio.renderers.html`) — FastAPI server
-  + Jinja2 templates + HTMX-driven swaps. Heartbeat polling detects
-  abandoned tabs.
+  + React/Vite SPA. Heartbeat polling detects abandoned tabs.
 - **CLI shorthand** (`pydantic_studio.cli`) — `fill`, `run`, `check`,
   `edit`, `show`, `version`. Uses typer.
 
 Adding another renderer (e.g., a Tk desktop app) means implementing one
 new module under `renderers/`. The tree stays untouched.
+
+## Root model variants
+
+Some applications need one editor entry point that can produce different
+Pydantic root model classes. pydantic-studio models this with
+`VariantRegistry` and `VariantSpec` rather than a project-specific
+dependency. `build_variant_form_tree()` builds the selected model's
+normal `FormTree` and attaches serializable variant metadata:
+
+- `options` — stable ids, labels, descriptions, and model type names
+- `selected_id` — the currently selected root model
+- `discriminator` — optional output key such as `class_name`
+- `persistence` — `metadata` by default, or `inline_discriminator` to
+  write the selected id into the saved config
+
+Renderers own the interaction style. Console asks one root-variant
+question before field prompts. Textual TUI renders a synthetic `Variant`
+row at the top of the root form and maps `←`/`→` to
+`select_root_variant()`. The web SPA renders a page-level selector and
+sends the same mutation. The selected model's fields are rebuilt through
+the regular builder registry, so this stays generic across domains.
 
 ## Cross-frontend identity
 

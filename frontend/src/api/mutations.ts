@@ -18,7 +18,8 @@ export type Mutation =
   | { op: "add_entry"; path: string; key: string }
   | { op: "remove_entry"; path: string; index: number }
   | { op: "rename_key"; path: string; index: number; new_key: string }
-  | { op: "select_variant"; path: string; variant_index: number };
+  | { op: "select_variant"; path: string; variant_index: number }
+  | { op: "select_root_variant"; variant_id: string };
 
 export interface MutationResponse {
   tree: FormTree;

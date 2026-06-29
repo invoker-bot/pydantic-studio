@@ -9,6 +9,10 @@ interactive frontends sharing a single form-state model:
 - An **HTML browser app** — `pydantic-studio edit --frontend web mypkg:Config config.yaml`
 - **CLI helpers** — `pydantic-studio fill | run | check`
 
+The same state model can also expose a root model selector, so one
+generic editor can choose between several Pydantic classes without
+depending on an application-specific config package.
+
 ## Why?
 
 Hand-editing config files is error-prone. Pydantic schemas already encode

@@ -3,15 +3,30 @@
 **Interactive editor for Pydantic models.** Generate and edit `config.yaml` /
 `config.toml` / `config.json` against a strongly-typed schema, with three
 frontends sharing a single form-state model: sequential console prompts, a
-Textual TUI, and an HTMX-driven local web app.
+Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-744%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-767%20passing-brightgreen)](#development)
 
 ---
 
 ## At a glance
+
+**Console prompt flow** (default) — a Yeoman-style wizard for plain
+terminals, SSH sessions, and quick config generation. It asks one
+question at a time, shows the current/default value in brackets, keeps
+the value when you press Enter, and re-prompts invalid answers:
+
+```text
+$ pydantic-studio edit myapp.config:AppSettings config.yaml
+Editing AppSettings
+name [prod]: staging
+port [8080]: 9090
+debug [false]: y
+level (debug/info/warn) [info]: warn
+saved to config.yaml
+```
 
 **Textual TUI** — a real form, not a modal editor: the focused field IS
 the editable field (type to edit, `Tab`/`Enter` to flow on), with inline
@@ -60,9 +75,9 @@ your hand-written comments.
 
 ## Status
 
-**v0.3.0 — Alpha.** All 9 implementation phases plus the task-oriented
+**v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 720+ tests (unit + integration + TUI/HTMX smoke). The editing
+by 760+ tests (unit + integration + TUI/web smoke). The editing
 session now has an explicit submit/cancel contract (`run_app` returns
 `EditOutcome`), and loading is symmetric with saving (existing values
 run through field validators — see
@@ -133,7 +148,7 @@ pydantic-studio edit myapp.config:AppSettings
 # Or open the Textual TUI
 pydantic-studio edit --frontend tui myapp.config:AppSettings config.yaml
 
-# Or the HTMX-driven browser UI
+# Or the React-backed browser UI
 pydantic-studio edit --frontend web myapp.config:AppSettings config.yaml
 ```
 
@@ -141,9 +156,26 @@ Format is auto-detected from extension (`.yaml` / `.yml` / `.toml` / `.json`).
 
 ### Console Mode
 
-`edit` defaults to the console renderer. It asks one prompt per field,
-pre-fills schema defaults, keeps the current value when you press Enter,
-and writes the configured save target when all prompts are complete.
+`edit` defaults to the console renderer. It is intentionally not a
+full-screen UI: it behaves like a Yeoman-style prompt wizard, asking one
+question at a time in the current terminal.
+
+Each prompt includes the field path and current/default value. Press
+Enter to keep that value, or type a replacement. Choice fields show the
+allowed labels inline (`level (debug/info/warn) [info]:`), booleans
+accept common yes/no forms, and invalid input is rejected without
+mutating the tree:
+
+```text
+port [8080]: abc
+cannot parse 'abc' as int
+port [8080]: 9090
+```
+
+Containers stay sequential as well: lists and mappings first ask for a
+count, then prompt through each item or entry. When all prompts are
+complete, the tree is validated through the normal save path and written
+to the configured target.
 
 ### Textual TUI
 
@@ -227,6 +259,8 @@ validation for mid-edit drafts) — are also exported.
 from pydantic_studio import (
     # Tree construction
     build_form_tree, FormTree, FormNode,
+    # Root model variants
+    VariantSpec, VariantRegistry, build_variant_form_tree,
     # 24 node types
     StringNode, IntNode, FloatNode, BoolNode, DecimalNode,
     DatetimeNode, DateNode, TimeNode, TimedeltaNode,
@@ -244,7 +278,7 @@ from pydantic_studio import (
     run_console_app,              # sequential console prompts
     StudioApp, run_app,           # Textual TUI (run_app -> EditOutcome)
     EditOutcome,                  # session result: submitted | cancelled
-    StudioServer, run_html_app,   # HTML/HTMX
+    StudioServer, run_html_app,   # HTML / React SPA
     # Registry
     Registry, NodeBuilder, register_builder,
     default_registry, reset_default_registry,
@@ -254,6 +288,47 @@ from pydantic_studio import (
     CancelledByUser, ValidationFailedError,
 )
 ```
+
+## Root model variants
+
+When one editor entry point can produce several Pydantic model classes,
+keep that selection in pydantic-studio instead of coupling your app to a
+project-specific config factory:
+
+```python
+from pydantic import BaseModel
+from pydantic_studio import VariantRegistry, VariantSpec, build_variant_form_tree
+
+
+class EmailNotifier(BaseModel):
+    address: str = "ops@example.com"
+
+
+class SlackNotifier(BaseModel):
+    channel: str = "#ops"
+
+
+variants = VariantRegistry(
+    [
+        VariantSpec(id="email", model=EmailNotifier, label="Email"),
+        VariantSpec(id="slack", model=SlackNotifier, label="Slack"),
+    ]
+)
+
+tree = build_variant_form_tree(
+    variants,
+    selected_id="email",
+    discriminator="class_name",
+    persistence="inline_discriminator",
+)
+```
+
+The selection is renderer-native: console asks `variant (email/slack)
+[email]:`, TUI shows a root `Variant` row that cycles with `←`/`→`,
+and the web UI renders a selector in the page. The default persistence
+mode is `metadata`, which keeps the choice in the session only. Use
+`inline_discriminator` to write a discriminator key such as
+`class_name: slack` alongside the selected model fields.
 
 ## Drafts (auto-save + recovery)
 

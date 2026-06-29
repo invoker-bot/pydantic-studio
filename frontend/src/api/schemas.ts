@@ -7,6 +7,22 @@
 
 import { z } from "zod";
 
+export const VariantOptionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().nullable(),
+  model_type_name: z.string(),
+});
+
+export const VariantStateSchema = z.object({
+  options: z.array(VariantOptionSchema),
+  selected_id: z.string(),
+  discriminator: z.string().nullable(),
+  persistence: z.enum(["metadata", "inline_discriminator", "model_field"]),
+});
+
+export type VariantStateData = z.infer<typeof VariantStateSchema>;
+
 // Common base fields on every FormNode.
 const NodeBase = z.object({
   name: z.string(),
@@ -367,6 +383,7 @@ export type FormNodeData =
 export const FormTreeSchema = z.object({
   schema_name: z.string(),
   root: GroupNodeSchema,
+  variant: VariantStateSchema.nullable(),
   unsaved_count: z.number(),
   preview: z.string(),
   readonly_paths: z.array(z.string()).default([]),

@@ -125,10 +125,8 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
             source = loaded
 
     # Run through validation so schema defaults are resolved into concrete
-    # values — ``tree.to_python()`` alone omits keys whose nodes are unset,
-    # which would produce an empty YAML file for a brand-new tree.
-    instance = tree.to_instance()
-    data = instance.model_dump(mode="json")
+    # values, with root-variant output metadata injected when configured.
+    data = tree.to_output_python()
     cm = _build_commented_map(data, schema, source)
     yaml = _yaml()
 
@@ -169,6 +167,12 @@ def _build_commented_map(
         src_ca = getattr(source, "ca", None)
         if src_ca is not None and src_ca.comment is not None:
             cm.ca.comment = src_ca.comment
+
+    for key, value in data.items():
+        if key in schema.model_fields:
+            continue
+        cm[key] = value
+        _copy_comment_if_present(source, cm, key)
 
     for field_name, field_info in schema.model_fields.items():
         if field_name not in data:

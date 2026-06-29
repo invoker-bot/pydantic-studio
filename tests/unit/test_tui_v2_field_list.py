@@ -6,7 +6,12 @@ import pytest
 from pydantic import BaseModel
 from textual.app import App
 
-from pydantic_studio import build_form_tree
+from pydantic_studio import (
+    VariantRegistry,
+    VariantSpec,
+    build_form_tree,
+    build_variant_form_tree,
+)
 from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 
@@ -60,6 +65,14 @@ class _Host(App):
         yield self._view
 
 
+class _EmailConfig(BaseModel):
+    address: str = "ops@example.com"
+
+
+class _SlackConfig(BaseModel):
+    channel: str = "#ops"
+
+
 @pytest.mark.asyncio
 async def test_field_list_mounts_one_row_per_child() -> None:
     tree = build_form_tree(_Schema)
@@ -70,6 +83,30 @@ async def test_field_list_mounts_one_row_per_child() -> None:
         assert len(rows) == 3
         names = [r.label_text for r in rows]
         assert names == ["name", "count", "enabled"]
+
+
+@pytest.mark.asyncio
+async def test_field_list_root_variant_row_cycles_root_model() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_EmailConfig, label="Email"),
+                VariantSpec(id="slack", model=_SlackConfig, label="Slack"),
+            ]
+        ),
+        selected_id="email",
+    )
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view).run_test() as pilot:
+        await pilot.pause()
+        assert [row.label_text for row in view.query(FieldRow)] == ["Variant", "address"]
+
+        await pilot.press("right")
+        await pilot.pause()
+
+        assert tree.variant is not None
+        assert tree.variant.selected_id == "slack"
+        assert [row.label_text for row in view.query(FieldRow)] == ["Variant", "channel"]
 
 
 @pytest.mark.asyncio

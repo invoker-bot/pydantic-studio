@@ -33,6 +33,7 @@ nav:
   - Examples:
       - examples/index.md
       - Console prompt mode: examples/console-mode.md
+      - Root model variants: examples/variant-selection.md
       - Server config: examples/server-config.md
       - Multi-format I/O: examples/multi-format.md
   - API Reference: api.md

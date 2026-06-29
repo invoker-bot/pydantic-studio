@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.3.4"
+__version__ = "0.4.0"
 
 from pydantic_studio.exceptions import (
     CancelledByUser,
@@ -68,6 +68,11 @@ from pydantic_studio.tree.nodes import (
     UuidNode,
 )
 from pydantic_studio.tree.validation import ValidationResult
+from pydantic_studio.variants import (
+    VariantRegistry,
+    VariantSpec,
+    build_variant_form_tree,
+)
 
 
 def register_builder(builder: NodeBuilder) -> None:
@@ -116,8 +121,11 @@ __all__ = [
     "UuidNode",
     "ValidationFailedError",
     "ValidationResult",
+    "VariantRegistry",
+    "VariantSpec",
     "__version__",
     "build_form_tree",
+    "build_variant_form_tree",
     "delete_draft",
     "draft_newer_than",
     "find_draft",
