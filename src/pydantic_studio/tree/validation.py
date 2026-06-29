@@ -14,16 +14,20 @@ class ValidationResult:
     is a tuple to prevent in-place mutation through the frozen wrapper.
     """
 
-    ok: bool
+    ok: bool  # pyright: ignore[reportRedeclaration]
     errors: tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod
     def success(cls) -> ValidationResult:
         return cls(ok=True, errors=())
 
-    # convenience aliases
+    # Convenience alias. Instances expose ``result.ok`` as a boolean; the
+    # class exposes ``ValidationResult.ok()`` as a factory. Runtime lookup
+    # handles that because instance attributes shadow the classmethod.
     @classmethod
-    def ok(cls) -> ValidationResult:  # noqa: A003, RUF100 - intentional shadowing of builtin
+    def ok(  # noqa: A003, RUF100 - intentional bool/factory alias
+        cls,
+    ) -> ValidationResult:  # pyright: ignore[reportRedeclaration]
         return cls.success()
 
     @classmethod
@@ -31,4 +35,4 @@ class ValidationResult:
         return cls(ok=False, errors=tuple(errors))
 
     def __bool__(self) -> bool:
-        return self.ok
+        return self.ok  # pyright: ignore[reportReturnType]
