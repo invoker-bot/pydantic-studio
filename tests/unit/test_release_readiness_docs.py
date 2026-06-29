@@ -19,13 +19,22 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("817", "794 default"),
-        "CLAUDE.md": ("817", "794 default"),
+        "README.md": ("818", "795 default"),
+        "CLAUDE.md": ("818", "795 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
         for snippet in snippets:
             assert snippet in text, f"{doc} should mention {snippet!r}"
+
+
+def test_workflow_jobs_have_timeout_limits() -> None:
+    for workflow_name in ("ci.yml", "publish.yml"):
+        workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
+        for job_name, job in workflow["jobs"].items():
+            assert "timeout-minutes" in job, f"{workflow_name}:{job_name} needs a timeout"
+            assert isinstance(job["timeout-minutes"], int)
+            assert 1 <= job["timeout-minutes"] <= 60
 
 
 def test_publish_workflow_uses_trusted_publishing_without_api_token_secret() -> None:

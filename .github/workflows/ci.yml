@@ -15,6 +15,7 @@ jobs:
   python:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +58,7 @@ jobs:
   release-gate:
     name: Browser and package gate
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: python
     steps:
       - uses: actions/checkout@v4

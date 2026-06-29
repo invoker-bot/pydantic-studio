@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -132,6 +133,7 @@ jobs:
 
   publish-pypi:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
     environment:
       name: pypi
@@ -159,6 +161,7 @@ jobs:
 
   publish-piesource:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
     outputs:
       publish-outcome: ${{ steps.publish-piesource.outcome }}
@@ -185,6 +188,7 @@ jobs:
 
   publish-result:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs:
       - publish-pypi
       - publish-piesource
