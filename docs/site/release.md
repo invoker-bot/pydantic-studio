@@ -125,6 +125,15 @@ gate are green. The tag must match the package version exactly; for the
 current package this is:
 
 ```bash
+git fetch origin main:refs/remotes/origin/main
+if [ -n "$(git status --short)" ]; then
+  echo "Worktree has uncommitted changes"
+  exit 1
+fi
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+  echo "HEAD does not match origin/main"
+  exit 1
+fi
 RELEASE_TAG="v0.4.0"
 tag_version="${RELEASE_TAG#v}"
 pkg_version=$(uv run python -c 'import pydantic_studio as ps; print(ps.__version__)')

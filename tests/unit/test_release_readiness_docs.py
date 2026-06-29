@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("837", "814 default"),
-        "CLAUDE.md": ("837", "814 default"),
+        "README.md": ("838", "815 default"),
+        "CLAUDE.md": ("838", "815 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -394,6 +394,25 @@ def test_release_guide_checks_tag_matches_package_version_before_tagging() -> No
     assert text.index('if [ "$tag_version" != "$pkg_version" ]; then') < text.index(
         'git tag "$RELEASE_TAG"'
     )
+
+
+def test_release_guide_requires_clean_origin_main_before_tagging() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    fetch = "git fetch origin main:refs/remotes/origin/main"
+    clean = 'if [ -n "$(git status --short)" ]; then'
+    origin_main = 'if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then'
+    tag = 'git tag "$RELEASE_TAG"'
+
+    for snippet in (
+        fetch,
+        clean,
+        "Worktree has uncommitted changes",
+        origin_main,
+        "HEAD does not match origin/main",
+    ):
+        assert snippet in text
+
+    assert text.index(fetch) < text.index(clean) < text.index(origin_main) < text.index(tag)
 
 
 def test_release_guide_pushes_verified_release_tag_after_tagging() -> None:
