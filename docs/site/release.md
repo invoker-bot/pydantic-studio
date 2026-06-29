@@ -121,7 +121,8 @@ rm -rf .dist-smoke-wheel .dist-smoke-sdist
 ## Tagging
 
 Only create the release tag after the local preflight and the main-branch CI
-gate are green. The tag must match the package version exactly; for the
+gate are green. The tagging check uses the GitHub CLI (`gh`) authenticated to
+this repository. The tag must match the package version exactly; for the
 current package this is:
 
 ```bash
@@ -132,6 +133,19 @@ if [ -n "$(git status --short)" ]; then
 fi
 if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
   echo "HEAD does not match origin/main"
+  exit 1
+fi
+ci_status=$(
+  gh run list \
+    --workflow CI \
+    --branch main \
+    --commit "$(git rev-parse HEAD)" \
+    --limit 1 \
+    --json conclusion,status \
+    --jq '.[0] | "\(.status) \(.conclusion)"'
+)
+if [ "$ci_status" != "completed success" ]; then
+  echo "CI is not green for $(git rev-parse --short HEAD): ${ci_status:-no run found}"
   exit 1
 fi
 RELEASE_TAG="v0.4.0"

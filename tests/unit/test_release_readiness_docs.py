@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("838", "815 default"),
-        "CLAUDE.md": ("838", "815 default"),
+        "README.md": ("839", "816 default"),
+        "CLAUDE.md": ("839", "816 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
@@ -413,6 +413,27 @@ def test_release_guide_requires_clean_origin_main_before_tagging() -> None:
         assert snippet in text
 
     assert text.index(fetch) < text.index(clean) < text.index(origin_main) < text.index(tag)
+
+
+def test_release_guide_verifies_main_ci_status_before_tagging() -> None:
+    text = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+    origin_main = 'if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then'
+    ci_check = "gh run list"
+    tag = 'git tag "$RELEASE_TAG"'
+
+    for snippet in (
+        "GitHub CLI",
+        ci_check,
+        "--workflow CI",
+        "--branch main",
+        '--commit "$(git rev-parse HEAD)"',
+        "--json conclusion,status",
+        "completed success",
+        "CI is not green",
+    ):
+        assert snippet in text
+
+    assert text.index(origin_main) < text.index(ci_check) < text.index(tag)
 
 
 def test_release_guide_pushes_verified_release_tag_after_tagging() -> None:
