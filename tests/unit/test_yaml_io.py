@@ -267,6 +267,24 @@ class TestSaveYamlNewFile:
         save_yaml(tree, out)
         assert out.exists()
 
+    def test_save_uses_field_aliases(self, tmp_path: Path) -> None:
+        from pydantic_studio import save_yaml
+
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        out = tmp_path / "alias.yaml"
+        tree = build_form_tree(AliasConfig)
+        result = tree.set_value("api_key", "rotated")
+        assert result.ok is True
+
+        save_yaml(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert "api-key: rotated" in content
+        assert "api_key" not in content
+        assert load_yaml(out, AliasConfig).to_instance().api_key == "rotated"
+
 
 class TestSaveYamlPreservesComments:
     """When a source file or yaml_source exists, save_yaml must preserve

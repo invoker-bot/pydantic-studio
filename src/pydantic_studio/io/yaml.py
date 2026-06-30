@@ -4,10 +4,10 @@
 and key order), builds a ``FormTree`` from the values, and stashes the
 CommentedMap on the tree for ``save_yaml`` to use as a comment source.
 
-``save_yaml`` (Tasks 8-9) writes a schema-ordered CommentedMap whose
-values come from ``tree.to_python()`` and whose comments come from the
-stashed source (preserving user comments) or from ``FieldInfo.description``
-(auto-generated for new keys).
+``save_yaml`` writes a schema-ordered CommentedMap whose values come
+from ``tree.to_output_python(by_alias=True)`` and whose comments come
+from the stashed source (preserving user comments) or from
+``FieldInfo.description`` (auto-generated for new keys).
 """
 
 from __future__ import annotations
@@ -128,7 +128,7 @@ def save_yaml(tree: FormTree, path: str | Path) -> None:
 
     # Run through validation so schema defaults are resolved into concrete
     # values, with root-variant output metadata injected when configured.
-    data = tree.to_output_python()
+    data = tree.to_output_python(by_alias=True)
     _warn_unknown_yaml_fields(_dropped_source_key_paths(source, data, schema))
     cm = _build_commented_map(data, schema, source)
     yaml = _yaml()
@@ -171,44 +171,84 @@ def _build_commented_map(
         if src_ca is not None and src_ca.comment is not None:
             cm.ca.comment = src_ca.comment
 
+    field_output_keys = {
+        _output_key_for_field(field_name, field_info)
+        for field_name, field_info in schema.model_fields.items()
+    }
+
     for key, value in data.items():
-        if key in schema.model_fields:
+        if key in field_output_keys:
             continue
         cm[key] = value
         _copy_comment_if_present(source, cm, key)
 
     for field_name, field_info in schema.model_fields.items():
-        if field_name not in data:
+        output_key = _output_key_for_field(field_name, field_info)
+        if output_key not in data:
             continue
-        value = data[field_name]
+        value = data[output_key]
         nested_schema = _nested_schema_class(field_info)
         nested_source: CommentedMap | None = None
-        if (
-            source is not None
-            and field_name in source
-            and isinstance(source[field_name], CommentedMap)
-        ):
-            nested_source = source[field_name]
+        if source is not None:
+            for source_key in _source_keys_for_field(field_name, field_info, output_key):
+                if source_key in source and isinstance(source[source_key], CommentedMap):
+                    nested_source = source[source_key]
+                    break
 
         if isinstance(value, dict) and nested_schema is not None:
-            cm[field_name] = _build_commented_map(
+            cm[output_key] = _build_commented_map(
                 value, nested_schema, nested_source
             )
         else:
-            cm[field_name] = value
+            cm[output_key] = value
 
         # Copy the source comment if present, else use the description.
-        copied = _copy_comment_if_present(source, cm, field_name)
+        copied = _copy_field_comment_if_present(source, cm, output_key, field_name, field_info)
         if not copied and field_info.description:
             cm.yaml_set_comment_before_after_key(
-                field_name,
+                output_key,
                 before=field_info.description,
             )
     return cm
 
 
+def _output_key_for_field(field_name: str, field_info: FieldInfo) -> str:
+    serialization_alias = getattr(field_info, "serialization_alias", None)
+    if isinstance(serialization_alias, str) and serialization_alias:
+        return serialization_alias
+    if field_info.alias:
+        return field_info.alias
+    return field_name
+
+
+def _source_keys_for_field(
+    field_name: str,
+    field_info: FieldInfo,
+    output_key: str,
+) -> tuple[str, ...]:
+    keys = [output_key, field_name, *top_level_input_keys(field_name, field_info)]
+    return tuple(dict.fromkeys(keys))
+
+
+def _copy_field_comment_if_present(
+    source: CommentedMap | None,
+    target: CommentedMap,
+    target_key: str,
+    field_name: str,
+    field_info: FieldInfo,
+) -> bool:
+    for source_key in _source_keys_for_field(field_name, field_info, target_key):
+        if _copy_comment_if_present(source, target, target_key, source_key=source_key):
+            return True
+    return False
+
+
 def _copy_comment_if_present(
-    source: CommentedMap | None, target: CommentedMap, key: str
+    source: CommentedMap | None,
+    target: CommentedMap,
+    key: str,
+    *,
+    source_key: str | None = None,
 ) -> bool:
     """If ``source`` has any comments associated with ``key``, copy them
     onto ``target``. Returns True if a comment was copied.
@@ -218,12 +258,13 @@ def _copy_comment_if_present(
     Copying the entry verbatim preserves every kind of per-key comment
     (before, inline, after) without parsing the structure.
     """
-    if source is None or key not in source:
+    source_key = key if source_key is None else source_key
+    if source is None or source_key not in source:
         return False
     src_ca = getattr(source, "ca", None)
     if src_ca is None:
         return False
-    src_items = src_ca.items.get(key)
+    src_items = src_ca.items.get(source_key)
     if not src_items:
         return False
     # Detach the list so subsequent mutations on either side don't alias.
