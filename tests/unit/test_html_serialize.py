@@ -321,6 +321,24 @@ def test_dispatch_set_value_requires_path_without_mutating() -> None:
     assert tree.root.find("name").value == "alpha"
 
 
+def test_dispatch_set_value_coerces_nested_container_scalar_values() -> None:
+    list_tree = build_form_tree(_WithIntList, existing={"counts": [1]})
+    list_result = dispatch_mutation(
+        list_tree, {"op": "set_value", "path": "counts.0", "value": "2"}
+    )
+
+    assert list_result.ok is True
+    assert list_tree.root.find("counts").items[0].value == 2
+
+    mapping_tree = build_form_tree(_WithIntValueDict, existing={"weights": {"base": 1}})
+    mapping_result = dispatch_mutation(
+        mapping_tree, {"op": "set_value", "path": "weights.0", "value": "2"}
+    )
+
+    assert mapping_result.ok is True
+    assert mapping_tree.root.find("weights").entries[0][1].value == 2
+
+
 def test_dispatch_undo_restores_previous_state() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
     dispatch_mutation(tree, {"op": "set_value", "path": "name", "value": "beta"})

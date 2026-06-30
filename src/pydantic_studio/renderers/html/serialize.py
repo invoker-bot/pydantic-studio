@@ -110,22 +110,8 @@ def _iter_failed_errors(e: Any) -> Any:
 
 
 def _resolve(tree: FormTree, path: str) -> Any:
-    """Walk path segments to find the target node. Returns the node
-    or raises if the path doesn't resolve."""
-    from pydantic_studio.tree.nodes import GroupNode
-
-    if not path:
-        return tree.root
-    node: Any = tree.root
-    for seg in path.split("."):
-        if isinstance(node, GroupNode):
-            child = node.find(seg)
-            if child is None:
-                raise KeyError(seg)
-            node = child
-        else:
-            raise KeyError(seg)
-    return node
+    """Resolve a target node using FormTree's path semantics."""
+    return tree._resolve_path(path)
 
 
 def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
