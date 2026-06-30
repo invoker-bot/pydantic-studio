@@ -260,6 +260,84 @@ def _maybe_coerce_wire_value_for_node(node: Any, value: Any) -> Any:
     return value
 
 
+def _maybe_coerce_wire_seed_for_node(node: Any, seed: Any) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import (
+        GroupNode,
+        MappingNode,
+        SequenceNode,
+        UnionNode,
+        _resolve_type_name,
+    )
+
+    if isinstance(node, GroupNode):
+        if not isinstance(seed, dict):
+            return seed
+        from pydantic_studio.types.aliases import (
+            input_value_or_missing_for_field,
+            is_missing_input_value,
+        )
+
+        coerced: dict[str, Any] = {}
+        for child in node.fields:
+            field_info = node.schema_class.model_fields.get(child.name)
+            if field_info is None:
+                continue
+            value = input_value_or_missing_for_field(seed, child.name, field_info)
+            if is_missing_input_value(value):
+                continue
+            coerced[child.name] = _maybe_coerce_wire_seed_for_node(child, value)
+        return coerced
+    if isinstance(node, SequenceNode):
+        if not isinstance(seed, list | tuple):
+            return seed
+        values = list(seed)
+        item_type_names = (
+            node.slot_type_names
+            if node.origin == "tuple_fixed"
+            else [node.item_type_name] * len(values)
+        )
+        coerced_items: list[Any] = []
+        registry = default_registry()
+        for index, value in enumerate(values):
+            if item_type_names is None or index >= len(item_type_names):
+                coerced_items.append(value)
+                continue
+            item_type_name = item_type_names[index]
+            if item_type_name is None:
+                coerced_items.append(value)
+                continue
+            item_type = _resolve_type_name(item_type_name)
+            item_node = registry.find(item_type).build(
+                item_type, FieldInfo(annotation=item_type), None
+            )
+            coerced_items.append(_maybe_coerce_wire_seed_for_node(item_node, value))
+        return coerced_items
+    if isinstance(node, MappingNode):
+        if not isinstance(seed, dict):
+            return seed
+        registry = default_registry()
+        key_type = _resolve_type_name(node.key_type_name)
+        value_type = _resolve_type_name(node.value_type_name)
+        key_node = registry.find(key_type).build(
+            key_type, FieldInfo(annotation=key_type), None
+        )
+        value_node = registry.find(value_type).build(
+            value_type, FieldInfo(annotation=value_type), None
+        )
+        return {
+            _maybe_coerce_wire_seed_for_node(key_node, key): (
+                _maybe_coerce_wire_seed_for_node(value_node, value)
+            )
+            for key, value in seed.items()
+        }
+    if isinstance(node, UnionNode) and node.selected is not None:
+        return _maybe_coerce_wire_seed_for_node(node.selected, seed)
+    return _maybe_coerce_wire_value_for_node(node, seed)
+
+
 def _sequence_item_arg(tree: FormTree, path: str, value: Any) -> Any:
     from pydantic.fields import FieldInfo
 
@@ -299,7 +377,31 @@ def _union_variant_seed_arg(
         )
     except Exception:
         return seed
-    return _maybe_coerce_wire_value_for_node(variant_node, seed)
+    return _maybe_coerce_wire_seed_for_node(variant_node, seed)
+
+
+def _root_variant_seed_arg(tree: FormTree, variant_id: str, seed: Any) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import _resolve_type_name
+
+    try:
+        if tree.variant is None:
+            return seed
+        option = next(
+            (candidate for candidate in tree.variant.options if candidate.id == variant_id),
+            None,
+        )
+        if option is None:
+            return seed
+        model = _resolve_type_name(option.model_type_name)
+        root_node = default_registry().find(model).build(
+            model, FieldInfo(annotation=model), None
+        )
+    except Exception:
+        return seed
+    return _maybe_coerce_wire_seed_for_node(root_node, seed)
 
 
 def _mapping_key_template(tree: FormTree, path: str) -> Any:
@@ -471,7 +573,8 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
         if op == "select_root_variant":
             variant_id = _required_string_arg(mutation, "variant_id")
             if "seed" in mutation:
-                return tree.select_root_variant(variant_id, mutation["seed"])
+                seed = _root_variant_seed_arg(tree, variant_id, mutation["seed"])
+                return tree.select_root_variant(variant_id, seed)
             return tree.select_root_variant(variant_id)
     except (KeyError, ValueError, TypeError) as exc:
         return ValidationResult.fail([f"mutation failed: {exc}"])

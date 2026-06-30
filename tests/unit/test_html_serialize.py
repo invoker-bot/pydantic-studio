@@ -74,6 +74,16 @@ class _UnionHolder(BaseModel):
     value: int | str
 
 
+class _StructuredSeed(BaseModel):
+    count: int
+    counts: list[int] = Field(default_factory=list)
+    ports: dict[int, int] = Field(default_factory=dict)
+
+
+class _StructuredUnionHolder(BaseModel):
+    value: str | _StructuredSeed
+
+
 class _AnyHolder(BaseModel):
     payload: Any = None
 
@@ -84,6 +94,11 @@ class _VariantEmail(BaseModel):
 
 class _VariantSlack(BaseModel):
     channel: str = "#ops"
+
+
+class _VariantPort(BaseModel):
+    port: int = 443
+    replicas: list[int] = Field(default_factory=list)
 
 
 def test_tree_to_json_returns_schema_name_and_root() -> None:
@@ -626,6 +641,35 @@ def test_dispatch_select_variant_coerces_seed_for_target_variant() -> None:
     assert val.selected.value == 2
 
 
+def test_dispatch_select_variant_coerces_structured_seed_values() -> None:
+    tree = build_form_tree(_StructuredUnionHolder, existing={"value": "seeded"})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "select_variant",
+            "path": "value",
+            "variant_index": 1,
+            "seed": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert val.selected_index == 1
+    assert val.selected.kind == "group"
+    assert val.selected.find("count").value == 2
+    assert [item.value for item in val.selected.find("counts").items] == [3, 4]
+    assert [
+        (key.value, value.value)
+        for key, value in val.selected.find("ports").entries
+    ] == [(80, 8080)]
+
+
 def test_dispatch_select_variant_rejects_string_index_without_mutating() -> None:
     tree = build_form_tree(_UnionHolder, existing={"value": 42})
     result = dispatch_mutation(
@@ -680,6 +724,32 @@ def test_dispatch_select_root_variant_passes_seed_to_tree() -> None:
     assert result.ok is True
     assert tree.schema_class is _VariantSlack
     assert tree.root.find("channel").value == "#alerts"
+
+
+def test_dispatch_select_root_variant_coerces_structured_seed_values() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail),
+                VariantSpec(id="port", model=_VariantPort),
+            ]
+        ),
+        selected_id="email",
+    )
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "select_root_variant",
+            "variant_id": "port",
+            "seed": {"port": "8443", "replicas": ["1", "2"]},
+        },
+    )
+
+    assert result.ok is True
+    assert tree.schema_class is _VariantPort
+    assert tree.root.find("port").value == 8443
+    assert [item.value for item in tree.root.find("replicas").items] == [1, 2]
 
 
 def test_dispatch_select_root_variant_does_not_require_path() -> None:
