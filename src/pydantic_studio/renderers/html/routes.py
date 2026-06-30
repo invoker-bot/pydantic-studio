@@ -24,6 +24,7 @@ _PATH_MUTATION_OPS = {
     "select_variant",
 }
 _READONLY_MESSAGE = "read-only — value is managed by the caller"
+_MISSING_READONLY_PATH = object()
 
 
 def _tree_payload(server: StudioServer) -> dict[str, object]:
@@ -42,6 +43,8 @@ def _readonly_mutation_error(
     server: StudioServer, mutation: dict[str, Any]
 ) -> str | None:
     op = mutation.get("op")
+    if op in {"undo", "redo"}:
+        return _readonly_history_error(server, op)
     if op == "select_root_variant" and server.readonly_paths:
         return f"root variant is {_READONLY_MESSAGE}"
     if op not in _PATH_MUTATION_OPS:
@@ -52,6 +55,52 @@ def _readonly_mutation_error(
     if any(_paths_overlap(path, readonly) for readonly in server.readonly_paths):
         return f"{path} is {_READONLY_MESSAGE}"
     return None
+
+
+def _readonly_history_error(server: StudioServer, op: str) -> str | None:
+    if not server.readonly_paths:
+        return None
+    target_root = _history_target_root(server.tree, op)
+    if target_root is None:
+        return None
+    for readonly_path in sorted(server.readonly_paths):
+        current = _readonly_path_state(server.tree, server.tree.root, readonly_path)
+        target = _readonly_path_state(server.tree, target_root, readonly_path)
+        if current != target:
+            return f"{op} would modify read-only path {readonly_path!r}"
+    return None
+
+
+def _history_target_root(tree: Any, op: str) -> Any | None:
+    from pydantic_studio.tree import snapshots as _snap
+
+    if op == "undo":
+        if tree.cursor == 0:
+            return None
+        return _snap.restore(tree.snapshots[tree.cursor - 1])
+    if op == "redo":
+        if tree.cursor + 1 >= len(tree.snapshots):
+            return None
+        return _snap.restore(tree.snapshots[tree.cursor + 1])
+    return None
+
+
+def _readonly_path_state(tree: Any, root: Any, path: str) -> Any:
+    try:
+        node = _resolve_path_from_root(tree, root, path)
+    except Exception:
+        return _MISSING_READONLY_PATH
+    return node.model_dump(mode="json")
+
+
+def _resolve_path_from_root(tree: Any, root: Any, path: str) -> Any:
+    from pydantic_studio.tree.paths import Path
+
+    path_obj = Path.parse(path)
+    node = root
+    for segment in path_obj.segments:
+        node = tree._descend(node, segment)
+    return node
 
 
 def _mutation_error_path(mutation: dict[str, Any]) -> str:

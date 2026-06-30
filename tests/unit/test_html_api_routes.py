@@ -415,6 +415,66 @@ def test_api_mutations_reject_root_variant_switch_when_any_path_is_readonly() ->
     assert server.tree.root.find("channel") is None
 
 
+def test_api_mutations_reject_readonly_undo_without_mutating() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    assert tree.set_value("name", "beta").ok is True
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    response = client.post("/api/mutations", json={"op": "undo"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {
+        "ok": False,
+        "errors": ["undo would modify read-only path 'name'"],
+    }
+    assert body["validation"]["errors"][0] == {
+        "path": "",
+        "message": "undo would modify read-only path 'name'",
+    }
+    assert server.tree.root.find("name").value == "beta"
+    name_field = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "name")
+    assert name_field["value"] == "beta"
+    assert body["tree"]["history"] == {"can_undo": True, "can_redo": False}
+
+
+def test_api_mutations_reject_readonly_redo_without_mutating() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    assert tree.set_value("name", "beta").ok is True
+    assert tree.undo() is True
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    response = client.post("/api/mutations", json={"op": "redo"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {
+        "ok": False,
+        "errors": ["redo would modify read-only path 'name'"],
+    }
+    assert server.tree.root.find("name").value == "alpha"
+    name_field = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "name")
+    assert name_field["value"] == "alpha"
+    assert body["tree"]["history"] == {"can_undo": False, "can_redo": True}
+
+
+def test_api_mutations_allows_readonly_undo_when_path_is_unchanged() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    assert tree.set_value("workers", 8).ok is True
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    response = client.post("/api/mutations", json={"op": "undo"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {"ok": True, "errors": []}
+    assert server.tree.root.find("name").value == "alpha"
+    assert server.tree.root.find("workers").value == 4
+
+
 def test_api_mutations_root_variant_validation_error_uses_root_path() -> None:
     tree = build_variant_form_tree(
         VariantRegistry(
