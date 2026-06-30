@@ -19,6 +19,10 @@ class SlackSettings(BaseModel):
     channel: str = "#ops"
 
 
+class CollidingDiscriminatorSettings(BaseModel):
+    class_name: str = "model-field"
+
+
 def test_variant_registry_keeps_order_and_labels() -> None:
     registry = VariantRegistry(
         [
@@ -109,3 +113,21 @@ def test_save_yaml_includes_inline_discriminator(tmp_path) -> None:
     text = out.read_text(encoding="utf-8")
     assert text.splitlines()[0] == "class_name: email"
     assert "address: ops@example.com" in text
+
+
+def test_inline_discriminator_rejects_model_output_key_collision() -> None:
+    registry = VariantRegistry(
+        [
+            VariantSpec(id="colliding", model=CollidingDiscriminatorSettings),
+            VariantSpec(id="slack", model=SlackSettings),
+        ]
+    )
+    tree = build_variant_form_tree(
+        registry,
+        selected_id="colliding",
+        discriminator="class_name",
+        persistence="inline_discriminator",
+    )
+
+    with pytest.raises(ValueError, match="inline discriminator"):
+        tree.to_output_python()

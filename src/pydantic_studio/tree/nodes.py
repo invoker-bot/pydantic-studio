@@ -1419,6 +1419,12 @@ class FormTree(BaseModel):
             and self.variant.persistence == "inline_discriminator"
             and self.variant.discriminator
         ):
+            if self.variant.discriminator in data:
+                msg = (
+                    f"inline discriminator key {self.variant.discriminator!r} "
+                    "conflicts with a model output field"
+                )
+                raise ValueError(msg)
             data = {self.variant.discriminator: self.variant.selected_id, **data}
         return data
 
