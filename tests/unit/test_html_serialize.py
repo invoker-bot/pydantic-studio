@@ -339,6 +339,18 @@ def test_dispatch_set_value_coerces_nested_container_scalar_values() -> None:
     assert mapping_tree.root.find("weights").entries[0][1].value == 2
 
 
+def test_dispatch_set_value_coerces_selected_union_scalar_value() -> None:
+    tree = build_form_tree(_UnionHolder, existing={"value": 1})
+
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "value", "value": "2"}
+    )
+
+    assert result.ok is True
+    union = tree.root.find("value")
+    assert union.selected.value == 2
+
+
 def test_dispatch_undo_restores_previous_state() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
     dispatch_mutation(tree, {"op": "set_value", "path": "name", "value": "beta"})

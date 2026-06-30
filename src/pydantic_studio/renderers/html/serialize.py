@@ -181,9 +181,12 @@ def _maybe_coerce_wire_value_for_node(node: Any, value: Any) -> Any:
         SecretNode,
         TimedeltaNode,
         TimeNode,
+        UnionNode,
         UuidNode,
     )
 
+    if isinstance(node, UnionNode) and node.selected is not None:
+        return _maybe_coerce_wire_value_for_node(node.selected, value)
     if isinstance(node, BoolNode):
         lowered = value.strip().lower()
         if lowered in {"y", "yes", "true", "1", "on"}:
