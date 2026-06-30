@@ -123,3 +123,15 @@ def test_fq_resolve_round_trip_for_literal() -> None:
         _Literal["a.b", "c.d"],
     ):
         assert _resolve_type_name(_fq(typ)) == typ, _fq(typ)
+
+
+def test_fq_does_not_structurally_encode_non_scalar_literal_members() -> None:
+    """JSON can encode list/dict Literal members, but the result cannot safely
+    rebuild a supported LiteralNode. Keep those exotic members on the bare
+    typing.Literal path instead of emitting malformed structural metadata."""
+    from typing import Literal as _Literal
+
+    from pydantic_studio.types.utils import _fq
+
+    assert _fq(_Literal[["nested"]]) == "typing.Literal"
+    assert _fq(_Literal[{"x": "y"}]) == "typing.Literal"

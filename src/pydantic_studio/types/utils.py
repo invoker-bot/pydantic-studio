@@ -80,12 +80,19 @@ def _fq(t: Any) -> str:
         payload = json.dumps([_fq(arg) for arg in get_args(stripped)])
         return f"{container_names[origin]}{payload}"
     if is_literal_type(stripped):
-        try:
-            payload = json.dumps(list(get_args(stripped)))
-        except TypeError:
-            pass  # unencodable member — fall through to the bare name
-        else:
-            return f"typing.Literal{payload}"
+        choices = get_args(stripped)
+        has_unsupported_choice = any(
+            choice is not None
+            and not isinstance(choice, str | int | float | bool)
+            for choice in choices
+        )
+        if not has_unsupported_choice:
+            try:
+                payload = json.dumps(list(choices))
+            except TypeError:
+                pass  # unencodable member — fall through to the bare name
+            else:
+                return f"typing.Literal{payload}"
     return (
         f"{getattr(stripped, '__module__', 'builtins')}."
         f"{getattr(stripped, '__qualname__', repr(stripped))}"
