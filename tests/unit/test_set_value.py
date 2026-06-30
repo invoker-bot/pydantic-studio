@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 from pydantic import BaseModel, Field
 
@@ -20,6 +22,14 @@ class ConstrainedIntSchema(BaseModel):
     above: int = Field(default=2, gt=0)
     below: int = Field(default=2, lt=10)
     even: int = Field(default=2, multiple_of=2)
+
+
+class ConstrainedFloatSchema(BaseModel):
+    at_least: float = Field(default=0.5, ge=0.5)
+    at_most: float = Field(default=0.5, le=1.0)
+    above: float = Field(default=0.5, gt=0.0)
+    below: float = Field(default=0.5, lt=1.0)
+    quarter_step: float = Field(default=0.5, multiple_of=0.25)
 
 
 class ConstrainedStringSchema(BaseModel):
@@ -97,6 +107,46 @@ def test_set_int_value_rejects_constraint_violations_without_mutating(
     assert result.errors == (message,)
     assert node.value == 2
     assert node.error == message
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        ("at_least", 0.25, "must be >= 0.5"),
+        ("at_most", 1.5, "must be <= 1.0"),
+        ("above", 0.0, "must be > 0.0"),
+        ("below", 1.0, "must be < 1.0"),
+        ("quarter_step", 0.3, "must be a multiple of 0.25"),
+    ],
+)
+def test_set_float_value_rejects_constraint_violations_without_mutating(
+    path: str, value: float, message: str
+) -> None:
+    tree = build_form_tree(ConstrainedFloatSchema)
+    node = tree.root.find(path)
+    assert node is not None
+    assert node.value == 0.5
+
+    result = tree.set_value(path, value)
+
+    assert result.ok is False
+    assert result.errors == (message,)
+    assert node.value == 0.5
+    assert node.error == message
+
+
+def test_set_float_value_rejects_nan_against_bounds_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedFloatSchema)
+    node = tree.root.find("at_least")
+    assert node is not None
+    assert node.value == 0.5
+
+    result = tree.set_value("at_least", math.nan)
+
+    assert result.ok is False
+    assert result.errors == ("must be >= 0.5",)
+    assert node.value == 0.5
+    assert node.error == "must be >= 0.5"
 
 
 @pytest.mark.parametrize(

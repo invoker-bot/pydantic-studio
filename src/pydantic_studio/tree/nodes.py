@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import sys
 from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
@@ -262,7 +263,24 @@ class FloatNode(FormNode):
         # Accept int (Pydantic coerces). Reject bool.
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return (f"expected float, got {type(value).__name__}",)
-        return ()
+        errors: list[str] = []
+        value_is_nan = math.isnan(value)
+        if self.ge is not None and (value_is_nan or value < self.ge):
+            errors.append(f"must be >= {self.ge}")
+        if self.le is not None and (value_is_nan or value > self.le):
+            errors.append(f"must be <= {self.le}")
+        if self.gt is not None and (value_is_nan or value <= self.gt):
+            errors.append(f"must be > {self.gt}")
+        if self.lt is not None and (value_is_nan or value >= self.lt):
+            errors.append(f"must be < {self.lt}")
+        if self.multiple_of is not None:
+            try:
+                TypeAdapter(Annotated[float, Field(multiple_of=self.multiple_of)]).validate_python(
+                    value
+                )
+            except ValidationError:
+                errors.append(f"must be a multiple of {self.multiple_of}")
+        return tuple(errors)
 
     def to_python(self) -> float | None:
         return self.value
