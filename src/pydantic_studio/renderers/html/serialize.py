@@ -21,7 +21,17 @@ if TYPE_CHECKING:
 # - snapshots:    list[bytes] of prior tree states (undo ring); each
 #                 snapshot is ~the size of the tree, so including it N
 #                 times bloats every response by Nx
-_TREE_EXCLUDE: set[str] = {"schema_class", "snapshots"}
+# - created_at, cursor, snapshot_limit, draft_path: internal history/draft controls.
+#                 The SPA receives the stable, derived ``history`` state
+#                 instead of these implementation details.
+_TREE_EXCLUDE: set[str] = {
+    "schema_class",
+    "snapshots",
+    "created_at",
+    "cursor",
+    "snapshot_limit",
+    "draft_path",
+}
 
 
 def tree_to_json(tree: FormTree) -> dict[str, Any]:

@@ -367,6 +367,6 @@ export const FormTreeSchema = z.object({
   unsaved_count: z.number(),
   preview: z.string(),
   readonly_paths: z.array(z.string()),
-});
+}).strict();
 
 export type FormTree = z.infer<typeof FormTreeSchema>;

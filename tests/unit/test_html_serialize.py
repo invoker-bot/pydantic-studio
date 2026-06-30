@@ -102,6 +102,10 @@ def test_tree_to_json_excludes_schema_class_and_snapshots() -> None:
     data = tree_to_json(tree)
     assert "schema_class" not in data
     assert "snapshots" not in data
+    assert "created_at" not in data
+    assert "cursor" not in data
+    assert "snapshot_limit" not in data
+    assert "draft_path" not in data
 
 
 def test_tree_to_json_includes_clean_history_state() -> None:

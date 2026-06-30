@@ -135,8 +135,15 @@ def test_frontend_tree_schema_rejects_extra_top_level_fields() -> None:
         encoding="utf-8"
     )
 
-    assert "FormTreeSchema" in schema
+    match = re.search(
+        r"export const FormTreeSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        schema,
+        re.DOTALL,
+    )
+    assert match is not None
+    assert "readonly_paths: z.array(z.string())," in match.group("body")
     assert ".passthrough()" not in schema
+    assert ".strip()" not in schema
     assert "tolerate extra top-level fields" not in schema
 
 
