@@ -95,10 +95,10 @@ def test_tree_to_json_returns_schema_name_and_root() -> None:
     assert field_kinds == {"name": "string", "workers": "int"}
 
 
-def test_tree_to_json_excludes_schema_class_and_snapshots() -> None:
-    tree = build_form_tree(_Primitive)
+def test_tree_to_json_excludes_internal_formtree_and_group_fields() -> None:
+    tree = build_form_tree(_Outer)
     # Seed a snapshot so we can verify it's stripped.
-    tree.set_value("name", "after")
+    tree.set_value("primary.host", "after")
     data = tree_to_json(tree)
     assert "schema_class" not in data
     assert "snapshots" not in data
@@ -106,6 +106,8 @@ def test_tree_to_json_excludes_schema_class_and_snapshots() -> None:
     assert "cursor" not in data
     assert "snapshot_limit" not in data
     assert "draft_path" not in data
+    assert "omitted" not in data["root"]
+    assert "omitted" not in data["root"]["fields"][0]
 
 
 def test_tree_to_json_includes_clean_history_state() -> None:

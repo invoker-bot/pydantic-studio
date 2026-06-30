@@ -46,6 +46,7 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     from pydantic_studio.renderers.html.render import render_yaml_preview
 
     data = tree.model_dump(mode="json", exclude=_TREE_EXCLUDE)
+    _strip_node_internal_fields(data["root"])
     data["variant"] = (
         tree.variant.model_dump(mode="json") if tree.variant is not None else None
     )
@@ -56,6 +57,18 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     data["unsaved_count"] = len(tree.snapshots)
     data["preview"] = render_yaml_preview(tree)
     return data
+
+
+def _strip_node_internal_fields(value: Any) -> None:
+    """Remove node implementation details from the JSON API payload."""
+    if isinstance(value, dict):
+        if value.get("kind") == "group":
+            value.pop("omitted", None)
+        for child in value.values():
+            _strip_node_internal_fields(child)
+    elif isinstance(value, list):
+        for child in value:
+            _strip_node_internal_fields(child)
 
 
 def validation_envelope(tree: FormTree) -> dict[str, Any]:

@@ -135,6 +135,13 @@ def test_frontend_tree_schema_rejects_extra_top_level_fields() -> None:
         encoding="utf-8"
     )
 
+    node_base = re.search(
+        r"const NodeBase = z\.object\(\{\n(?P<body>(?:  .+\n)+)\}\)\.strict\(\);",
+        schema,
+    )
+    assert node_base is not None
+    assert "error: z.string().nullable()," in node_base.group("body")
+
     match = re.search(
         r"export const FormTreeSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
         schema,

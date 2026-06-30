@@ -28,7 +28,7 @@ const NodeBase = z.object({
   description: z.string().nullable(),
   required: z.boolean(),
   error: z.string().nullable(),
-});
+}).strict();
 
 export const StringNodeSchema = NodeBase.extend({
   kind: z.literal("string"),
