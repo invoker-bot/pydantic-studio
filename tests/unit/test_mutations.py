@@ -97,13 +97,45 @@ def test_snapshot_buffer_evicts_oldest():
         tree.set_value("name", f"v{i}")
     # 5 mutations but limit=3 → only 3 most recent snapshots kept.
     assert len(tree.snapshots) == 3
-    # The earliest accessible state should be the one captured before "v2".
+    # The earliest accessible state should be the oldest snapshot left after
+    # undo captures the current "v4" state for redo while preserving the
+    # configured ring limit.
     while tree.undo():
         pass
-    # We've undone everything we can. The earliest reachable name is "v1"
-    # (the value before "v2" was assigned), since the snapshot taken before
-    # "v0" was evicted.
-    assert tree.root.find("name").value == "v1"
+    assert len(tree.snapshots) == tree.snapshot_limit
+    assert tree.root.find("name").value == "v2"
+
+
+def test_undo_keeps_snapshot_buffer_bounded_and_preserves_redo():
+    tree = build_form_tree(Simple)
+    tree.snapshot_limit = 3
+    for i in range(5):
+        tree.set_value("name", f"v{i}")
+
+    assert tree.root.find("name").value == "v4"
+    assert len(tree.snapshots) == tree.snapshot_limit
+
+    assert tree.undo() is True
+
+    assert tree.root.find("name").value == "v3"
+    assert len(tree.snapshots) == tree.snapshot_limit
+    assert tree.redo() is True
+    assert tree.root.find("name").value == "v4"
+    assert len(tree.snapshots) == tree.snapshot_limit
+
+
+def test_undo_with_single_snapshot_slot_restores_without_redo():
+    tree = build_form_tree(Simple)
+    tree.snapshot_limit = 1
+    tree.set_value("name", "v0")
+    tree.set_value("name", "v1")
+
+    assert len(tree.snapshots) == 1
+    assert tree.undo() is True
+
+    assert tree.root.find("name").value == "v0"
+    assert len(tree.snapshots) == 1
+    assert tree.redo() is False
 
 
 def test_snapshot_limit_default_is_50():

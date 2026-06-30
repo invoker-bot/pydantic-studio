@@ -2649,10 +2649,15 @@ class FormTree(BaseModel):
         if self.cursor < len(self.snapshots):
             self.snapshots = self.snapshots[: self.cursor]
         self.snapshots.append(snap)
-        # Bound: drop oldest until under the limit.
+        self.cursor = len(self.snapshots)
+        self._trim_snapshot_history()
+
+    def _trim_snapshot_history(self) -> None:
+        """Drop oldest snapshots until the history fits ``snapshot_limit``."""
         while len(self.snapshots) > self.snapshot_limit:
             self.snapshots.pop(0)
-        self.cursor = len(self.snapshots)
+            if self.cursor > 0:
+                self.cursor -= 1
 
     def undo(self) -> bool:
         """Restore the previous state. Returns True if anything was undone."""
@@ -2664,8 +2669,11 @@ class FormTree(BaseModel):
         # Step back: cursor points to the snapshot that *was* the state before
         # the most recent mutation. To allow redo, capture the current state
         # first if cursor == len(snapshots).
-        if self.cursor == len(self.snapshots):
+        if self.cursor == len(self.snapshots) and (
+            len(self.snapshots) < self.snapshot_limit or self.snapshot_limit > 1
+        ):
             self.snapshots.append(_snap.take(self.root))
+            self._trim_snapshot_history()
         self.cursor -= 1
         self.root = _snap.restore(self.snapshots[self.cursor])
         return True
