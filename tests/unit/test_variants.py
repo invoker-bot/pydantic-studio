@@ -75,6 +75,20 @@ def test_build_variant_form_tree_attaches_metadata() -> None:
     assert tree.to_output_python()["class_name"] == "email"
 
 
+def test_build_variant_form_tree_reads_inline_discriminator_from_existing() -> None:
+    tree = build_variant_form_tree(
+        _registry(),
+        existing={"class_name": "slack", "channel": "#alerts"},
+        discriminator="class_name",
+        persistence="inline_discriminator",
+    )
+
+    assert tree.schema_class is SlackSettings
+    assert tree.variant is not None
+    assert tree.variant.selected_id == "slack"
+    assert tree.to_output_python() == {"class_name": "slack", "channel": "#alerts"}
+
+
 def test_select_root_variant_rebuilds_schema_and_root() -> None:
     tree = build_variant_form_tree(_registry(), selected_id="email")
 
