@@ -1264,7 +1264,7 @@ class FormTree(BaseModel):
         # additional top-level filtering is needed here.
         data = self.to_python()
         try:
-            return self.schema_class.model_validate(data)
+            return self.schema_class.model_validate(data, by_name=True)
         except ValidationError as e:
             errors = [
                 f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"

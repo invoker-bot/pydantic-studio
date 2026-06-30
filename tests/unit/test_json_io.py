@@ -93,3 +93,34 @@ class TestSaveJson:
         content = out.read_text(encoding="utf-8")
         assert '"api-key": "secret"' in content
         assert "api_key" not in content
+
+    def test_save_preserves_edited_alias_field_value(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.json_ import save_json
+
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        out = tmp_path / "out.json"
+        tree = build_form_tree(AliasConfig)
+        result = tree.set_value("api_key", "rotated")
+        assert result.ok is True
+        save_json(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert '"api-key": "rotated"' in content
+
+    def test_save_alias_field_round_trips_through_load(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.json_ import load_json, save_json
+
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        out = tmp_path / "out.json"
+        tree = build_form_tree(AliasConfig)
+        result = tree.set_value("api_key", "rotated")
+        assert result.ok is True
+        save_json(tree, out)
+
+        reloaded = load_json(out, AliasConfig)
+
+        assert reloaded.to_instance().api_key == "rotated"

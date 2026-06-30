@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from pydantic import BaseModel, Field
 
 from pydantic_studio.exceptions import ValidationFailedError
 from pydantic_studio.tree.builder import build_form_tree
@@ -64,3 +65,14 @@ def test_to_instance_load_then_edit_then_save_round_trip():
     tree.set_value("age", 31)
     inst = tree.to_instance()
     assert inst.model_dump() == {**initial, "age": 31}
+
+
+def test_to_instance_preserves_alias_field_edits():
+    class AliasConfig(BaseModel):
+        api_key: str = Field(default="secret", alias="api-key")
+
+    tree = build_form_tree(AliasConfig)
+    result = tree.set_value("api_key", "rotated")
+
+    assert result.ok is True
+    assert tree.to_instance().api_key == "rotated"

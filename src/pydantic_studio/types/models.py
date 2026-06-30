@@ -96,6 +96,8 @@ class GroupBuilder:
                 child_type = str  # fallback — shouldn't happen in practice
             child_builder = self._registry.find(child_type)
             child_existing = existing_dict.get(fname)
+            if child_existing is None and finfo.alias:
+                child_existing = existing_dict.get(finfo.alias)
             if child_existing is not None and _has_transforming_validator(finfo):
                 child_existing = _parse_existing(finfo, child_existing)
             child = child_builder.build(child_type, finfo, child_existing)
