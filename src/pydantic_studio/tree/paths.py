@@ -137,6 +137,20 @@ def paths_overlap(left: str, right: str) -> bool:
     return left == right or left.startswith(f"{right}.") or right.startswith(f"{left}.")
 
 
+def path_contains(parent: str, child: str) -> bool:
+    """Return True when ``parent`` is the same path as ``child`` or an
+    ancestor of it.
+
+    The comparison uses parsed segments so ``items[0].name`` and
+    ``items.0.name`` are equivalent.
+    """
+    parent_segments = _path_segments(parent)
+    child_segments = _path_segments(child)
+    if parent_segments is not None and child_segments is not None:
+        return child_segments[: len(parent_segments)] == parent_segments
+    return parent == child or child.startswith(f"{parent}.")
+
+
 def _path_segments(path: str) -> tuple[PathSegment, ...] | None:
     try:
         return Path.parse(path).segments

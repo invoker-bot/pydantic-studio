@@ -19,7 +19,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow, RowClicked
-from pydantic_studio.tree.paths import paths_overlap
+from pydantic_studio.tree.paths import path_contains, paths_overlap
 
 if TYPE_CHECKING:
     from typing import ClassVar
@@ -419,9 +419,7 @@ class FieldListView(VerticalScroll):
             for idx, spec in enumerate(specs)
             if idx in visible
             and spec.path
-            and any(
-                m == spec.path or m.startswith(f"{spec.path}.") for m in missing
-            )
+            and any(path_contains(spec.path, m) for m in missing)
         ]
         if not hits:
             return
@@ -443,11 +441,9 @@ class FieldListView(VerticalScroll):
         for idx, spec in enumerate(specs):
             if idx not in visible:
                 continue
-            if spec.path == path:
+            if path_contains(spec.path, path):
                 target = idx
                 break
-            if spec.path and path.startswith(f"{spec.path}.") and target is None:
-                target = idx
         if target is None or target == self._cursor:
             return target is not None
         self._move_cursor(target)

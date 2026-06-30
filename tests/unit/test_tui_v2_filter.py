@@ -142,3 +142,23 @@ async def test_ctrl_f_is_noop_on_sequence_screens() -> None:
         await pilot.press("ctrl+f")
         await pilot.pause()
         assert not list(app.screen.query(Input))
+
+
+@pytest.mark.asyncio
+async def test_focus_path_accepts_bracket_form_descendant_paths() -> None:
+    tree = build_form_tree(_Schema)
+    tree.add_item("items")
+    app = StudioApp(tree=tree, save_path=None)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        root_view = app.screen.query_one(FieldListView)
+        assert root_view.focus_path("items[0].network") is True
+        assert root_view._row_specs()[root_view.cursor].path == "items"
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        item_view = app.screen.query_one(FieldListView)
+        assert item_view.focus_path("items[0].network") is True
+        assert item_view._row_specs()[item_view.cursor].path == "items.0"
