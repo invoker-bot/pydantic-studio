@@ -251,6 +251,15 @@ def test_dispatch_set_value_validation_failure_leaves_tree_untouched() -> None:
     assert tree.root.find("workers").value == 4
 
 
+def test_dispatch_rejects_null_path_without_mutating() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
+    result = dispatch_mutation(tree, {"op": "set_value", "path": None, "value": "beta"})
+
+    assert result.ok is False
+    assert any("path must be a string" in err for err in result.errors)
+    assert tree.root.find("name").value == "alpha"
+
+
 def test_dispatch_add_item_appends_to_sequence() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a"]})
     result = dispatch_mutation(tree, {"op": "add_item", "path": "tags"})

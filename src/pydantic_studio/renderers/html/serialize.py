@@ -233,6 +233,14 @@ def _required_int_arg(mutation: dict[str, Any], key: str) -> int:
     return value
 
 
+def _path_arg(mutation: dict[str, Any]) -> str:
+    value = mutation.get("path", "")
+    if not isinstance(value, str):
+        msg = "path must be a string"
+        raise TypeError(msg)
+    return value
+
+
 def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
     """Apply one mutation from the JSON API onto the FormTree.
 
@@ -241,6 +249,7 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     - the ``op`` is unknown / missing
     - the request is missing a required key (``index``, ``key``, etc.)
     - a coercion fails (e.g., non-numeric ``index``)
+    - the path is not a string
     - the path doesn't resolve to a node
 
     The route layer turns malformed requests into 400 responses and keeps
@@ -248,8 +257,8 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     ``validation.ok = false``.
     """
     op = mutation.get("op")
-    path = mutation.get("path", "")
     try:
+        path = _path_arg(mutation)
         if op == "set_value":
             value = mutation.get("value")
             value = _maybe_coerce_typed_value(tree, path, value)
