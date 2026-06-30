@@ -1714,8 +1714,9 @@ class FormTree(BaseModel):
 
         model = _resolve_type_name(option.model_type_name)
         builder = default_registry().find(model)
+        root_seed = {} if seed is None else seed
         new_root, errors = _build_seeded_node(
-            builder, model, FieldInfo(annotation=model), seed or {}
+            builder, model, FieldInfo(annotation=model), root_seed
         )
         if errors:
             return ValidationResult.fail(errors)
