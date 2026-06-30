@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import re
 import tarfile
 import tomllib
@@ -34,6 +35,26 @@ def _wheel_metadata(wheel: Path) -> str:
                 f"expected exactly one METADATA file in {wheel}, got {metadata_names!r}"
             )
         return zf.read(metadata_names[0]).decode("utf-8")
+
+
+def _wheel_entry_points(wheel: Path) -> configparser.SectionProxy | None:
+    with zipfile.ZipFile(wheel) as zf:
+        entry_point_names = [
+            name for name in zf.namelist() if name.endswith(".dist-info/entry_points.txt")
+        ]
+        if len(entry_point_names) > 1:
+            raise RuntimeError(
+                f"expected at most one entry_points.txt file in {wheel}, "
+                f"got {entry_point_names!r}"
+            )
+        if not entry_point_names:
+            return None
+        parser = configparser.ConfigParser()
+        parser.optionxform = str
+        parser.read_string(zf.read(entry_point_names[0]).decode("utf-8"))
+        if not parser.has_section("console_scripts"):
+            return None
+        return parser["console_scripts"]
 
 
 def _sdist_names(sdist: Path) -> list[str]:
@@ -102,6 +123,23 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     if invalid:
         raise RuntimeError(f"pyproject.toml project identity fields must be strings: {invalid!r}")
     return tuple(f"{metadata_name}: {project[field]}" for field, metadata_name in fields)
+
+
+def _project_console_scripts(pyproject: dict[str, object]) -> dict[str, str]:
+    project = _table(pyproject, "project", "project")
+    scripts = project.get("scripts", {})
+    if not isinstance(scripts, dict):
+        raise RuntimeError("pyproject.toml [project.scripts] must be a table")
+
+    invalid = [
+        name
+        for name, target in scripts.items()
+        if not isinstance(name, str) or not isinstance(target, str)
+    ]
+    if invalid:
+        raise RuntimeError(f"pyproject.toml console scripts must be strings: {invalid!r}")
+
+    return {name: target for name, target in scripts.items() if isinstance(name, str)}
 
 
 def _string_sequence(table: dict[str, object], key: str, path: str) -> tuple[str, ...]:
@@ -236,6 +274,19 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     ]
     if missing_dependencies:
         raise RuntimeError(f"{wheel} missing dependency metadata: {missing_dependencies!r}")
+
+    console_scripts = _project_console_scripts(pyproject)
+    if console_scripts:
+        entry_points = _wheel_entry_points(wheel)
+        missing_entry_points = [
+            f"{name} = {target}"
+            for name, target in console_scripts.items()
+            if entry_points is None or entry_points.get(name) != target
+        ]
+        if missing_entry_points:
+            raise RuntimeError(
+                f"{wheel} missing console script entry points: {missing_entry_points!r}"
+            )
 
     sdist_metadata_headers = _metadata_headers(_sdist_metadata(sdist))
     missing_sdist_identity = [

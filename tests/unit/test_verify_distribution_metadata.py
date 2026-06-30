@@ -26,9 +26,16 @@ def _load_verifier() -> ModuleType:
     return module
 
 
-def _write_wheel(dist: Path, metadata: str) -> None:
+def _write_wheel(
+    dist: Path,
+    metadata: str,
+    *,
+    entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
+) -> None:
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
         zf.writestr("pydantic_studio-0.4.0.dist-info/METADATA", metadata)
+        if entry_points:
+            zf.writestr("pydantic_studio-0.4.0.dist-info/entry_points.txt", entry_points)
 
 
 def _write_sdist(
@@ -74,6 +81,9 @@ dependencies = [
   "pydantic>=2.7",
   "typer>=0.12",
 ]
+
+[project.scripts]
+pydantic-studio = "pydantic_studio.cli:app"
 
 [project.optional-dependencies]
 email = ["email-validator>=2"]
@@ -385,4 +395,31 @@ def test_verify_distribution_metadata_ignores_metadata_mentions_in_description(
     )
 
     with pytest.raises(RuntimeError, match=r"Requires-Dist"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "entry_points",
+    [
+        "",
+        "[console_scripts]\npydantic-studio = wrong.module:app\n",
+    ],
+)
+def test_verify_distribution_metadata_rejects_console_script_entry_point_drift(
+    tmp_path: Path,
+    entry_points: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, entry_points=entry_points)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"pydantic-studio"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)

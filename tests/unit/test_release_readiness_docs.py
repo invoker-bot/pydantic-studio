@@ -19,13 +19,19 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("876", "853 default"),
-        "CLAUDE.md": ("876", "853 default"),
+        "README.md": ("879", "856 default"),
+        "CLAUDE.md": ("879", "856 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
         for snippet in snippets:
             assert snippet in text, f"{doc} should mention {snippet!r}"
+
+
+def test_release_guide_names_console_script_entry_point_verification() -> None:
+    guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
+
+    assert "console script entry points" in guide
 
 
 def test_workflow_jobs_have_timeout_limits() -> None:
