@@ -49,6 +49,11 @@ def test_edit_outcome_shape() -> None:
     assert cancelled.cancelled is True
 
 
+def test_edit_outcome_rejects_unknown_status() -> None:
+    with pytest.raises(ValueError, match=r"EditOutcome\.status"):
+        EditOutcome(status="abandoned")  # type: ignore[arg-type]
+
+
 @pytest.mark.asyncio
 async def test_ctrl_s_submits_and_exits_without_save_path() -> None:
     tree = build_form_tree(_Schema)

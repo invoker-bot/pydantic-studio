@@ -34,6 +34,11 @@ class EditOutcome:
 
     status: Literal["submitted", "cancelled"]
 
+    def __post_init__(self) -> None:
+        if self.status not in {"submitted", "cancelled"}:
+            msg = "EditOutcome.status must be 'submitted' or 'cancelled'"
+            raise ValueError(msg)
+
     @property
     def submitted(self) -> bool:
         return self.status == "submitted"
