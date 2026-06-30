@@ -9,6 +9,10 @@ import { z } from "zod";
 import { studioUrl } from "@/api/base";
 import { FormTreeSchema, type FormTree } from "@/api/schemas";
 
+const MutationErrorResponseSchema = z.object({
+  detail: z.string(),
+}).strict();
+
 const ValidationErrorSchema = z.object({
   path: z.string(),
   message: z.string(),
@@ -56,8 +60,8 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
   });
   if (response.status === 400) {
     // Unknown op or malformed request (Phase 1 spec §5.2 contract).
-    const body = await response.json();
-    throw new Error(`Mutation rejected: ${body.detail ?? "bad request"}`);
+    const body = MutationErrorResponseSchema.parse(await response.json());
+    throw new Error(`Mutation rejected: ${body.detail}`);
   }
   if (!response.ok) {
     throw new Error(`POST /api/mutations failed: HTTP ${response.status}`);

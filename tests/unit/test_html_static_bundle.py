@@ -176,9 +176,16 @@ def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
         encoding="utf-8"
     )
 
+    assert "MutationErrorResponseSchema.parse(await response.json())" in mutations
     assert "MutationResponseSchema.parse(raw)" in mutations
+    assert "body.detail ??" not in mutations
     assert "validation: raw.validation" not in mutations
     assert "mutation_result: raw.mutation_result" not in mutations
+    assert re.search(
+        r"const MutationErrorResponseSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        mutations,
+        re.DOTALL,
+    )
     assert re.search(
         r"const ValidationErrorSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
         mutations,
