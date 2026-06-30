@@ -341,6 +341,31 @@ class TestSaveYamlPreservesComments:
         assert "obsolete_zip" not in content
         assert "address.obsolete_zip" in captured.err
 
+    def test_alias_path_unknown_sibling_warns_and_is_dropped_on_save(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pydantic_studio import save_yaml
+
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", validation_alias=AliasPath("auth", "api-key"))
+
+        src = tmp_path / "alias-path.yaml"
+        src.write_text(
+            "auth:\n"
+            "  api-key: rotated\n"
+            "  stale: ignored\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, AliasConfig)
+        capsys.readouterr()
+        save_yaml(tree, src)
+        captured = capsys.readouterr()
+
+        content = src.read_text(encoding="utf-8")
+        assert "stale" not in content
+        assert "auth.stale" in captured.err
+        assert "auth.api-key" not in captured.err
+
     def test_save_to_existing_file_without_load(self, tmp_path: Path) -> None:
         """If the user calls save_yaml with a tree that was NOT loaded from
         the target path but the path already exists, comments from the file

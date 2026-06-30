@@ -361,6 +361,9 @@ def _dropped_source_key_paths(
                     f"{path}.",
                 )
             )
+        alias_path_tails = _alias_path_tails_for_key(schema, key_str)
+        if alias_path_tails and isinstance(value, Mapping):
+            paths.extend(_unknown_key_paths_for_input_paths(value, alias_path_tails, f"{path}."))
     return paths
 
 
