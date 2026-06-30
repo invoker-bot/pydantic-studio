@@ -247,15 +247,22 @@ def _project_author_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
 
 
 def _project_readme_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
-    project = _table(pyproject, "project", "project")
-    readme = project.get("readme")
+    readme = _project_readme(pyproject)
     if readme is None:
         return ()
-    if not isinstance(readme, str):
-        raise RuntimeError("pyproject.toml project readme must be a string")
     if Path(readme).suffix.lower() in {".md", ".markdown"}:
         return ("Description-Content-Type: text/markdown",)
     return ()
+
+
+def _project_readme(pyproject: dict[str, object]) -> str | None:
+    project = _table(pyproject, "project", "project")
+    readme = project.get("readme")
+    if readme is None:
+        return None
+    if not isinstance(readme, str):
+        raise RuntimeError("pyproject.toml project readme must be a string")
+    return readme
 
 
 def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:
@@ -388,7 +395,16 @@ def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
             "pyproject.toml source-include missing support files: "
             f"{missing_source_include!r}"
         )
-    return tuple(dict.fromkeys((*source_include, *_project_license_files(pyproject))))
+    readme = _project_readme(pyproject)
+    return tuple(
+        dict.fromkeys(
+            (
+                *source_include,
+                *((readme,) if readme is not None else ()),
+                *_project_license_files(pyproject),
+            )
+        )
+    )
 
 
 def _sdist_root(names: Sequence[str], sdist: Path) -> str:
