@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pydantic_studio.tree.paths import Path, PathSegment
+from pydantic_studio.tree.paths import Path, PathSegment, paths_overlap
 
 
 def test_parse_simple_field():
@@ -107,3 +107,8 @@ def test_path_segment_alias():
     """PathSegment is the canonical name for str | int."""
     s: PathSegment = "name"  # noqa: F841
     i: PathSegment = 0       # noqa: F841
+
+
+def test_paths_overlap_treats_root_as_ancestor():
+    assert paths_overlap("", "profile.name") is True
+    assert paths_overlap("profile.name", "") is True

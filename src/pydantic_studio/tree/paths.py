@@ -138,8 +138,6 @@ def paths_overlap(left: str, right: str) -> bool:
     left_segments = _path_segments(left)
     right_segments = _path_segments(right)
     if left_segments is not None and right_segments is not None:
-        if not left_segments or not right_segments:
-            return left_segments == right_segments
         return (
             left_segments == right_segments
             or left_segments[: len(right_segments)] == right_segments
