@@ -37,6 +37,20 @@ def _wheel_dist_info_files(
     return [name for name in names if name == expected]
 
 
+def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
+    with zipfile.ZipFile(wheel) as zf:
+        names = set(zf.namelist())
+    missing_files = [
+        filename
+        for filename in ("WHEEL", "RECORD")
+        if f"{dist_info_dir}/{filename}" not in names
+    ]
+    if missing_files:
+        raise RuntimeError(
+            f"{wheel} missing wheel structure files in {dist_info_dir}: {missing_files!r}"
+        )
+
+
 def _wheel_metadata(wheel: Path, *, dist_info_dir: str) -> str:
     with zipfile.ZipFile(wheel) as zf:
         metadata_names = _wheel_dist_info_files(
@@ -291,6 +305,7 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     sdist = _single_file(dist_dir, "*.tar.gz")
     wheel_dist_info_dir = _wheel_dist_info_dir(pyproject)
 
+    _verify_wheel_structure(wheel, dist_info_dir=wheel_dist_info_dir)
     metadata_headers = _metadata_headers(_wheel_metadata(wheel, dist_info_dir=wheel_dist_info_dir))
     missing_identity = [
         line for line in _project_identity(pyproject) if line not in metadata_headers

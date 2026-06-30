@@ -10,8 +10,9 @@ retains that artifact for 30 days for release troubleshooting.
 The release metadata verifier checks the package Name, Version,
 Requires-Python, license files, classifiers, keywords, dependencies, optional
 extras, and every declared Project-URL in both the wheel `METADATA` and the
-sdist `PKG-INFO`, confirms the wheel console script entry points match
-`[project.scripts]`, then confirms every explicit `source-include` entry is
+sdist `PKG-INFO`, confirms the wheel `.dist-info` identity, structure files,
+and console script entry points match `[project.scripts]`, then confirms every
+explicit `source-include` entry is
 present in the source archive. The Changelog, Security, and Contributing URL
 targets must also be listed in `source-include`.
 The package metadata exposes Source, Documentation, Issues, Changelog,

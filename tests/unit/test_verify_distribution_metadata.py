@@ -33,11 +33,17 @@ def _write_wheel(
     metadata_name: str = "pydantic_studio-0.4.0.dist-info/METADATA",
     entry_points_name: str = "pydantic_studio-0.4.0.dist-info/entry_points.txt",
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
+    wheel_metadata: str | None = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+    record: str | None = "pydantic_studio/__init__.py,,\n",
 ) -> None:
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
         zf.writestr(metadata_name, metadata)
         if entry_points:
             zf.writestr(entry_points_name, entry_points)
+        if wheel_metadata is not None:
+            zf.writestr("pydantic_studio-0.4.0.dist-info/WHEEL", wheel_metadata)
+        if record is not None:
+            zf.writestr("pydantic_studio-0.4.0.dist-info/RECORD", record)
 
 
 def _write_sdist(
@@ -273,6 +279,34 @@ def test_verify_distribution_metadata_rejects_wrong_wheel_dist_info_entry_points
     )
 
     with pytest.raises(RuntimeError, match=r"pydantic_studio-0\.4\.0\.dist-info"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("missing_filename", "kwargs"),
+    [
+        ("WHEEL", {"wheel_metadata": None}),
+        ("RECORD", {"record": None}),
+    ],
+)
+def test_verify_distribution_metadata_rejects_missing_wheel_structure_files(
+    tmp_path: Path,
+    missing_filename: str,
+    kwargs: dict[str, str | None],
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, **kwargs)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=missing_filename):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
