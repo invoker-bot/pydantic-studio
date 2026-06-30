@@ -60,3 +60,29 @@ def test_live_preview_renders_yaml_not_formtree_dump(
     assert '"kind"' not in text
     assert '"required"' not in text
     assert '"fields"' not in text
+
+
+def test_undo_and_redo_buttons_restore_browser_edits(
+    page: Page, fastapi_url: str
+) -> None:
+    page.goto(f"{fastapi_url}/")
+
+    name_input = page.get_by_label("name", exact=True)
+    expect(name_input).to_be_visible(timeout=5000)
+    expect(name_input).to_have_value("demo-service")
+
+    name_input.fill("edited-via-history")
+    name_input.blur()
+
+    preview = page.get_by_test_id("tree-preview")
+    expect(preview).to_contain_text("edited-via-history", timeout=5000)
+
+    page.get_by_role("button", name="Undo").click()
+
+    expect(preview).to_contain_text("name: demo-service", timeout=5000)
+    expect(name_input).to_have_value("demo-service")
+
+    page.get_by_role("button", name="Redo").click()
+
+    expect(preview).to_contain_text("edited-via-history", timeout=5000)
+    expect(name_input).to_have_value("edited-via-history")

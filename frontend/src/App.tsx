@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Redo2, Undo2 } from "lucide-react";
 
 import { fetchTree } from "@/api/tree";
+import { useApplyMutation } from "@/api/mutations";
 import {
   useCancelEdit,
   useSubmitTree,
@@ -27,6 +29,7 @@ export default function App() {
 
   const submit = useSubmitTree();
   const cancel = useCancelEdit();
+  const history = useApplyMutation();
   const [status, setStatus] = useState<Status>("editing");
   const [submitErrors, setSubmitErrors] = useState<SubmitError[]>([]);
   const [requiredCursor, setRequiredCursor] = useState(0);
@@ -106,6 +109,7 @@ export default function App() {
       onSuccess: () => setStatus("cancelled"),
     });
   };
+  const isActionPending = submit.isPending || cancel.isPending || history.isPending;
 
   return (
     <div className="grid min-h-screen grid-cols-1 gap-6 bg-white p-4 font-sans sm:p-6 lg:grid-cols-2 lg:gap-8 lg:p-8">
@@ -136,14 +140,34 @@ export default function App() {
             )}
             <Button
               variant="outline"
+              size="icon"
+              aria-label="Undo"
+              title="Undo"
+              onClick={() => history.mutate({ op: "undo" })}
+              disabled={isActionPending}
+            >
+              <Undo2 aria-hidden="true" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Redo"
+              title="Redo"
+              onClick={() => history.mutate({ op: "redo" })}
+              disabled={isActionPending}
+            >
+              <Redo2 aria-hidden="true" />
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleCancel}
-              disabled={cancel.isPending || submit.isPending}
+              disabled={isActionPending}
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
-              disabled={submit.isPending || cancel.isPending}
+              disabled={isActionPending}
             >
               {submit.isPending ? "Saving..." : "Save"}
             </Button>

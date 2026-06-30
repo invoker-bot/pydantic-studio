@@ -8,11 +8,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { studioUrl } from "@/api/base";
 import { FormTreeSchema, type FormTree } from "@/api/schemas";
 
-// Discriminated union mirroring spec §3.2. Phase 3 wires set_value
-// (used by every primitive field). Container ops (add_item, etc.)
-// land in Phase 4 when the corresponding components arrive.
+// Discriminated union for the JSON API mutation contract. Field edits,
+// containers, variants, and history controls all share this server-
+// authoritative path.
 export type Mutation =
   | { op: "set_value"; path: string; value: unknown }
+  | { op: "undo" }
+  | { op: "redo" }
   | { op: "add_item"; path: string }
   | { op: "remove_item"; path: string; index: number }
   | { op: "move_item"; path: string; from: number; to: number }
