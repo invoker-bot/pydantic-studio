@@ -140,34 +140,31 @@ def fastapi_url() -> Iterator[str]:
     per test; cheap insurance for test isolation.
     """
     port = _find_free_port()
-    tree = build_form_tree(_DemoSchema)
-    # Seed defaults so the SPA renders with values (Phase 6 housekeeping
-    # removed default-seeding from build_form_tree). tags/env/metadata
-    # start at default_factory empties; notifier is preselected by
-    # UnionBuilder via isinstance against the EmailNotifier default.
-    tree.set_value("name", "demo-service")
-    tree.set_value("workers", 4)
-    tree.set_value("debug", False)
-    tree.set_value("level", _LogLevel.INFO)
-    tree.set_value("ratio", 1.0)
-    tree.set_value("price", Decimal("0.00"))
-    tree.set_value("log_dir", "/tmp")
-    tree.set_value("homepage", "https://example.com")
-    tree.set_value("contact", "ops@example.com")
-    tree.set_value("starts_on", date(2025, 1, 1))
-    tree.set_value("cron_at", time(2, 30, 0))
-    tree.set_value("last_run", datetime(2025, 1, 1, 12, 0, 0))
-    tree.set_value("ttl", timedelta(hours=1))
-    tree.set_value("bind_ip", "127.0.0.1")
-    tree.set_value("subnet", "10.0.0.0/24")
-    tree.set_value("request_id", UUID("00000000-0000-0000-0000-000000000000"))
-    tree.set_value("api_key", "placeholder")
-    tree.set_value("api_key_bytes", b"placeholder")
-    # PatternNode.validate_value accepts the regex source string; flags
-    # carry through from the field's default (re.IGNORECASE) via the
-    # builder.
-    tree.set_value("pattern_field", "^[a-z]+$")
-    tree.set_value("salt", b"\xde\xad\xbe\xef")
+    tree = build_form_tree(
+        _DemoSchema,
+        existing={
+            "name": "demo-service",
+            "workers": 4,
+            "debug": False,
+            "level": _LogLevel.INFO,
+            "ratio": 1.0,
+            "price": Decimal("0.00"),
+            "log_dir": FsPath("/tmp"),
+            "homepage": "https://example.com",
+            "contact": "ops@example.com",
+            "starts_on": date(2025, 1, 1),
+            "cron_at": time(2, 30, 0),
+            "last_run": datetime(2025, 1, 1, 12, 0, 0),
+            "ttl": timedelta(hours=1),
+            "bind_ip": IPv4Address("127.0.0.1"),
+            "subnet": IPv4Network("10.0.0.0/24"),
+            "request_id": UUID("00000000-0000-0000-0000-000000000000"),
+            "api_key": "placeholder",
+            "api_key_bytes": b"placeholder",
+            "pattern_field": re.compile(r"^[a-z]+$", re.IGNORECASE),
+            "salt": b"\xde\xad\xbe\xef",
+        },
+    )
     server = StudioServer(tree=tree, save_path=None)
     config = uvicorn.Config(
         server.app,

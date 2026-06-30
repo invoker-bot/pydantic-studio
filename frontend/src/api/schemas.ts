@@ -360,6 +360,10 @@ export const FormTreeSchema = z.object({
   schema_name: z.string(),
   root: GroupNodeSchema,
   variant: VariantStateSchema.nullable(),
+  history: z.object({
+    can_undo: z.boolean(),
+    can_redo: z.boolean(),
+  }),
   unsaved_count: z.number(),
   preview: z.string(),
   readonly_paths: z.array(z.string()),

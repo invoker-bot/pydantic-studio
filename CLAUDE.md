@@ -11,8 +11,8 @@ immediately.
   YAML / TOML / JSON config files against a strongly-typed schema.
 - **Status**: v0.4.0 alpha — all 9 implementation phases, the
   task-oriented overhaul, TUI form mode, the React-backed web app, and
-  root model variants are merged on master. Current local gate: 1075
-  tests: 1050 default tests plus 25 explicit Playwright browser e2e tests, ruff
+  root model variants are merged on master. Current local gate: 1078
+  tests: 1052 default tests plus 26 explicit Playwright browser e2e tests, ruff
   clean, pyright clean for production code, `mkdocs build --strict`
   clean, frontend bundle build clean, `uv build` clean, `twine check`
   clean, and wheel/sdist install smoke clean. CI runs the default suite
@@ -249,7 +249,7 @@ ruff knows the rule and won't complain.
 
 ## Test patterns
 
-- **`uv run pytest -q`** runs the default suite (1050 tests at v0.4.0).
+- **`uv run pytest -q`** runs the default suite (1052 tests at v0.4.0).
   This intentionally skips `tests/e2e/` and disables the pytest-playwright
   plugin because plugin registration interferes with Textual
   `App.run_test()` under `asyncio_mode="auto"`.

@@ -104,6 +104,31 @@ def test_tree_to_json_excludes_schema_class_and_snapshots() -> None:
     assert "snapshots" not in data
 
 
+def test_tree_to_json_includes_clean_history_state() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
+
+    data = tree_to_json(tree)
+
+    assert data["history"] == {"can_undo": False, "can_redo": False}
+
+
+def test_tree_to_json_history_tracks_undo_redo_cursor() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
+
+    tree.set_value("name", "beta")
+    after_edit = tree_to_json(tree)
+
+    tree.undo()
+    after_undo = tree_to_json(tree)
+
+    tree.redo()
+    after_redo = tree_to_json(tree)
+
+    assert after_edit["history"] == {"can_undo": True, "can_redo": False}
+    assert after_undo["history"] == {"can_undo": False, "can_redo": True}
+    assert after_redo["history"] == {"can_undo": True, "can_redo": False}
+
+
 def test_tree_to_json_includes_yaml_preview_of_values() -> None:
     """The envelope must carry a `preview` field that renders the
     *effective config values* as YAML, so the SPA can show users what

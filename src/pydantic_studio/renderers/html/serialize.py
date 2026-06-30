@@ -39,6 +39,10 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     data["variant"] = (
         tree.variant.model_dump(mode="json") if tree.variant is not None else None
     )
+    data["history"] = {
+        "can_undo": tree.cursor > 0,
+        "can_redo": tree.cursor + 1 < len(tree.snapshots),
+    }
     data["unsaved_count"] = len(tree.snapshots)
     data["preview"] = render_yaml_preview(tree)
     return data

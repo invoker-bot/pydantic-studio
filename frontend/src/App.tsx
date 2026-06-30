@@ -144,7 +144,7 @@ export default function App() {
               aria-label="Undo"
               title="Undo"
               onClick={() => history.mutate({ op: "undo" })}
-              disabled={isActionPending}
+              disabled={isActionPending || !data.history.can_undo}
             >
               <Undo2 aria-hidden="true" />
             </Button>
@@ -154,7 +154,7 @@ export default function App() {
               aria-label="Redo"
               title="Redo"
               onClick={() => history.mutate({ op: "redo" })}
-              disabled={isActionPending}
+              disabled={isActionPending || !data.history.can_redo}
             >
               <Redo2 aria-hidden="true" />
             </Button>
