@@ -78,6 +78,24 @@ def _resolve_type_name(name: str) -> Any:
     return obj
 
 
+def _json_safe_any_value(value: Any) -> Any:
+    try:
+        return json.loads(json.dumps(value, allow_nan=False))
+    except (TypeError, ValueError, OverflowError):
+        if isinstance(value, dict):
+            return {
+                str(_json_safe_any_value(k)): _json_safe_any_value(v)
+                for k, v in value.items()
+            }
+        if isinstance(value, (list, tuple, set)):
+            return [_json_safe_any_value(item) for item in value]
+        if isinstance(value, (bytes, bytearray)):
+            return bytes(value).hex()
+        if hasattr(value, "get_secret_value"):
+            return "**********"
+        return str(value)
+
+
 class FormNode(BaseModel):
     """Abstract base. Concrete subclasses set their own ``kind`` literal.
 
@@ -1086,6 +1104,10 @@ class AnyValueNode(FormNode):
         if self.mode != inferred:
             object.__setattr__(self, "mode", inferred)
         return self
+
+    @field_serializer("value", when_used="json")
+    def _serialize_json_value(self, value: Any) -> Any:
+        return _json_safe_any_value(value)
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
         # ``typing.Any`` accepts every value, including None — tree-level

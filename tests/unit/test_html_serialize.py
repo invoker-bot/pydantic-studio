@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import json
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -59,6 +60,10 @@ class _WithDict(BaseModel):
 
 class _UnionHolder(BaseModel):
     value: int | str
+
+
+class _AnyHolder(BaseModel):
+    payload: Any = None
 
 
 class _VariantEmail(BaseModel):
@@ -197,6 +202,20 @@ def test_tree_to_json_includes_root_variant_metadata() -> None:
     assert data["variant"]["selected_id"] == "email"
     assert data["variant"]["options"][0]["label"] == "Email"
     assert "class_name: email" in data["preview"]
+
+
+def test_tree_to_json_serializes_non_json_native_any_value() -> None:
+    class OpaqueValue:
+        def __str__(self) -> str:
+            return "opaque-value"
+
+    tree = build_form_tree(_AnyHolder, existing={"payload": OpaqueValue()})
+
+    data = tree_to_json(tree)
+
+    payload = next(f for f in data["root"]["fields"] if f["name"] == "payload")
+    assert payload["value"] == "opaque-value"
+    json.dumps(data, allow_nan=False)
 
 
 def test_validation_envelope_ok_for_complete_tree() -> None:
