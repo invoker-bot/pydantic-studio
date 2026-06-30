@@ -1729,7 +1729,9 @@ class FormTree(BaseModel):
             persistence=persistence,
         )
 
-    def select_root_variant(self, variant_id: str, seed: Any = None) -> ValidationResult:
+    def select_root_variant(
+        self, variant_id: str, seed: Any = _UNSET_VALUE
+    ) -> ValidationResult:
         """Switch the root model to a caller-supplied variant."""
         if self.variant is None:
             return ValidationResult.fail(["tree does not have root variants"])
@@ -1750,7 +1752,7 @@ class FormTree(BaseModel):
 
         model = _resolve_type_name(option.model_type_name)
         builder = default_registry().find(model)
-        root_seed = {} if seed is None else seed
+        root_seed = {} if seed is _UNSET_VALUE else seed
         new_root, errors = _build_seeded_node(
             builder, model, FieldInfo(annotation=model), root_seed
         )

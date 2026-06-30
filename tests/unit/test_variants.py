@@ -173,6 +173,21 @@ def test_select_root_variant_rejects_falsy_invalid_seed_without_mutating() -> No
     assert tree.snapshots == []
 
 
+def test_select_root_variant_rejects_explicit_none_seed_argument_without_mutating() -> None:
+    tree = build_variant_form_tree(_registry(), selected_id="email")
+
+    result = tree.select_root_variant("slack", seed=None)
+
+    assert result.ok is False
+    assert result.errors == ("expected dict/BaseModel for group seed, got NoneType",)
+    assert tree.schema_class is EmailSettings
+    assert tree.variant is not None
+    assert tree.variant.selected_id == "email"
+    assert tree.root.find("address") is not None
+    assert tree.root.find("channel") is None
+    assert tree.snapshots == []
+
+
 def test_select_root_variant_rejects_wrong_model_seed_without_mutating() -> None:
     tree = build_variant_form_tree(_registry(), selected_id="email")
 
