@@ -30,6 +30,7 @@ async def test_footer_idle_mode_shows_navigation() -> None:
         # buttons; the footer teaches the form keys instead.
         assert "Ctrl+N" in fh.line1
         assert "Ctrl+F" in fh.line1
+        assert "Del clear optional group" in fh.line1
 
 
 @pytest.mark.asyncio

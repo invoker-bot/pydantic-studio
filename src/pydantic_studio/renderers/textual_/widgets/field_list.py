@@ -686,7 +686,19 @@ class FieldListView(VerticalScroll):
         return f"key{index}"
 
     def action_delete_focused(self) -> None:
-        """D removes the focused sequence item or mapping entry."""
+        """Delete removes structure, or clears an optional group row."""
+        if self._group.kind == "group":
+            row = self._focused_row()
+            if row is None or row.node.kind != "group" or row.node.required:
+                return
+            if self._reject_readonly(row):
+                return
+            result = self._form_tree.set_value(row.path, None)
+            if result.ok:
+                self._refresh_rows()
+            else:
+                row.set_error("; ".join(result.errors) or "invalid")
+            return
         if self._group.kind == "sequence":
             result = self._form_tree.remove_item(self._base_path, self._cursor)
             if result.ok:

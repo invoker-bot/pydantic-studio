@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 from textual.app import App
+from textual.widgets import Static
 
 from pydantic_studio import (
     VariantRegistry,
@@ -57,9 +58,12 @@ class _Big(BaseModel):
 
 
 class _Host(App):
-    def __init__(self, view: FieldListView) -> None:
+    def __init__(
+        self, view: FieldListView, readonly_paths: frozenset[str] = frozenset()
+    ) -> None:
         super().__init__()
         self._view = view
+        self.readonly_paths = readonly_paths
 
     def compose(self):
         yield self._view
@@ -71,6 +75,19 @@ class _EmailConfig(BaseModel):
 
 class _SlackConfig(BaseModel):
     channel: str = "#ops"
+
+
+class _OptionalInner(BaseModel):
+    host: str | None = None
+    port: int = 5432
+
+
+class _OptionalHost(BaseModel):
+    primary: _OptionalInner | None = None
+
+
+def _value_text(row: FieldRow) -> str:
+    return str(row.query_one(".field-row--value", Static).render())
 
 
 @pytest.mark.asyncio
@@ -241,6 +258,50 @@ async def test_field_list_space_on_bool_row_toggles() -> None:
         await pilot.press("space")
         await pilot.pause()
         assert tree.root.find("debug").value is True
+
+
+@pytest.mark.asyncio
+async def test_field_list_delete_clears_optional_group_row() -> None:
+    tree = build_form_tree(
+        _OptionalHost,
+        existing={"primary": {"host": "db.internal", "port": 15432}},
+    )
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view).run_test() as pilot:
+        await pilot.pause()
+        row = next(iter(view.query(FieldRow)))
+        assert _value_text(row) == "2 fields"
+
+        await pilot.press("delete")
+        await pilot.pause()
+
+        primary = tree.root.find("primary")
+        assert primary is not None
+        assert primary.omitted is True
+        assert tree.to_instance().primary is None
+        row = next(iter(view.query(FieldRow)))
+        assert _value_text(row) == "not set"
+
+
+@pytest.mark.asyncio
+async def test_field_list_delete_rejects_readonly_optional_group_row() -> None:
+    tree = build_form_tree(
+        _OptionalHost,
+        existing={"primary": {"host": "db.internal", "port": 15432}},
+    )
+    view = FieldListView(group=tree.root, form_tree=tree, base_path="")
+    async with _Host(view, readonly_paths=frozenset({"primary"})).run_test() as pilot:
+        await pilot.pause()
+
+        await pilot.press("delete")
+        await pilot.pause()
+
+        assert tree.to_instance().primary == _OptionalInner(
+            host="db.internal",
+            port=15432,
+        )
+        row = next(iter(view.query(FieldRow)))
+        assert "read-only" in row.helper_text
 
 
 @pytest.mark.asyncio

@@ -13,7 +13,7 @@ Mode = Literal["idle", "editing", "sequence", "mapping", "union", "errors"]
 _LINE1: dict[str, str] = {
     "idle": (
         "type to edit · Tab/Enter next · Space toggle · ←→ cycle · "
-        "Ctrl+N next required · Ctrl+F filter · Esc revert/back"
+        "Del clear optional group · Ctrl+N next required · Ctrl+F filter · Esc revert/back"
     ),
     "editing": "type to edit · Enter commit+next · Esc revert",
     "sequence": (

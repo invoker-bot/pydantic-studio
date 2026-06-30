@@ -21,6 +21,8 @@ class ContainerCell(Cell):
     def value_text(self) -> str:
         node = self._node
         if node.kind == "group":
+            if not getattr(node, "required", True) and getattr(node, "omitted", False):
+                return "not set"
             count = len(getattr(node, "fields", []))
             return f"{count} field{'s' if count != 1 else ''}"
         if node.kind == "sequence":
