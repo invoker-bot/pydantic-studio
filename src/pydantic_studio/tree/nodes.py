@@ -1437,6 +1437,44 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
             for message in _validate_seed_against_node(child, value):
                 errors.append(f"[{index}]: {message}")
         return errors
+    if isinstance(node, MappingNode):
+        if not isinstance(seed, dict):
+            return [f"expected dict for mapping value, got {type(seed).__name__}"]
+        errors: list[str] = []
+        length = len(seed)
+        if node.min_length is not None and length < node.min_length:
+            errors.append(f"length must be >= {node.min_length}")
+        if node.max_length is not None and length > node.max_length:
+            errors.append(f"length must be <= {node.max_length}")
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree.builder import default_registry
+
+        registry = default_registry()
+        key_type = _resolve_type_name(node.key_type_name)
+        value_type = _resolve_type_name(node.value_type_name)
+        key_builder = registry.find(key_type)
+        value_builder = registry.find(value_type)
+        key_field = FieldInfo(annotation=key_type)
+        value_field = FieldInfo(annotation=value_type)
+        for raw_key, raw_value in seed.items():
+            try:
+                key_node = key_builder.build(key_type, key_field, raw_key)
+            except ValidationError as exc:
+                for message in _validation_error_messages(exc):
+                    errors.append(f"key {raw_key!r}: {message}")
+                continue
+            for message in _validate_seed_against_node(key_node, raw_key):
+                errors.append(f"key {raw_key!r}: {message}")
+            try:
+                value_node = value_builder.build(value_type, value_field, raw_value)
+            except ValidationError as exc:
+                for message in _validation_error_messages(exc):
+                    errors.append(f"[{raw_key!r}]: {message}")
+                continue
+            for message in _validate_seed_against_node(value_node, raw_value):
+                errors.append(f"[{raw_key!r}]: {message}")
+        return errors
     if isinstance(node, UnionNode) and node.selected is not None:
         return _validate_seed_against_node(node.selected, seed)
     validate_value = getattr(node, "validate_value", None)

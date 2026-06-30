@@ -42,6 +42,14 @@ class _SeededListUnionHolder(BaseModel):
     value: str | _SeededListPayload
 
 
+class _SeededMappingPayload(BaseModel):
+    settings: dict[str, int] = Field(default_factory=dict)
+
+
+class _SeededMappingUnionHolder(BaseModel):
+    value: str | _SeededMappingPayload
+
+
 def test_optional_demotes_to_inner_type_node() -> None:
     """``str | None`` becomes a StringNode with required=False, NOT a UnionNode."""
     tree = build_form_tree(WithOptional)
@@ -167,6 +175,21 @@ def test_select_variant_rejects_sequence_seed_item_without_mutating() -> None:
 
     assert result.ok is False
     assert result.errors == ("items: [0]: expected int, got str",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
+def test_select_variant_rejects_mapping_seed_value_without_mutating() -> None:
+    tree = build_form_tree(_SeededMappingUnionHolder, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 1, seed={"settings": {"workers": "1"}})
+
+    assert result.ok is False
+    assert result.errors == ("settings: ['workers']: expected int, got str",)
     val = tree.root.find("value")
     assert isinstance(val, UnionNode)
     assert val.selected_index == 0
