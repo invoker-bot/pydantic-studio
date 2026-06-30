@@ -356,3 +356,33 @@ def test_verify_distribution_metadata_rejects_dependency_metadata_drift(
 
     with pytest.raises(RuntimeError, match=missing_line.split(":", 1)[0]):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
+def test_verify_distribution_metadata_ignores_metadata_mentions_in_description(
+    tmp_path: Path,
+    drifted_file: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    expected_metadata = _metadata()
+    missing_line = "Requires-Dist: pydantic>=2.7"
+    drifted_metadata = "\n".join(
+        line for line in expected_metadata.splitlines() if line != missing_line
+    )
+    drifted_metadata = (
+        f"{drifted_metadata}\n\n"
+        "The long description can mention release metadata examples such as "
+        f"{missing_line} without declaring the header."
+    )
+    _write_wheel(dist, drifted_metadata if drifted_file == "wheel" else expected_metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=drifted_metadata if drifted_file == "sdist" else expected_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"Requires-Dist"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)

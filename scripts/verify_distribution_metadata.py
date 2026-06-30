@@ -7,6 +7,7 @@ import re
 import tarfile
 import tomllib
 import zipfile
+from email.parser import Parser
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -53,6 +54,11 @@ def _sdist_metadata(sdist: Path) -> str:
         if metadata_file is None:
             raise RuntimeError(f"could not read PKG-INFO file in {sdist}")
         return metadata_file.read().decode("utf-8")
+
+
+def _metadata_headers(metadata: str) -> frozenset[str]:
+    message = Parser().parsestr(metadata)
+    return frozenset(f"{name}: {value}" for name, value in message.items())
 
 
 def _load_pyproject(project_root: Path) -> dict[str, object]:
@@ -204,17 +210,21 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     wheel = _single_file(dist_dir, "*.whl")
     sdist = _single_file(dist_dir, "*.tar.gz")
 
-    metadata = _wheel_metadata(wheel)
-    missing_identity = [line for line in _project_identity(pyproject) if line not in metadata]
+    metadata_headers = _metadata_headers(_wheel_metadata(wheel))
+    missing_identity = [
+        line for line in _project_identity(pyproject) if line not in metadata_headers
+    ]
     if missing_identity:
         raise RuntimeError(f"{wheel} missing package identity metadata: {missing_identity!r}")
 
-    missing_urls = [url for url in _expected_project_urls(pyproject) if url not in metadata]
+    missing_urls = [
+        url for url in _expected_project_urls(pyproject) if url not in metadata_headers
+    ]
     if missing_urls:
         raise RuntimeError(f"{wheel} missing project URL metadata: {missing_urls!r}")
 
     missing_registry_metadata = [
-        line for line in _project_registry_metadata(pyproject) if line not in metadata
+        line for line in _project_registry_metadata(pyproject) if line not in metadata_headers
     ]
     if missing_registry_metadata:
         raise RuntimeError(
@@ -222,26 +232,28 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         )
 
     missing_dependencies = [
-        line for line in _project_dependency_metadata(pyproject) if line not in metadata
+        line for line in _project_dependency_metadata(pyproject) if line not in metadata_headers
     ]
     if missing_dependencies:
         raise RuntimeError(f"{wheel} missing dependency metadata: {missing_dependencies!r}")
 
-    sdist_metadata = _sdist_metadata(sdist)
+    sdist_metadata_headers = _metadata_headers(_sdist_metadata(sdist))
     missing_sdist_identity = [
-        line for line in _project_identity(pyproject) if line not in sdist_metadata
+        line for line in _project_identity(pyproject) if line not in sdist_metadata_headers
     ]
     if missing_sdist_identity:
         raise RuntimeError(f"{sdist} missing package identity metadata: {missing_sdist_identity!r}")
 
     missing_sdist_urls = [
-        url for url in _expected_project_urls(pyproject) if url not in sdist_metadata
+        url for url in _expected_project_urls(pyproject) if url not in sdist_metadata_headers
     ]
     if missing_sdist_urls:
         raise RuntimeError(f"{sdist} missing project URL metadata: {missing_sdist_urls!r}")
 
     missing_sdist_registry_metadata = [
-        line for line in _project_registry_metadata(pyproject) if line not in sdist_metadata
+        line
+        for line in _project_registry_metadata(pyproject)
+        if line not in sdist_metadata_headers
     ]
     if missing_sdist_registry_metadata:
         raise RuntimeError(
@@ -249,7 +261,9 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         )
 
     missing_sdist_dependencies = [
-        line for line in _project_dependency_metadata(pyproject) if line not in sdist_metadata
+        line
+        for line in _project_dependency_metadata(pyproject)
+        if line not in sdist_metadata_headers
     ]
     if missing_sdist_dependencies:
         raise RuntimeError(f"{sdist} missing dependency metadata: {missing_sdist_dependencies!r}")
