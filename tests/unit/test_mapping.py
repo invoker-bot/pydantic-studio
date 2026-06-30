@@ -220,3 +220,53 @@ def test_rename_key_rejects_normalized_duplicate_key_without_mutating() -> None:
         Path("other.yaml"): 2,
     }
     assert tree.snapshots == []
+
+
+def test_set_value_replaces_mapping_entries_and_undoes() -> None:
+    tree = build_form_tree(WithDict, existing={"settings": {"old": 1}})
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+
+    result = tree.set_value("settings", {"timeout": 30, "retries": 3})
+
+    assert result.ok is True
+    assert settings.to_python() == {"timeout": 30, "retries": 3}
+    assert tree.undo() is True
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    assert settings.to_python() == {"old": 1}
+
+
+def test_set_value_rejects_invalid_mapping_value_without_mutating() -> None:
+    tree = build_form_tree(WithDict, existing={"settings": {"old": 1}})
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+
+    result = tree.set_value("settings", {"timeout": "not-an-int"})
+
+    assert result.ok is False
+    assert result.errors == ("['timeout']: expected int, got str",)
+    assert settings.to_python() == {"old": 1}
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_normalized_duplicate_mapping_keys_without_mutating() -> None:
+    tree = build_form_tree(
+        WithPathDict,
+        existing={"paths": {Path("old.yaml"): 1}},
+    )
+    paths = tree.root.find("paths")
+    assert isinstance(paths, MappingNode)
+
+    result = tree.set_value(
+        "paths",
+        {
+            Path("existing.yaml"): 1,
+            "existing.yaml": 2,
+        },
+    )
+
+    assert result.ok is False
+    assert result.errors == ("duplicate key PosixPath('existing.yaml')",)
+    assert paths.to_python() == {Path("old.yaml"): 1}
+    assert tree.snapshots == []

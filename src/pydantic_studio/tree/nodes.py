@@ -1048,7 +1048,9 @@ class MappingNode(FormNode):
         return {k.to_python(): v.to_python() for k, v in self.entries}
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
-        return ()  # whole-mapping replacement deferred to v0.2
+        if not isinstance(value, dict):
+            return (f"expected dict for mapping value, got {type(value).__name__}",)
+        return ()
 
 
 class UnionNode(FormNode):
@@ -1870,10 +1872,30 @@ class FormTree(BaseModel):
             if target.selected is None:
                 return ValidationResult.fail(["union has no selected variant"])
             write_target = target.selected
-            if not hasattr(write_target, "value"):
+            if not isinstance(write_target, MappingNode) and not hasattr(write_target, "value"):
                 return ValidationResult.fail(
                     ["selected union variant is not directly editable"]
                 )
+
+        if isinstance(write_target, MappingNode):
+            result, entries = self._build_mapping_entries(write_target, value)
+            if not result.ok:
+                message = result.errors[0] if result.errors else "invalid"
+                write_target.error = message
+                target.error = message
+                return result
+
+            self._push_snapshot(_snap.take(self.root))
+            write_target.entries = entries
+            write_target.error = None
+            for group in walked_groups:
+                if group.omitted:
+                    group.omitted = False
+            if isinstance(target, UnionNode):
+                target.error = None
+            if self.draft_path is not None:
+                _snap.draft_save(self, self.draft_path)
+            return ValidationResult.ok()
 
         errors = write_target.validate_value(value)
         if errors:
@@ -2116,6 +2138,82 @@ class FormTree(BaseModel):
             if key_node.to_python() == key:
                 return ValidationResult.fail([f"duplicate key {key!r}"])
         return ValidationResult.ok()
+
+    def _build_mapping_entries(
+        self, mp: MappingNode, value: Any
+    ) -> tuple[ValidationResult, list[tuple[AnyNode, AnyNode]]]:
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree.builder import default_registry
+
+        errors = list(mp.validate_value(value))
+        if errors:
+            return ValidationResult.fail(errors), []
+
+        length_result = self._validate_mapping_length(mp, len(value))
+        if not length_result.ok:
+            return length_result, []
+
+        reg = default_registry()
+        key_type = _resolve_type_name(mp.key_type_name)
+        value_type = _resolve_type_name(mp.value_type_name)
+        key_builder = reg.find(key_type)
+        value_builder = reg.find(value_type)
+        key_field = FieldInfo(annotation=key_type)
+        value_field = FieldInfo(annotation=value_type)
+
+        entries: list[tuple[AnyNode, AnyNode]] = []
+        normalized_keys: list[Any] = []
+        for raw_key, raw_value in value.items():
+            key_probe = key_builder.build(key_type, key_field, None)
+            key_errors = _validate_seed_against_node(
+                key_probe,
+                raw_key,
+                none_is_absent=False,
+            )
+            if key_errors:
+                errors.extend(f"key {raw_key!r}: {message}" for message in key_errors)
+                continue
+            try:
+                key_node = key_builder.build(key_type, key_field, raw_key)
+            except ValidationError as exc:
+                errors.extend(
+                    f"key {raw_key!r}: {message}"
+                    for message in _validation_error_messages(exc)
+                )
+                continue
+
+            normalized_key = key_node.to_python()
+            if any(existing_key == normalized_key for existing_key in normalized_keys):
+                errors.append(f"duplicate key {normalized_key!r}")
+                continue
+
+            value_probe = value_builder.build(value_type, value_field, None)
+            value_errors = _validate_seed_against_node(
+                value_probe,
+                raw_value,
+                none_is_absent=False,
+            )
+            if value_errors:
+                errors.extend(f"[{raw_key!r}]: {message}" for message in value_errors)
+                continue
+            try:
+                value_node = value_builder.build(value_type, value_field, raw_value)
+            except ValidationError as exc:
+                errors.extend(
+                    f"[{raw_key!r}]: {message}"
+                    for message in _validation_error_messages(exc)
+                )
+                continue
+
+            key_node.name = "key"
+            value_node.name = "value"
+            entries.append((key_node, value_node))
+            normalized_keys.append(normalized_key)
+
+        if errors:
+            return ValidationResult.fail(errors), []
+        return ValidationResult.ok(), entries
 
     def add_entry(
         self, path: str, key: Any, value: Any = _UNSET_VALUE
