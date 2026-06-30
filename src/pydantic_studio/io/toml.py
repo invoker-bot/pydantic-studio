@@ -41,7 +41,8 @@ def load_toml(path: str | Path, schema: type[BaseModel]) -> FormTree:
 def save_toml(tree: FormTree, path: str | Path) -> None:
     """Write a FormTree to a TOML file with description comments.
 
-    Tree is materialized via ``to_instance()`` (mirrors save_yaml's contract).
+    Tree is materialized via ``to_output_python(by_alias=True)`` so saved keys
+    match the schema's external field names.
 
     Raises:
         ValidationFailedError: If the tree fails validation.
@@ -55,7 +56,7 @@ def save_toml(tree: FormTree, path: str | Path) -> None:
         msg = "tree.schema_class is None; cannot derive description comments"
         raise ValueError(msg)
 
-    data = tree.to_output_python()
+    data = tree.to_output_python(by_alias=True)
     doc = _build_document(data, schema)
 
     fd, tmp = tempfile.mkstemp(prefix=".tmp-toml-", dir=str(path.parent))
@@ -71,26 +72,40 @@ def save_toml(tree: FormTree, path: str | Path) -> None:
 def _build_document(data: dict[str, Any], schema: type[BaseModel]) -> Any:
     """Construct a tomlkit Document with description comments per key."""
     doc = document()
-    for field_name, value in data.items():
+    field_output_keys = {
+        _output_key_for_field(field_name, field_info)
+        for field_name, field_info in schema.model_fields.items()
+    }
+    for output_key, value in data.items():
         if value is None:
             continue
-        if field_name in schema.model_fields:
+        if output_key in field_output_keys:
             continue
-        doc.add(field_name, value)
+        doc.add(output_key, value)
     for field_name, field_info in schema.model_fields.items():
-        if field_name not in data:
+        output_key = _output_key_for_field(field_name, field_info)
+        if output_key not in data:
             continue
-        value = data[field_name]
+        value = data[output_key]
         if value is None:
             continue
         nested_schema = _nested_schema_class(field_info)
         if isinstance(value, dict) and nested_schema is not None:
-            doc.add(field_name, _build_document(value, nested_schema))
+            doc.add(output_key, _build_document(value, nested_schema))
         else:
             if field_info.description:
                 doc.add(comment(field_info.description))
-            doc.add(field_name, value)
+            doc.add(output_key, value)
     return doc
+
+
+def _output_key_for_field(field_name: str, field_info: FieldInfo) -> str:
+    serialization_alias = getattr(field_info, "serialization_alias", None)
+    if isinstance(serialization_alias, str) and serialization_alias:
+        return serialization_alias
+    if isinstance(field_info.alias, str) and field_info.alias:
+        return field_info.alias
+    return field_name
 
 
 def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:

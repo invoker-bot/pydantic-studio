@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
 from tests.fixtures.schemas import Server, WithOptional
@@ -60,6 +61,25 @@ class TestLoadToml:
 
 
 class TestSaveToml:
+    def test_save_uses_field_aliases(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.toml import load_toml, save_toml
+
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        out = tmp_path / "alias.toml"
+        tree = build_form_tree(AliasConfig)
+        result = tree.set_value("api_key", "rotated")
+        assert result.ok is True
+
+        save_toml(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert "api-key" in content
+        assert "api_key" not in content
+        assert "rotated" in content
+        assert load_toml(out, AliasConfig).to_instance().api_key == "rotated"
+
     def test_save_creates_file_with_values(self, tmp_path: Path) -> None:
         from pydantic_studio.io.toml import save_toml
 
