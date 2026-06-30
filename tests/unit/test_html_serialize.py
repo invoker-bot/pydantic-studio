@@ -268,6 +268,18 @@ def test_dispatch_remove_item_pops_indexed_entry() -> None:
     assert values == ["a", "c"]
 
 
+def test_dispatch_remove_item_rejects_bool_index_without_mutating() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
+    result = dispatch_mutation(
+        tree, {"op": "remove_item", "path": "tags", "index": True}
+    )
+
+    assert result.ok is False
+    assert any("index must be an integer" in err for err in result.errors)
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["a", "b", "c"]
+
+
 def test_dispatch_move_item_reorders_sequence() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
     result = dispatch_mutation(
@@ -276,6 +288,18 @@ def test_dispatch_move_item_reorders_sequence() -> None:
     assert result.ok is True
     values = [it.value for it in tree.root.find("tags").items]
     assert values == ["b", "c", "a"]
+
+
+def test_dispatch_move_item_rejects_float_target_without_mutating() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
+    result = dispatch_mutation(
+        tree, {"op": "move_item", "path": "tags", "from": 0, "to": 1.9}
+    )
+
+    assert result.ok is False
+    assert any("to must be an integer" in err for err in result.errors)
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["a", "b", "c"]
 
 
 def test_dispatch_add_entry_appends_new_key() -> None:
@@ -342,6 +366,19 @@ def test_dispatch_select_variant_switches_to_indexed_branch() -> None:
     val = tree.root.find("value")
     assert val.selected_index == 1
     assert val.selected.kind == "string"
+
+
+def test_dispatch_select_variant_rejects_string_index_without_mutating() -> None:
+    tree = build_form_tree(_UnionHolder, existing={"value": 42})
+    result = dispatch_mutation(
+        tree, {"op": "select_variant", "path": "value", "variant_index": "1"}
+    )
+
+    assert result.ok is False
+    assert any("variant_index must be an integer" in err for err in result.errors)
+    val = tree.root.find("value")
+    assert val.selected_index == 0
+    assert val.selected.kind == "int"
 
 
 def test_dispatch_select_root_variant_switches_root_model() -> None:

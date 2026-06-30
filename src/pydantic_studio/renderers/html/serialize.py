@@ -225,6 +225,14 @@ def _required_string_arg(mutation: dict[str, Any], key: str) -> str:
     return value
 
 
+def _required_int_arg(mutation: dict[str, Any], key: str) -> int:
+    value = mutation[key]
+    if type(value) is not int:
+        msg = f"{key} must be an integer"
+        raise TypeError(msg)
+    return value
+
+
 def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
     """Apply one mutation from the JSON API onto the FormTree.
 
@@ -249,19 +257,27 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
         if op == "add_item":
             return tree.add_item(path)
         if op == "remove_item":
-            return tree.remove_item(path, int(mutation["index"]))
+            return tree.remove_item(path, _required_int_arg(mutation, "index"))
         if op == "move_item":
-            return tree.move_item(path, int(mutation["from"]), int(mutation["to"]))
+            return tree.move_item(
+                path,
+                _required_int_arg(mutation, "from"),
+                _required_int_arg(mutation, "to"),
+            )
         if op == "add_entry":
             return tree.add_entry(path, key=_required_string_arg(mutation, "key"))
         if op == "remove_entry":
-            return tree.remove_entry(path, int(mutation["index"]))
+            return tree.remove_entry(path, _required_int_arg(mutation, "index"))
         if op == "rename_key":
             return tree.rename_key(
-                path, int(mutation["index"]), _required_string_arg(mutation, "new_key")
+                path,
+                _required_int_arg(mutation, "index"),
+                _required_string_arg(mutation, "new_key"),
             )
         if op == "select_variant":
-            return tree.select_variant(path, int(mutation["variant_index"]))
+            return tree.select_variant(
+                path, _required_int_arg(mutation, "variant_index")
+            )
         if op == "select_root_variant":
             return tree.select_root_variant(
                 _required_string_arg(mutation, "variant_id")
