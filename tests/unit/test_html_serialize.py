@@ -33,6 +33,10 @@ class _Outer(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
 
 
+class _OptionalOuter(BaseModel):
+    primary: _Inner | None = None
+
+
 class _EmailVariant(BaseModel):
     kind: Literal["email"] = "email"
     address: str
@@ -110,7 +114,7 @@ def test_tree_to_json_returns_schema_name_and_root() -> None:
     assert field_kinds == {"name": "string", "workers": "int"}
 
 
-def test_tree_to_json_excludes_internal_formtree_and_group_fields() -> None:
+def test_tree_to_json_excludes_internal_formtree_fields_and_keeps_group_state() -> None:
     tree = build_form_tree(_Outer)
     # Seed a snapshot so we can verify it's stripped.
     tree.set_value("primary.host", "after")
@@ -121,8 +125,17 @@ def test_tree_to_json_excludes_internal_formtree_and_group_fields() -> None:
     assert "cursor" not in data
     assert "snapshot_limit" not in data
     assert "draft_path" not in data
-    assert "omitted" not in data["root"]
-    assert "omitted" not in data["root"]["fields"][0]
+    assert "omitted" in data["root"]
+    assert "omitted" in data["root"]["fields"][0]
+
+
+def test_tree_to_json_marks_omitted_optional_group() -> None:
+    tree = build_form_tree(_OptionalOuter)
+
+    data = tree_to_json(tree)
+
+    primary = next(f for f in data["root"]["fields"] if f["name"] == "primary")
+    assert primary["omitted"] is True
 
 
 def test_tree_to_json_includes_clean_history_state() -> None:
@@ -364,6 +377,24 @@ def test_dispatch_set_value_coerces_selected_union_scalar_value() -> None:
     assert result.ok is True
     union = tree.root.find("value")
     assert union.selected.value == 2
+
+
+def test_dispatch_set_value_null_clears_optional_group() -> None:
+    tree = build_form_tree(
+        _OptionalOuter,
+        existing={"primary": {"host": "db.internal", "port": 15432}},
+    )
+
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "primary", "value": None}
+    )
+
+    assert result.ok is True
+    assert tree.to_instance().primary is None
+    primary = tree.root.find("primary")
+    assert primary.omitted is True
+    assert primary.find("host").value is None
+    assert primary.find("port").value == 5432
 
 
 def test_dispatch_undo_restores_previous_state() -> None:

@@ -45,6 +45,49 @@ def test_existing_section_data_is_kept() -> None:
     assert inst.simulate == Section(a=3)
 
 
+def test_set_value_none_clears_existing_optional_model() -> None:
+    tree = build_form_tree(Host, existing={"simulate": {"a": 3, "b": "custom"}})
+
+    result = tree.set_value("simulate", None)
+
+    assert result.ok is True
+    simulate = tree.root.find("simulate")
+    assert simulate is not None
+    assert simulate.omitted is True
+    assert tree.to_instance().simulate is None
+
+    a = simulate.find("a")
+    b = simulate.find("b")
+    assert a is not None
+    assert b is not None
+    assert a.value == 1
+    assert b.value == "x"
+
+
+def test_set_value_none_clear_can_be_undone() -> None:
+    tree = build_form_tree(Host, existing={"simulate": {"a": 3, "b": "custom"}})
+
+    result = tree.set_value("simulate", None)
+    assert result.ok is True
+
+    assert tree.undo() is True
+    inst = tree.to_instance()
+    assert inst.simulate == Section(a=3, b="custom")
+    simulate = tree.root.find("simulate")
+    assert simulate is not None
+    assert simulate.omitted is False
+
+
+def test_set_value_none_on_omitted_optional_model_is_noop() -> None:
+    tree = build_form_tree(Host)
+
+    result = tree.set_value("simulate", None)
+
+    assert result.ok is True
+    assert tree.snapshots == []
+    assert tree.to_instance().simulate is None
+
+
 def test_default_factory_optional_model_keeps_prefill() -> None:
     class HostFactory(BaseModel):
         simulate: Section | None = Field(default_factory=Section)

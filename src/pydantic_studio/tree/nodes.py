@@ -1155,10 +1155,6 @@ class GroupNode(FormNode):
         ``Optional[Model]`` fields the user never touched, making fresh
         trees of such schemas unsaveable.
 
-        Known v0.1 limitation: users cannot save an Optional[T] field as
-        explicit None once the subtree has values — that requires v0.2's
-        explicit-null toggle.
-
         An *omitted* optional group short-circuits to ``None`` regardless
         of its children: their pre-filled schema defaults are presentation
         only until the user activates the group (see ``GroupNode.omitted``).
@@ -1554,6 +1550,22 @@ def _build_seeded_node(
         return None, _validation_error_messages(exc)
 
 
+def _reset_group_to_schema_defaults(group: GroupNode) -> None:
+    """Reset a group subtree to the same children produced for no existing value."""
+    from pydantic_studio.tree.builder import default_registry
+
+    registry = default_registry()
+    rebuilt: list[Any] = []
+    for name, field_info in group.schema_class.model_fields.items():
+        child_type = field_info.annotation or str
+        child_builder = registry.find(child_type)
+        child = child_builder.build(child_type, field_info, None)
+        child.name = name
+        rebuilt.append(child)
+    group.fields = rebuilt
+    group.error = None
+
+
 def _overlay_any_output_values(data: Any, node: Any, *, by_alias: bool) -> Any:
     if isinstance(node, AnyValueNode):
         return _json_safe_any_value(node.value)
@@ -1833,6 +1845,26 @@ class FormTree(BaseModel):
         # Resolve the terminal segment to a target node.
         last = path_obj.segments[-1]
         target = self._descend(node, last)
+        if isinstance(target, GroupNode):
+            if value is not None:
+                target.error = "group fields must be edited by descendant paths"
+                return ValidationResult.fail([target.error])
+            if target.required:
+                target.error = "value is required"
+                return ValidationResult.fail([target.error])
+            if target.omitted:
+                return ValidationResult.ok()
+
+            self._push_snapshot(_snap.take(self.root))
+            _reset_group_to_schema_defaults(target)
+            target.omitted = True
+            for group in walked_groups:
+                if group.omitted:
+                    group.omitted = False
+            if self.draft_path is not None:
+                _snap.draft_save(self, self.draft_path)
+            return ValidationResult.ok()
+
         write_target = target
         if isinstance(target, UnionNode):
             if target.selected is None:

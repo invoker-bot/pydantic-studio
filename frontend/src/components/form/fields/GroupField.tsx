@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 
+import { useApplyMutation } from "@/api/mutations";
 import type { GroupNodeData } from "@/api/schemas";
-import { hasErrorUnder, useFormFlags } from "@/components/form/errors";
+import {
+  hasErrorUnder,
+  hasReadonlyUnder,
+  useFormFlags,
+} from "@/components/form/errors";
 import { FormField } from "@/components/form/FormField";
 import { childPath } from "@/components/form/path";
+import { Button } from "@/components/ui/button";
 import { isUnsetSubtree } from "@/lib/required";
 import { shortTypeName } from "@/lib/typeName";
 
@@ -41,36 +48,59 @@ function NestedGroup({
   // inside.
   const [expanded, setExpanded] = useState(false);
   const flags = useFormFlags();
+  const mutation = useApplyMutation();
   const errored = hasErrorUnder(flags, path);
+  const readonlyStructure = hasReadonlyUnder(flags, path);
 
   useEffect(() => {
     if (errored) setExpanded(true);
   }, [errored]);
 
-  const unset = isUnsetSubtree(node);
+  const unset = node.omitted || isUnsetSubtree(node);
   const summary = unset
     ? "not set — expand to configure"
     : `${node.fields.length} ${node.fields.length === 1 ? "field" : "fields"}`;
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50/50">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100"
-        aria-expanded={expanded}
-      >
-        <span className="flex items-baseline gap-2">
-          <span className="text-xs font-mono uppercase text-zinc-500">group</span>
-          <span className="font-medium">{node.name}</span>
-          {node.schema_class && (
-            <span className="text-xs text-zinc-400">
-              {shortTypeName(node.schema_class)}
-            </span>
-          )}
-          <span className="text-xs text-zinc-400">{summary}</span>
-        </span>
-        <span className="text-zinc-400">{expanded ? "v" : ">"}</span>
-      </button>
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100"
+          aria-expanded={expanded}
+        >
+          <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-xs font-mono uppercase text-zinc-500">group</span>
+            <span className="font-medium">{node.name}</span>
+            {node.schema_class && (
+              <span className="text-xs text-zinc-400">
+                {shortTypeName(node.schema_class)}
+              </span>
+            )}
+            <span className="text-xs text-zinc-400">{summary}</span>
+          </span>
+          <span className="shrink-0 text-zinc-400">{expanded ? "v" : ">"}</span>
+        </button>
+        {!node.required && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="m-1 h-8 w-8 shrink-0 text-zinc-500 hover:text-red-700"
+            aria-label={`Clear ${node.name}`}
+            title={`Clear ${node.name}`}
+            disabled={unset || readonlyStructure || mutation.isPending}
+            onClick={() => {
+              mutation.mutate(
+                { op: "set_value", path, value: null },
+                { onSuccess: () => setExpanded(false) },
+              );
+            }}
+          >
+            <Trash2 aria-hidden="true" />
+          </Button>
+        )}
+      </div>
       {expanded && (
         <div className="space-y-4 border-t border-zinc-200 p-4 bg-white">
           {node.fields.map((child) => (

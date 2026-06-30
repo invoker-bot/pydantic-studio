@@ -18,7 +18,10 @@ import type {
 export function isUnsetSubtree(node: FormNodeData): boolean {
   switch (node.kind) {
     case "group":
-      return (node as GroupNodeData).fields.every(isUnsetSubtree);
+      return (
+        (node as GroupNodeData).omitted ||
+        (node as GroupNodeData).fields.every(isUnsetSubtree)
+      );
     case "sequence":
       return (node as SequenceNodeData).items.length === 0;
     case "mapping":

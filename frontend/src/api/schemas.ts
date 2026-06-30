@@ -204,6 +204,7 @@ export interface GroupNodeData {
   required: boolean;
   error: string | null;
   schema_class: string;
+  omitted: boolean;
   fields: FormNodeData[];
 }
 
@@ -211,6 +212,7 @@ export const GroupNodeSchema: z.ZodType<GroupNodeData> = z.lazy(() =>
   NodeBase.extend({
     kind: z.literal("group"),
     schema_class: z.string(),
+    omitted: z.boolean(),
     fields: z.array(FormNodeSchema),
   }),
 );

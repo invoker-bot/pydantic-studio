@@ -62,8 +62,6 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
 def _strip_node_internal_fields(value: Any) -> None:
     """Remove node implementation details from the JSON API payload."""
     if isinstance(value, dict):
-        if value.get("kind") == "group":
-            value.pop("omitted", None)
         for child in value.values():
             _strip_node_internal_fields(child)
     elif isinstance(value, list):
