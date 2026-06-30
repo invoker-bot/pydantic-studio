@@ -290,6 +290,27 @@ def test_dispatch_set_value_requires_path_without_mutating() -> None:
     assert tree.root.find("name").value == "alpha"
 
 
+def test_dispatch_undo_restores_previous_state() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
+    dispatch_mutation(tree, {"op": "set_value", "path": "name", "value": "beta"})
+
+    result = dispatch_mutation(tree, {"op": "undo"})
+
+    assert result.ok is True
+    assert tree.root.find("name").value == "alpha"
+
+
+def test_dispatch_redo_restores_undone_state() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 4})
+    dispatch_mutation(tree, {"op": "set_value", "path": "name", "value": "beta"})
+    dispatch_mutation(tree, {"op": "undo"})
+
+    result = dispatch_mutation(tree, {"op": "redo"})
+
+    assert result.ok is True
+    assert tree.root.find("name").value == "beta"
+
+
 def test_dispatch_add_item_appends_to_sequence() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a"]})
     result = dispatch_mutation(tree, {"op": "add_item", "path": "tags"})

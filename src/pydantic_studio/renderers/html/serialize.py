@@ -364,6 +364,14 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
             value = _required_arg(mutation, "value")
             value = _maybe_coerce_typed_value(tree, path, value)
             return tree.set_value(path, value)
+        if op == "undo":
+            if tree.undo():
+                return ValidationResult.ok()
+            return ValidationResult.fail(["nothing to undo"])
+        if op == "redo":
+            if tree.redo():
+                return ValidationResult.ok()
+            return ValidationResult.fail(["nothing to redo"])
         if op == "add_item":
             path = _path_arg(mutation)
             if "value" in mutation:
