@@ -64,6 +64,23 @@ def test_submit_validation_failure_leaves_outcome_unset(tmp_path: Path) -> None:
     assert not out.exists()
 
 
+def test_submit_write_failure_leaves_outcome_unset(tmp_path: Path) -> None:
+    out = tmp_path / "config.yaml"
+    out.mkdir()
+    tree = build_form_tree(_ValidSchema)
+    session = EditSession(tree=tree, save_path=out)
+
+    result = session.submit()
+
+    assert result.ok is False
+    assert result.outcome is None
+    assert result.paths == ()
+    assert result.errors
+    assert "could not save" in result.errors[0]
+    assert session.outcome is None
+    assert session.done is False
+
+
 def test_cancel_sets_cancelled_and_is_idempotent() -> None:
     session = EditSession(tree=build_form_tree(_ValidSchema))
     first = session.cancel()

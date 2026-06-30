@@ -69,7 +69,13 @@ class EditSession:
 
         try:
             if self.save_path is not None:
-                save_yaml(self.tree, self.save_path)
+                try:
+                    save_yaml(self.tree, self.save_path)
+                except (OSError, ValueError) as exc:
+                    return SubmitResult(
+                        ok=False,
+                        errors=(f"could not save to {self.save_path}: {exc}",),
+                    )
             else:
                 self.tree.to_instance()
         except ValidationFailedError as exc:
