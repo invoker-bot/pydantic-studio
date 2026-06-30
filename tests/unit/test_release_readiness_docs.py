@@ -19,8 +19,8 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("985", "962 default"),
-        "CLAUDE.md": ("985", "962 default"),
+        "README.md": ("987", "964 default"),
+        "CLAUDE.md": ("987", "964 default"),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")

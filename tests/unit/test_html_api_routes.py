@@ -171,6 +171,20 @@ def test_api_tree_includes_readonly_paths() -> None:
     assert payload["readonly_paths"] == ["path"]
 
 
+def test_api_mutations_tree_includes_readonly_paths() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "workers", "value": 8},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tree"]["readonly_paths"] == ["name"]
+
+
 def test_run_html_app_signature_matches_run_app_contract() -> None:
     """run_html_app mirrors the TUI session contract: readonly_paths in,
     EditOutcome out — `hft config gen/edit --web` depends on it."""

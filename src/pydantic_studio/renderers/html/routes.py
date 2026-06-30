@@ -13,6 +13,14 @@ if TYPE_CHECKING:
     from pydantic_studio.renderers.html.server import StudioServer
 
 
+def _tree_payload(server: StudioServer) -> dict[str, object]:
+    from pydantic_studio.renderers.html.serialize import tree_to_json
+
+    payload = tree_to_json(server.tree)
+    payload["readonly_paths"] = sorted(server.readonly_paths)
+    return payload
+
+
 def register(app: FastAPI, server: StudioServer) -> None:
     """Wire the SPA shell and JSON API routes onto the FastAPI app."""
 
@@ -22,15 +30,12 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     from pydantic_studio.renderers.html.serialize import (
         dispatch_mutation,
-        tree_to_json,
         validation_envelope,
     )
 
     @app.get("/api/tree", response_class=JSONResponse)
     async def api_tree() -> JSONResponse:
-        payload = tree_to_json(server.tree)
-        payload["readonly_paths"] = sorted(server.readonly_paths)
-        return JSONResponse(content=payload)
+        return JSONResponse(content=_tree_payload(server))
 
     @app.post("/api/mutations", response_class=JSONResponse)
     async def api_mutations(request: Request) -> JSONResponse:
@@ -61,7 +66,7 @@ def register(app: FastAPI, server: StudioServer) -> None:
             }
         return JSONResponse(
             content={
-                "tree": tree_to_json(server.tree),
+                "tree": _tree_payload(server),
                 "validation": validation,
                 "mutation_result": {"ok": result.ok, "errors": list(result.errors)},
             }

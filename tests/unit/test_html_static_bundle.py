@@ -138,3 +138,12 @@ def test_frontend_tree_schema_rejects_extra_top_level_fields() -> None:
     assert "FormTreeSchema" in schema
     assert ".passthrough()" not in schema
     assert "tolerate extra top-level fields" not in schema
+
+
+def test_frontend_tree_schema_requires_readonly_paths() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+
+    assert "readonly_paths: z.array(z.string())," in schema
+    assert "readonly_paths: z.array(z.string()).default([])" not in schema
