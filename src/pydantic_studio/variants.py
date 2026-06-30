@@ -105,9 +105,9 @@ def build_variant_form_tree(
     from pydantic_studio.tree.builder import build_form_tree
 
     selected = selected_id
+    existing_selected: str | None = None
     if (
-        selected is None
-        and persistence == "inline_discriminator"
+        persistence == "inline_discriminator"
         and discriminator is not None
         and existing
     ):
@@ -119,7 +119,15 @@ def build_variant_form_tree(
                     f"got {type(raw_selected).__name__}"
                 )
                 raise ValueError(msg)
-            selected = raw_selected
+            existing_selected = raw_selected
+    if selected is None:
+        selected = existing_selected
+    elif existing_selected is not None and existing_selected != selected:
+        msg = (
+            f"selected variant {selected!r} conflicts with inline discriminator "
+            f"{discriminator!r} value {existing_selected!r}"
+        )
+        raise ValueError(msg)
     selected = selected or variants.default_id
     spec = variants.get(selected)
     tree = build_form_tree(spec.model, existing=existing)

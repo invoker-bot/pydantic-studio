@@ -89,6 +89,17 @@ def test_build_variant_form_tree_reads_inline_discriminator_from_existing() -> N
     assert tree.to_output_python() == {"class_name": "slack", "channel": "#alerts"}
 
 
+def test_build_variant_form_tree_rejects_selected_id_conflicting_with_existing() -> None:
+    with pytest.raises(ValueError, match="conflicts with inline discriminator"):
+        build_variant_form_tree(
+            _registry(),
+            selected_id="email",
+            existing={"class_name": "slack", "channel": "#alerts"},
+            discriminator="class_name",
+            persistence="inline_discriminator",
+        )
+
+
 def test_select_root_variant_rebuilds_schema_and_root() -> None:
     tree = build_variant_form_tree(_registry(), selected_id="email")
 
