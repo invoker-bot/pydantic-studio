@@ -31,6 +31,14 @@ def _tree_payload(server: StudioServer) -> dict[str, object]:
     from pydantic_studio.renderers.html.serialize import tree_to_json
 
     payload = tree_to_json(server.tree)
+    history = payload["history"]
+    if isinstance(history, dict):
+        history["can_undo"] = bool(history["can_undo"]) and (
+            _readonly_history_error(server, "undo") is None
+        )
+        history["can_redo"] = bool(history["can_redo"]) and (
+            _readonly_history_error(server, "redo") is None
+        )
     payload["readonly_paths"] = sorted(server.readonly_paths)
     return payload
 

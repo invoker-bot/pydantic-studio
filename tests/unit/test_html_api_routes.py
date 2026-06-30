@@ -322,6 +322,29 @@ def test_api_tree_includes_readonly_paths() -> None:
     assert payload["readonly_paths"] == ["path"]
 
 
+def test_api_tree_disables_readonly_undo_when_next_snapshot_changes_readonly_path() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    assert tree.set_value("name", "beta").ok is True
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    payload = client.get("/api/tree").json()
+
+    assert payload["history"] == {"can_undo": False, "can_redo": False}
+
+
+def test_api_tree_disables_readonly_redo_when_next_snapshot_changes_readonly_path() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    assert tree.set_value("name", "beta").ok is True
+    assert tree.undo() is True
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    payload = client.get("/api/tree").json()
+
+    assert payload["history"] == {"can_undo": False, "can_redo": False}
+
+
 def test_api_mutations_tree_includes_readonly_paths() -> None:
     tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
     server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
@@ -436,7 +459,7 @@ def test_api_mutations_reject_readonly_undo_without_mutating() -> None:
     assert server.tree.root.find("name").value == "beta"
     name_field = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "name")
     assert name_field["value"] == "beta"
-    assert body["tree"]["history"] == {"can_undo": True, "can_redo": False}
+    assert body["tree"]["history"] == {"can_undo": False, "can_redo": False}
 
 
 def test_api_mutations_reject_readonly_redo_without_mutating() -> None:
@@ -457,7 +480,7 @@ def test_api_mutations_reject_readonly_redo_without_mutating() -> None:
     assert server.tree.root.find("name").value == "alpha"
     name_field = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "name")
     assert name_field["value"] == "alpha"
-    assert body["tree"]["history"] == {"can_undo": False, "can_redo": True}
+    assert body["tree"]["history"] == {"can_undo": False, "can_redo": False}
 
 
 def test_api_mutations_allows_readonly_undo_when_path_is_unchanged() -> None:
