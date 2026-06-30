@@ -15,7 +15,10 @@ from pydantic import BaseModel, Field
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.textual_ import StudioApp
 from pydantic_studio.renderers.textual_.widgets.cells import Cell
-from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
+from pydantic_studio.renderers.textual_.widgets.field_list import (
+    FieldListView,
+    is_readonly_path,
+)
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 from pydantic_studio.renderers.textual_.widgets.help_bar import HelpBar
 
@@ -34,6 +37,15 @@ class _Profile(BaseModel):
 class _NestedSchema(BaseModel):
     profile: _Profile = Field(default_factory=_Profile)
     name: str = "outer"
+
+
+class _TagsSchema(BaseModel):
+    tags: list[str] = ["locked", "free"]
+    name: str = "outer"
+
+
+def test_bracket_and_dotted_readonly_paths_overlap() -> None:
+    assert is_readonly_path("tags.0", frozenset({"tags[0]"})) is True
 
 
 @pytest.mark.asyncio
@@ -87,6 +99,27 @@ async def test_readonly_parent_marks_descendant_rows_after_drilldown() -> None:
         await pilot.pause()
         assert tree._resolve_path("profile.name").value == "alpha", (
             "typing must not reach a descendant of a read-only parent"
+        )
+
+
+@pytest.mark.asyncio
+async def test_readonly_bracket_path_marks_dotted_descendant_row_after_drilldown() -> None:
+    tree = build_form_tree(_TagsSchema)
+    app = StudioApp(tree=tree, save_path=None, readonly_paths={"tags[0]"})
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        row = app.screen.query(FieldRow).first()
+        assert row.path == "tags.0"
+        assert "🔒" in row.label_text
+        assert row.query_one(Cell).disabled is True
+        for ch in "junk":
+            await pilot.press(ch)
+        await pilot.pause()
+        assert tree._resolve_path("tags.0").value == "locked", (
+            "typing must not reach a bracket-form read-only item"
         )
 
 

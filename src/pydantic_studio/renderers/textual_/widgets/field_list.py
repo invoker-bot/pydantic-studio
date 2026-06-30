@@ -19,6 +19,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow, RowClicked
+from pydantic_studio.tree.paths import paths_overlap
 
 if TYPE_CHECKING:
     from typing import ClassVar
@@ -81,12 +82,7 @@ class CursorMoved(Message):
 
 def is_readonly_path(path: str, readonly_paths: frozenset[str]) -> bool:
     """Return True when ``path`` overlaps a renderer read-only path."""
-    return any(
-        path == readonly
-        or path.startswith(f"{readonly}.")
-        or readonly.startswith(f"{path}.")
-        for readonly in readonly_paths
-    )
+    return any(paths_overlap(path, readonly) for readonly in readonly_paths)
 
 
 class FieldListView(VerticalScroll):

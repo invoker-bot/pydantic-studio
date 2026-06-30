@@ -114,3 +114,31 @@ class Path:
 
     def __str__(self) -> str:
         return self.render()
+
+
+def paths_overlap(left: str, right: str) -> bool:
+    """Return True when two path strings identify the same node or
+    ancestor/descendant nodes.
+
+    Both bracket indices (``tags[0]``) and dotted numeric indices
+    (``tags.0``) are parsed through ``Path`` before comparison so all
+    renderers enforce path-scoped behavior consistently.
+    """
+    left_segments = _path_segments(left)
+    right_segments = _path_segments(right)
+    if left_segments is not None and right_segments is not None:
+        if not left_segments or not right_segments:
+            return left_segments == right_segments
+        return (
+            left_segments == right_segments
+            or left_segments[: len(right_segments)] == right_segments
+            or right_segments[: len(left_segments)] == left_segments
+        )
+    return left == right or left.startswith(f"{right}.") or right.startswith(f"{left}.")
+
+
+def _path_segments(path: str) -> tuple[PathSegment, ...] | None:
+    try:
+        return Path.parse(path).segments
+    except ValueError:
+        return None
