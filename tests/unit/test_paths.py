@@ -96,6 +96,28 @@ def test_append_index():
     assert p.render() == "foo[3]"
 
 
+@pytest.mark.parametrize(
+    ("segments", "match"),
+    [
+        ((-1,), "negative index"),
+        ((True,), "boolean"),
+        (("",), "invalid field segment"),
+        (("foo.bar",), "invalid field segment"),
+        (("0",), "invalid field segment"),
+    ],
+)
+def test_path_constructor_rejects_invalid_segments(
+    segments: tuple[PathSegment, ...], match: str
+):
+    with pytest.raises(ValueError, match=match):
+        Path(segments)
+
+
+def test_append_rejects_invalid_segment():
+    with pytest.raises(ValueError, match="negative index"):
+        Path(("foo",)).append(-1)
+
+
 def test_path_is_hashable():
     """Paths are used as dict keys (e.g., per-field error map)."""
     d: dict[Path, str] = {}

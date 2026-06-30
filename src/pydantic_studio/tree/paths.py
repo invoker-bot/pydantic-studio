@@ -44,6 +44,20 @@ class Path:
 
     segments: tuple[PathSegment, ...] = ()
 
+    def __post_init__(self) -> None:
+        for segment in self.segments:
+            if isinstance(segment, bool):
+                msg = "boolean path segments are not valid indexes"
+                raise ValueError(msg)
+            if isinstance(segment, int):
+                if segment < 0:
+                    msg = f"negative index {segment} in path segments"
+                    raise ValueError(msg)
+                continue
+            if not _FIELD_RE.fullmatch(segment):
+                msg = f"invalid field segment {segment!r}"
+                raise ValueError(msg)
+
     @classmethod
     def parse(cls, raw: str) -> Path:
         if raw == "":
