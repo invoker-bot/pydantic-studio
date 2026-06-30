@@ -310,6 +310,33 @@ def test_verify_distribution_metadata_rejects_missing_wheel_structure_files(
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_wrong_wheel_compatibility_tag(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        wheel_metadata=(
+            "Wheel-Version: 1.0\n"
+            "Root-Is-Purelib: true\n"
+            "Tag: cp313-cp313-macosx_14_0_arm64\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"Tag"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path) -> None:
     verifier = _load_verifier()
     dist = tmp_path / "dist"

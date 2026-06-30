@@ -37,18 +37,29 @@ def _wheel_dist_info_files(
     return [name for name in names if name == expected]
 
 
+def _wheel_filename_tag(wheel: Path) -> str:
+    parts = wheel.name.removesuffix(".whl").split("-")
+    if len(parts) < 5:
+        raise RuntimeError(f"wheel filename does not include tag fields: {wheel}")
+    return "-".join(parts[-3:])
+
+
 def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
     with zipfile.ZipFile(wheel) as zf:
         names = set(zf.namelist())
-    missing_files = [
-        filename
-        for filename in ("WHEEL", "RECORD")
-        if f"{dist_info_dir}/{filename}" not in names
-    ]
-    if missing_files:
-        raise RuntimeError(
-            f"{wheel} missing wheel structure files in {dist_info_dir}: {missing_files!r}"
-        )
+        missing_files = [
+            filename
+            for filename in ("WHEEL", "RECORD")
+            if f"{dist_info_dir}/{filename}" not in names
+        ]
+        if missing_files:
+            raise RuntimeError(
+                f"{wheel} missing wheel structure files in {dist_info_dir}: {missing_files!r}"
+            )
+        wheel_metadata = zf.read(f"{dist_info_dir}/WHEEL").decode("utf-8")
+    expected_tag = f"Tag: {_wheel_filename_tag(wheel)}"
+    if expected_tag not in _metadata_headers(wheel_metadata):
+        raise RuntimeError(f"{wheel} missing wheel tag metadata: {[expected_tag]!r}")
 
 
 def _wheel_metadata(wheel: Path, *, dist_info_dir: str) -> str:
