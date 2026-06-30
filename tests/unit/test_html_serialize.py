@@ -367,6 +367,84 @@ def test_dispatch_set_value_coerces_nested_container_scalar_values() -> None:
     assert mapping_tree.root.find("weights").entries[0][1].value == 2
 
 
+def test_dispatch_set_value_coerces_group_replacement_fields() -> None:
+    tree = build_form_tree(_Outer, existing={"primary": {"host": "old.local"}})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "set_value",
+            "path": "primary",
+            "value": {"host": "db.local", "port": "15432"},
+        },
+    )
+
+    assert result.ok is True
+    primary = tree.root.find("primary")
+    assert primary.find("host").value == "db.local"
+    assert primary.find("port").value == 15432
+
+
+def test_dispatch_set_value_coerces_sequence_replacement_items() -> None:
+    tree = build_form_tree(_WithIntList, existing={"counts": [1]})
+
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "counts", "value": ["3", "4"]}
+    )
+
+    assert result.ok is True
+    counts = tree.root.find("counts")
+    assert [item.value for item in counts.items] == [3, 4]
+
+
+def test_dispatch_set_value_coerces_mapping_replacement_values() -> None:
+    tree = build_form_tree(_WithIntValueDict, existing={"weights": {"base": 1}})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "set_value",
+            "path": "weights",
+            "value": {"base": "2", "extra": "3"},
+        },
+    )
+
+    assert result.ok is True
+    weights = tree.root.find("weights")
+    assert [(key.value, value.value) for key, value in weights.entries] == [
+        ("base", 2),
+        ("extra", 3),
+    ]
+
+
+def test_dispatch_set_value_coerces_structured_union_replacement() -> None:
+    tree = build_form_tree(_StructuredUnionHolder, existing={"value": "seeded"})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "set_value",
+            "path": "value",
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert val.selected_index == 1
+    assert val.selected.kind == "group"
+    assert val.selected.find("count").value == 2
+    assert [item.value for item in val.selected.find("counts").items] == [3, 4]
+    assert [
+        (key.value, value.value)
+        for key, value in val.selected.find("ports").entries
+    ] == [(80, 8080)]
+
+
 def test_dispatch_set_value_coerces_selected_union_scalar_value() -> None:
     tree = build_form_tree(_UnionHolder, existing={"value": 1})
 

@@ -113,12 +113,16 @@ def _resolve(tree: FormTree, path: str) -> Any:
 
 
 def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
-    """Translate the wire-format string for a typed FormNode into the Python
-    typed value its ``validate_value`` expects.
+    """Translate wire-format values for a typed FormNode into the Python
+    values its builders and ``validate_value`` expect.
 
     Most primitive nodes accept the SPA's wire format directly. String
     representations for scalar keys and caller-supplied JSON API payloads
-    are coerced where the target node expects a concrete Python type.
+    are coerced where the target node expects a concrete Python type. Whole
+    structured replacements use the same recursive seed coercion as
+    ``select_variant(seed=...)`` so JSON payloads can replace groups,
+    sequences, mappings, and structured union variants without requiring
+    browser callers to pre-materialize Python-native values.
 
     The kinds that need coercion are those whose ``validate_value`` does
     an exact-type check that the JSON wire format can't satisfy
@@ -143,16 +147,57 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
       ``value.encode()``.
 
     Contract: returns ``value`` unchanged when no coercion applies, or
-    when coercion raises. The node's ``validate_value`` still runs on
-    whatever this returns, so a malformed wire string surfaces as the
-    canonical "invalid X" error.
+    when node lookup fails. The node's builder / ``validate_value`` still
+    runs on whatever this returns, so a malformed wire string surfaces as
+    the canonical validation error.
     """
-    if not isinstance(value, str):
-        return value
     try:
         node = _resolve(tree, path)
     except Exception:
         return value  # let set_value's own path-resolution fail clearly
+
+    return _maybe_coerce_set_value_for_node(tree, node, value)
+
+
+def _maybe_coerce_set_value_for_node(tree: FormTree, node: Any, value: Any) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import (
+        GroupNode,
+        MappingNode,
+        SequenceNode,
+        UnionNode,
+        _resolve_type_name,
+    )
+
+    if isinstance(node, UnionNode):
+        candidates: list[Any] = []
+        if node.selected is not None:
+            candidates.append(_maybe_coerce_wire_seed_for_node(node.selected, value))
+
+        registry = default_registry()
+        for type_name in node.variant_type_names:
+            try:
+                variant_type = _resolve_type_name(type_name)
+                variant_node = registry.find(variant_type).build(
+                    variant_type, FieldInfo(annotation=variant_type), None
+                )
+            except Exception:
+                continue
+            candidates.append(_maybe_coerce_wire_seed_for_node(variant_node, value))
+
+        for candidate in candidates:
+            result, _, _ = tree._build_union_variant_for_value(node, candidate)
+            if result.ok:
+                return candidate
+
+        if candidates:
+            return candidates[0]
+        return value
+
+    if isinstance(node, (GroupNode, SequenceNode, MappingNode)):
+        return _maybe_coerce_wire_seed_for_node(node, value)
 
     return _maybe_coerce_wire_value_for_node(node, value)
 
