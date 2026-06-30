@@ -82,6 +82,23 @@ def test_edit_console_failure_reports_clean_error(monkeypatch) -> None:
     assert "disk full" in result.output
 
 
+def test_edit_console_cancel_exits_without_failure_message(monkeypatch) -> None:
+    from pydantic_studio.exceptions import CancelledByUser
+
+    def fake_run(tree, save_path=None) -> None:
+        raise CancelledByUser()
+
+    import pydantic_studio.renderers.console as console_module
+
+    monkeypatch.setattr(console_module, "run_console_app", fake_run)
+
+    result = runner.invoke(app, ["edit", "tests.fixtures.schemas:Server"])
+
+    assert result.exit_code == 1
+    assert not isinstance(result.exception, CancelledByUser)
+    assert "edit failed" not in result.output.lower()
+
+
 def test_edit_tui_frontend_routes_to_studio_app(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

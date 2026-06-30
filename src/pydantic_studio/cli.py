@@ -357,7 +357,7 @@ def edit(
 ) -> None:
     """Launch an editor for a Pydantic schema."""
     from pydantic_studio import build_form_tree
-    from pydantic_studio.exceptions import ValidationFailedError
+    from pydantic_studio.exceptions import CancelledByUser, ValidationFailedError
 
     schema = _load_schema(target)
     if file is not None and file.exists():
@@ -387,6 +387,8 @@ def edit(
                 err=True,
             )
             raise typer.Exit(code=2)
+    except CancelledByUser as e:
+        raise typer.Exit(code=1) from e
     except (OSError, ValueError, ValidationFailedError) as e:
         typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from e
