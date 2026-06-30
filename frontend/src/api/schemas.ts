@@ -11,14 +11,14 @@ export const VariantOptionSchema = z.object({
   label: z.string(),
   description: z.string().nullable(),
   model_type_name: z.string(),
-});
+}).strict();
 
 export const VariantStateSchema = z.object({
   options: z.array(VariantOptionSchema),
   selected_id: z.string(),
   discriminator: z.string().nullable(),
   persistence: z.enum(["metadata", "inline_discriminator"]),
-});
+}).strict();
 
 export type VariantStateData = z.infer<typeof VariantStateSchema>;
 

@@ -110,6 +110,14 @@ def test_frontend_variant_schema_matches_supported_persistence_modes() -> None:
     )
 
     assert 'z.enum(["metadata", "inline_discriminator"])' in schema
+    assert re.search(
+        r"export const VariantOptionSchema = z\.object\(\{\n(?P<body>(?:  .+\n)+)\}\)\.strict\(\);",
+        schema,
+    )
+    assert re.search(
+        r"export const VariantStateSchema = z\.object\(\{\n(?P<body>(?:  .+\n)+)\}\)\.strict\(\);",
+        schema,
+    )
     assert '"model_field"' not in schema
     assert "model_field" not in bundled_js
 
