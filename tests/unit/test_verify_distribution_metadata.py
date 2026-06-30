@@ -62,6 +62,14 @@ def _write_pyproject(
 name = "pydantic-studio"
 version = "0.4.0"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["config", "editor", "fastapi", "pydantic", "textual"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Typing :: Typed",
+]
 
 [project.urls]
 Source = "https://example.invalid/pydantic-studio"
@@ -83,6 +91,12 @@ def _metadata(*, omit: str | None = None) -> str:
         ("Name", "pydantic-studio"),
         ("Version", "0.4.0"),
         ("Requires-Python", ">=3.11"),
+        ("Keywords", "config,editor,fastapi,pydantic,textual"),
+        ("License-Expression", "MIT"),
+        ("License-File", "LICENSE"),
+        ("Classifier", "Development Status :: 3 - Alpha"),
+        ("Classifier", "License :: OSI Approved :: MIT License"),
+        ("Classifier", "Typing :: Typed"),
         ("Source", "https://example.invalid/pydantic-studio"),
         ("Documentation", "https://example.invalid/docs"),
         ("Issues", "https://example.invalid/issues"),
@@ -92,7 +106,16 @@ def _metadata(*, omit: str | None = None) -> str:
     ]
     return "\n".join(
         f"{label}: {url}"
-        if label in {"Name", "Version", "Requires-Python"}
+        if label
+        in {
+            "Name",
+            "Version",
+            "Requires-Python",
+            "Keywords",
+            "License-Expression",
+            "License-File",
+            "Classifier",
+        }
         else f"Project-URL: {label}, {url}"
         for label, url in lines
         if label != omit
@@ -252,4 +275,38 @@ def test_verify_distribution_metadata_rejects_requires_python_metadata_drift(
     )
 
     with pytest.raises(RuntimeError, match=r"Requires-Python"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "missing_line",
+    [
+        "Keywords: config,editor,fastapi,pydantic,textual",
+        "Classifier: Typing :: Typed",
+        "License-Expression: MIT",
+        "License-File: LICENSE",
+    ],
+)
+@pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
+def test_verify_distribution_metadata_rejects_registry_metadata_drift(
+    tmp_path: Path,
+    missing_line: str,
+    drifted_file: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    expected_metadata = _metadata()
+    drifted_metadata = "\n".join(
+        line for line in expected_metadata.splitlines() if line != missing_line
+    )
+    _write_wheel(dist, drifted_metadata if drifted_file == "wheel" else expected_metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=drifted_metadata if drifted_file == "sdist" else expected_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=missing_line.split(":", 1)[0]):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)

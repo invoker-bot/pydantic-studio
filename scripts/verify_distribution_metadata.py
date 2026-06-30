@@ -96,6 +96,31 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     return tuple(f"{metadata_name}: {project[field]}" for field, metadata_name in fields)
 
 
+def _string_sequence(table: dict[str, object], key: str, path: str) -> tuple[str, ...]:
+    value = table.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise RuntimeError(f"pyproject.toml {path} must be strings")
+    return tuple(value)
+
+
+def _project_registry_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
+    project = _table(pyproject, "project", "project")
+    license_expression = project.get("license")
+    if not isinstance(license_expression, str):
+        raise RuntimeError("pyproject.toml project license must be a string")
+
+    keywords = _string_sequence(project, "keywords", "[project] keywords")
+    classifiers = _string_sequence(project, "classifiers", "[project] classifiers")
+    license_files = _string_sequence(project, "license-files", "[project] license-files")
+
+    return (
+        f"Keywords: {','.join(keywords)}",
+        f"License-Expression: {license_expression}",
+        *(f"License-File: {filename}" for filename in license_files),
+        *(f"Classifier: {classifier}" for classifier in classifiers),
+    )
+
+
 def _source_include(pyproject: dict[str, object]) -> tuple[str, ...]:
     tool = _table(pyproject, "tool", "tool")
     uv = _table(tool, "uv", "tool.uv")
@@ -152,6 +177,14 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     if missing_urls:
         raise RuntimeError(f"{wheel} missing project URL metadata: {missing_urls!r}")
 
+    missing_registry_metadata = [
+        line for line in _project_registry_metadata(pyproject) if line not in metadata
+    ]
+    if missing_registry_metadata:
+        raise RuntimeError(
+            f"{wheel} missing registry metadata: {missing_registry_metadata!r}"
+        )
+
     sdist_metadata = _sdist_metadata(sdist)
     missing_sdist_identity = [
         line for line in _project_identity(pyproject) if line not in sdist_metadata
@@ -164,6 +197,14 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     ]
     if missing_sdist_urls:
         raise RuntimeError(f"{sdist} missing project URL metadata: {missing_sdist_urls!r}")
+
+    missing_sdist_registry_metadata = [
+        line for line in _project_registry_metadata(pyproject) if line not in sdist_metadata
+    ]
+    if missing_sdist_registry_metadata:
+        raise RuntimeError(
+            f"{sdist} missing registry metadata: {missing_sdist_registry_metadata!r}"
+        )
 
     names = _sdist_names(sdist)
     missing_files = [
