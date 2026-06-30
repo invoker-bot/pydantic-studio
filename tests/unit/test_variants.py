@@ -19,6 +19,10 @@ class SlackSettings(BaseModel):
     channel: str = "#ops"
 
 
+class PortSettings(BaseModel):
+    port: int = 443
+
+
 class CollidingDiscriminatorSettings(BaseModel):
     class_name: str = "model-field"
 
@@ -127,6 +131,27 @@ def test_select_root_variant_rejects_unknown_id_without_mutating() -> None:
     assert tree.schema_class is EmailSettings
     assert tree.variant is not None
     assert tree.variant.selected_id == "email"
+
+
+def test_select_root_variant_rejects_invalid_seed_without_mutating() -> None:
+    registry = VariantRegistry(
+        [
+            VariantSpec(id="email", model=EmailSettings, label="Email"),
+            VariantSpec(id="port", model=PortSettings, label="Port"),
+        ]
+    )
+    tree = build_variant_form_tree(registry, selected_id="email")
+
+    result = tree.select_root_variant("port", seed={"port": "not-an-int"})
+
+    assert result.ok is False
+    assert any("expected int" in error for error in result.errors)
+    assert tree.schema_class is EmailSettings
+    assert tree.variant is not None
+    assert tree.variant.selected_id == "email"
+    assert tree.root.find("address") is not None
+    assert tree.root.find("port") is None
+    assert tree.snapshots == []
 
 
 def test_save_yaml_includes_inline_discriminator(tmp_path) -> None:

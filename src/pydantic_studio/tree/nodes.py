@@ -1292,6 +1292,72 @@ def _reject_duplicate_mapping_json_keys(node: MappingNode) -> None:
         seen.add(json_key)
 
 
+def _validation_error_messages(exc: Exception) -> list[str]:
+    errors = getattr(exc, "errors", None)
+    if callable(errors):
+        raw_errors = cast("list[dict[str, Any]]", errors())
+        messages = [
+            str(err.get("msg", err))
+            for err in raw_errors
+            if isinstance(err, dict)
+        ]
+        if messages:
+            return messages
+    return [str(exc)]
+
+
+def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
+    if seed is None:
+        return []
+    if isinstance(node, GroupNode):
+        from pydantic_studio.types.aliases import input_value_for_field
+
+        if isinstance(seed, BaseModel):
+            data = seed.model_dump(mode="python")
+        elif isinstance(seed, dict):
+            data = seed
+        else:
+            return []
+        errors: list[str] = []
+        for child in node.fields:
+            field_info = node.schema_class.model_fields.get(child.name)
+            if field_info is None:
+                continue
+            value = input_value_for_field(data, child.name, field_info)
+            if value is None:
+                continue
+            for message in _validate_seed_against_node(child, value):
+                errors.append(f"{child.name}: {message}")
+        return errors
+    if isinstance(node, UnionNode) and node.selected is not None:
+        return _validate_seed_against_node(node.selected, seed)
+    validate_value = getattr(node, "validate_value", None)
+    if callable(validate_value):
+        return list(cast("tuple[str, ...]", validate_value(seed)))
+    return []
+
+
+def _build_seeded_node(
+    builder: Any,
+    type_: Any,
+    field_info: Any,
+    seed: Any,
+) -> tuple[Any | None, list[str]]:
+    from pydantic import ValidationError
+
+    try:
+        node = builder.build(type_, field_info, None)
+    except ValidationError as exc:
+        return None, _validation_error_messages(exc)
+    errors = _validate_seed_against_node(node, seed)
+    if errors:
+        return None, errors
+    try:
+        return builder.build(type_, field_info, seed), []
+    except ValidationError as exc:
+        return None, _validation_error_messages(exc)
+
+
 def _overlay_any_output_values(data: Any, node: Any, *, by_alias: bool) -> Any:
     if isinstance(node, AnyValueNode):
         return _json_safe_any_value(node.value)
@@ -1499,7 +1565,11 @@ class FormTree(BaseModel):
 
         model = _resolve_type_name(option.model_type_name)
         builder = default_registry().find(model)
-        new_root = builder.build(model, FieldInfo(annotation=model), seed or {})
+        new_root, errors = _build_seeded_node(
+            builder, model, FieldInfo(annotation=model), seed or {}
+        )
+        if errors:
+            return ValidationResult.fail(errors)
         if not isinstance(new_root, GroupNode):
             return ValidationResult.fail(
                 [f"variant {variant_id!r} did not build a group root"]
@@ -1911,7 +1981,15 @@ class FormTree(BaseModel):
             )
         v_type = _resolve_type_name(union.variant_type_names[variant_index])
         builder = default_registry().find(v_type)
-        new_selected = builder.build(v_type, FieldInfo(annotation=v_type), seed)
+        new_selected, errors = _build_seeded_node(
+            builder, v_type, FieldInfo(annotation=v_type), seed
+        )
+        if errors:
+            return ValidationResult.fail(errors)
+        if new_selected is None:
+            return ValidationResult.fail(
+                [f"variant {variant_index!r} did not build a selected node"]
+            )
         self._push_snapshot(_snap.take(self.root))
         union.selected_index = variant_index
         union.selected = new_selected

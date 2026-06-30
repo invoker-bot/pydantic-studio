@@ -122,6 +122,21 @@ def test_select_variant_with_seed_value() -> None:
     assert val.selected.value == "seeded"
 
 
+def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
+    tree = build_form_tree(WithUnion, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 0, seed="not-an-int")
+
+    assert result.ok is False
+    assert any("expected int" in error for error in result.errors)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
 def test_discriminated_union_in_list_preserves_inner_field_values() -> None:
     """Regression: ``UnionBuilder._preselect`` validates a dict seed into
     a BaseModel instance and passes that instance to the inner builder.
