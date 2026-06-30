@@ -213,7 +213,18 @@ class IntNode(FormNode):
         # Reject bool explicitly even though it is an int subclass.
         if isinstance(value, bool) or not isinstance(value, int):
             return (f"expected int, got {type(value).__name__}",)
-        return ()
+        errors: list[str] = []
+        if self.ge is not None and value < self.ge:
+            errors.append(f"must be >= {self.ge}")
+        if self.le is not None and value > self.le:
+            errors.append(f"must be <= {self.le}")
+        if self.gt is not None and value <= self.gt:
+            errors.append(f"must be > {self.gt}")
+        if self.lt is not None and value >= self.lt:
+            errors.append(f"must be < {self.lt}")
+        if self.multiple_of is not None and value % self.multiple_of != 0:
+            errors.append(f"must be a multiple of {self.multiple_of}")
+        return tuple(errors)
 
     def to_python(self) -> int | None:
         return self.value

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
@@ -11,6 +12,14 @@ from pydantic_studio.tree.validation import ValidationResult
 class Schema(BaseModel):
     name: str = Field(min_length=3)
     age: int = Field(ge=0)
+
+
+class ConstrainedIntSchema(BaseModel):
+    at_least: int = Field(default=2, ge=1)
+    at_most: int = Field(default=2, le=8)
+    above: int = Field(default=2, gt=0)
+    below: int = Field(default=2, lt=10)
+    even: int = Field(default=2, multiple_of=2)
 
 
 def test_set_valid_value_returns_ok() -> None:
@@ -55,3 +64,29 @@ def test_undo_after_invalid_then_valid_does_not_crash() -> None:
     name_node = tree.root.find("name")
     assert name_node is not None
     assert name_node.value == "Alice"
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        ("at_least", 0, "must be >= 1"),
+        ("at_most", 9, "must be <= 8"),
+        ("above", 0, "must be > 0"),
+        ("below", 10, "must be < 10"),
+        ("even", 1, "must be a multiple of 2"),
+    ],
+)
+def test_set_int_value_rejects_constraint_violations_without_mutating(
+    path: str, value: int, message: str
+) -> None:
+    tree = build_form_tree(ConstrainedIntSchema)
+    node = tree.root.find(path)
+    assert node is not None
+    assert node.value == 2
+
+    result = tree.set_value(path, value)
+
+    assert result.ok is False
+    assert result.errors == (message,)
+    assert node.value == 2
+    assert node.error == message
