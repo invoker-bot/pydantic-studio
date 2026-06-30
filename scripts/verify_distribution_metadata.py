@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import tarfile
 import tomllib
 import zipfile
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 SUPPORT_PROJECT_URL_LABELS = ("Changelog", "Security", "Contributing")
+REQUIREMENT_NAME_RE = re.compile(r"^([A-Za-z0-9_.-]+)(.*)$")
 
 
 def _single_file(dist_dir: Path, pattern: str) -> Path:
@@ -121,6 +123,40 @@ def _project_registry_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
     )
 
 
+def _normalize_requirement(requirement: str) -> str:
+    match = REQUIREMENT_NAME_RE.match(requirement)
+    if match is None:
+        raise RuntimeError(f"pyproject.toml dependency is not a valid requirement: {requirement!r}")
+    name, suffix = match.groups()
+    normalized_name = re.sub(r"[-_.]+", "-", name).lower()
+    return f"{normalized_name}{suffix}"
+
+
+def _project_dependency_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
+    project = _table(pyproject, "project", "project")
+    dependencies = _string_sequence(project, "dependencies", "[project] dependencies")
+    optional_dependencies = project.get("optional-dependencies", {})
+    if not isinstance(optional_dependencies, dict):
+        raise RuntimeError("pyproject.toml [project.optional-dependencies] must be a table")
+
+    expected = [
+        f"Requires-Dist: {_normalize_requirement(dependency)}" for dependency in dependencies
+    ]
+    for extra in optional_dependencies:
+        if not isinstance(extra, str):
+            raise RuntimeError("pyproject.toml optional dependency names must be strings")
+        expected.append(f"Provides-Extra: {extra}")
+        for dependency in _string_sequence(
+            optional_dependencies,
+            extra,
+            f"[project.optional-dependencies] {extra}",
+        ):
+            expected.append(
+                f"Requires-Dist: {_normalize_requirement(dependency)} ; extra == '{extra}'"
+            )
+    return tuple(expected)
+
+
 def _source_include(pyproject: dict[str, object]) -> tuple[str, ...]:
     tool = _table(pyproject, "tool", "tool")
     uv = _table(tool, "uv", "tool.uv")
@@ -185,6 +221,12 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
             f"{wheel} missing registry metadata: {missing_registry_metadata!r}"
         )
 
+    missing_dependencies = [
+        line for line in _project_dependency_metadata(pyproject) if line not in metadata
+    ]
+    if missing_dependencies:
+        raise RuntimeError(f"{wheel} missing dependency metadata: {missing_dependencies!r}")
+
     sdist_metadata = _sdist_metadata(sdist)
     missing_sdist_identity = [
         line for line in _project_identity(pyproject) if line not in sdist_metadata
@@ -205,6 +247,12 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         raise RuntimeError(
             f"{sdist} missing registry metadata: {missing_sdist_registry_metadata!r}"
         )
+
+    missing_sdist_dependencies = [
+        line for line in _project_dependency_metadata(pyproject) if line not in sdist_metadata
+    ]
+    if missing_sdist_dependencies:
+        raise RuntimeError(f"{sdist} missing dependency metadata: {missing_sdist_dependencies!r}")
 
     names = _sdist_names(sdist)
     missing_files = [

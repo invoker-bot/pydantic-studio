@@ -70,6 +70,13 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Typing :: Typed",
 ]
+dependencies = [
+  "pydantic>=2.7",
+  "typer>=0.12",
+]
+
+[project.optional-dependencies]
+email = ["email-validator>=2"]
 
 [project.urls]
 Source = "https://example.invalid/pydantic-studio"
@@ -97,6 +104,10 @@ def _metadata(*, omit: str | None = None) -> str:
         ("Classifier", "Development Status :: 3 - Alpha"),
         ("Classifier", "License :: OSI Approved :: MIT License"),
         ("Classifier", "Typing :: Typed"),
+        ("Requires-Dist", "pydantic>=2.7"),
+        ("Requires-Dist", "typer>=0.12"),
+        ("Requires-Dist", "email-validator>=2 ; extra == 'email'"),
+        ("Provides-Extra", "email"),
         ("Source", "https://example.invalid/pydantic-studio"),
         ("Documentation", "https://example.invalid/docs"),
         ("Issues", "https://example.invalid/issues"),
@@ -115,6 +126,8 @@ def _metadata(*, omit: str | None = None) -> str:
             "License-Expression",
             "License-File",
             "Classifier",
+            "Requires-Dist",
+            "Provides-Extra",
         }
         else f"Project-URL: {label}, {url}"
         for label, url in lines
@@ -289,6 +302,39 @@ def test_verify_distribution_metadata_rejects_requires_python_metadata_drift(
 )
 @pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
 def test_verify_distribution_metadata_rejects_registry_metadata_drift(
+    tmp_path: Path,
+    missing_line: str,
+    drifted_file: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    expected_metadata = _metadata()
+    drifted_metadata = "\n".join(
+        line for line in expected_metadata.splitlines() if line != missing_line
+    )
+    _write_wheel(dist, drifted_metadata if drifted_file == "wheel" else expected_metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=drifted_metadata if drifted_file == "sdist" else expected_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=missing_line.split(":", 1)[0]):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "missing_line",
+    [
+        "Requires-Dist: pydantic>=2.7",
+        "Requires-Dist: email-validator>=2 ; extra == 'email'",
+        "Provides-Extra: email",
+    ],
+)
+@pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
+def test_verify_distribution_metadata_rejects_dependency_metadata_drift(
     tmp_path: Path,
     missing_line: str,
     drifted_file: str,

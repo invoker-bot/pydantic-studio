@@ -8,11 +8,11 @@ one release artifact, and then publishes that artifact to PyPI and piesource.
 The artifact upload fails immediately if no distributions are present and
 retains that artifact for 30 days for release troubleshooting.
 The release metadata verifier checks the package Name, Version,
-Requires-Python, license files, classifiers, keywords, and every declared
-Project-URL in both the wheel `METADATA` and the sdist `PKG-INFO`, then
-confirms every explicit `source-include` entry is present in the source
-archive. The Changelog, Security, and Contributing URL targets must also be
-listed in `source-include`.
+Requires-Python, license files, classifiers, keywords, dependencies, optional
+extras, and every declared Project-URL in both the wheel `METADATA` and the
+sdist `PKG-INFO`, then confirms every explicit `source-include` entry is
+present in the source archive. The Changelog, Security, and Contributing URL
+targets must also be listed in `source-include`.
 The package metadata exposes Source, Documentation, Issues, Changelog,
 Security, and Contributing project URLs so registry pages have clear support,
 navigation, release history, vulnerability-reporting links, and contributor
