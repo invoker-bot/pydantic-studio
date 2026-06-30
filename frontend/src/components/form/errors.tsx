@@ -5,7 +5,12 @@
 
 import { createContext, useContext } from "react";
 
-import { pathsEqual, pathsOverlap } from "@/components/form/path";
+import {
+  normalizePath,
+  pathContains,
+  pathsEqual,
+  pathsOverlap,
+} from "@/components/form/path";
 
 export interface FormFlags {
   errorPaths: ReadonlySet<string>;
@@ -24,13 +29,17 @@ export function useFormFlags(): FormFlags {
 }
 
 export function hasErrorAt(flags: FormFlags, path: string): boolean {
-  return path !== "" && flags.errorPaths.has(path);
+  if (path === "") return false;
+  for (const p of flags.errorPaths) {
+    if (pathsEqual(path, p)) return true;
+  }
+  return false;
 }
 
 export function hasErrorUnder(flags: FormFlags, path: string): boolean {
   if (path === "") return flags.errorPaths.size > 0;
   for (const p of flags.errorPaths) {
-    if (p === path || p.startsWith(`${path}.`)) return true;
+    if (pathContains(path, p)) return true;
   }
   return false;
 }
@@ -59,7 +68,7 @@ export function fieldAnchorId(path: string): string {
  * ancestor anchor when the exact path isn't rendered (e.g. an error
  * deep inside a collapsed card that is still mounting). */
 export function scrollToField(path: string): void {
-  let candidate = path;
+  let candidate = normalizePath(path);
   while (candidate) {
     const el = document.getElementById(fieldAnchorId(candidate));
     if (el) {

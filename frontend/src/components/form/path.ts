@@ -33,3 +33,12 @@ export function pathsOverlap(left: string, right: string): boolean {
     normalizedRight.startsWith(`${normalizedLeft}.`)
   );
 }
+
+export function pathContains(parent: string, child: string): boolean {
+  const normalizedParent = normalizePath(parent);
+  const normalizedChild = normalizePath(child);
+  return (
+    normalizedParent === normalizedChild ||
+    normalizedChild.startsWith(`${normalizedParent}.`)
+  );
+}
