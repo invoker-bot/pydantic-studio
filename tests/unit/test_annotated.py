@@ -112,3 +112,13 @@ def test_fq_strips_annotated_for_round_trip() -> None:
     # Annotated wrapping a Literal still round-trips the parametrized Literal
     # (the strip composes with the Literal JSON encoding).
     assert _resolve_type_name(_fq(Annotated[Literal["x", "y"], Field()])) == Literal["x", "y"]
+
+
+def test_fq_round_trips_union_type_names() -> None:
+    from pydantic_studio.tree.nodes import _resolve_type_name
+    from pydantic_studio.types.utils import _fq
+
+    encoded = _fq(str | Inner)
+
+    assert encoded.startswith("typing.Union[")
+    assert _resolve_type_name(encoded) == str | Inner

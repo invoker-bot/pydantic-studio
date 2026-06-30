@@ -88,6 +88,22 @@ class _StructuredUnionHolder(BaseModel):
     value: str | _StructuredSeed
 
 
+class _WithStructuredSeedList(BaseModel):
+    items: list[_StructuredSeed] = Field(default_factory=list)
+
+
+class _WithStructuredSeedMap(BaseModel):
+    items: dict[str, _StructuredSeed] = Field(default_factory=dict)
+
+
+class _WithStructuredUnionList(BaseModel):
+    items: list[str | _StructuredSeed] = Field(default_factory=list)
+
+
+class _WithStructuredUnionMap(BaseModel):
+    items: dict[str, str | _StructuredSeed] = Field(default_factory=dict)
+
+
 class _AnyHolder(BaseModel):
     payload: Any = None
 
@@ -527,6 +543,59 @@ def test_dispatch_add_item_coerces_typed_value() -> None:
     assert values == [1, 2]
 
 
+def test_dispatch_add_item_coerces_structured_seed_value() -> None:
+    tree = build_form_tree(_WithStructuredSeedList)
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "add_item",
+            "path": "items",
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    item = tree.root.find("items").items[0]
+    assert item.find("count").value == 2
+    assert [nested.value for nested in item.find("counts").items] == [3, 4]
+    assert [(key.value, value.value) for key, value in item.find("ports").entries] == [
+        (80, 8080)
+    ]
+
+
+def test_dispatch_add_item_coerces_structured_union_seed_value() -> None:
+    tree = build_form_tree(_WithStructuredUnionList)
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "add_item",
+            "path": "items",
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    union = tree.root.find("items").items[0]
+    assert union.selected_index == 1
+    assert union.selected.kind == "group"
+    assert union.selected.find("count").value == 2
+    assert [nested.value for nested in union.selected.find("counts").items] == [3, 4]
+    assert [
+        (key.value, value.value)
+        for key, value in union.selected.find("ports").entries
+    ] == [(80, 8080)]
+
+
 def test_dispatch_insert_item_inserts_at_index() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a", "c"]})
 
@@ -549,6 +618,69 @@ def test_dispatch_insert_item_coerces_typed_value() -> None:
     assert result.ok is True
     values = [it.value for it in tree.root.find("counts").items]
     assert values == [1, 2, 3]
+
+
+def test_dispatch_insert_item_coerces_structured_seed_value() -> None:
+    tree = build_form_tree(
+        _WithStructuredSeedList,
+        existing={"items": [{"count": 1, "counts": [], "ports": {}}]},
+    )
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "insert_item",
+            "path": "items",
+            "index": 0,
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    items = tree.root.find("items").items
+    assert [item.find("count").value for item in items] == [2, 1]
+    assert [nested.value for nested in items[0].find("counts").items] == [3, 4]
+    assert [
+        (key.value, value.value)
+        for key, value in items[0].find("ports").entries
+    ] == [(80, 8080)]
+
+
+def test_dispatch_insert_item_coerces_structured_union_seed_value() -> None:
+    tree = build_form_tree(_WithStructuredUnionList, existing={"items": ["seeded"]})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "insert_item",
+            "path": "items",
+            "index": 0,
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    items = tree.root.find("items").items
+    assert items[0].selected_index == 1
+    assert items[0].selected.kind == "group"
+    assert items[0].selected.find("count").value == 2
+    assert [nested.value for nested in items[0].selected.find("counts").items] == [
+        3,
+        4,
+    ]
+    assert [
+        (key.value, value.value)
+        for key, value in items[0].selected.find("ports").entries
+    ] == [(80, 8080)]
+    assert items[1].selected.value == "seeded"
 
 
 def test_dispatch_remove_item_pops_indexed_entry() -> None:
@@ -639,6 +771,63 @@ def test_dispatch_add_entry_coerces_typed_value() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("weights").entries]
     assert pairs == [("base", 1), ("extra", 2)]
+
+
+def test_dispatch_add_entry_coerces_structured_seed_value() -> None:
+    tree = build_form_tree(_WithStructuredSeedMap)
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "add_entry",
+            "path": "items",
+            "key": "first",
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    key, value = tree.root.find("items").entries[0]
+    assert key.value == "first"
+    assert value.find("count").value == 2
+    assert [nested.value for nested in value.find("counts").items] == [3, 4]
+    assert [
+        (port.value, target.value) for port, target in value.find("ports").entries
+    ] == [(80, 8080)]
+
+
+def test_dispatch_add_entry_coerces_structured_union_seed_value() -> None:
+    tree = build_form_tree(_WithStructuredUnionMap)
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "add_entry",
+            "path": "items",
+            "key": "first",
+            "value": {
+                "count": "2",
+                "counts": ["3", "4"],
+                "ports": {"80": "8080"},
+            },
+        },
+    )
+
+    assert result.ok is True
+    key, union = tree.root.find("items").entries[0]
+    assert key.value == "first"
+    assert union.selected_index == 1
+    assert union.selected.kind == "group"
+    assert union.selected.find("count").value == 2
+    assert [nested.value for nested in union.selected.find("counts").items] == [3, 4]
+    assert [
+        (port.value, target.value)
+        for port, target in union.selected.find("ports").entries
+    ] == [(80, 8080)]
 
 
 def test_dispatch_add_entry_rejects_null_key_without_mutating() -> None:

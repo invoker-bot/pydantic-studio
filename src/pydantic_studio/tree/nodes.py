@@ -42,11 +42,26 @@ def _resolve_type_name(name: str) -> Any:
     """Look up a fully-qualified type name (``module.Qualname``).
 
     Handles ``builtins.str`` etc. specially so unit tests don't need to
-    import builtins. ``typing.Literal[...]`` is rebuilt from its JSON-encoded
-    arguments (the inverse of ``_fq``'s Literal encoding) so containers of
-    ``Literal`` restore the parametrized form instead of the choice-less bare
-    ``typing.Literal``. Raises ValueError on miss with a diagnostic message.
+    import builtins. ``typing.Union[...]`` and ``typing.Literal[...]`` are
+    rebuilt from their JSON-encoded arguments (the inverse of ``_fq``'s
+    structural encodings) so containers restore parametrized forms instead of
+    builder-less bare typing objects. Raises ValueError on miss with a
+    diagnostic message.
     """
+    if name.startswith("typing.Union[") and name.endswith("]"):
+        try:
+            type_names = json.loads(name[len("typing.Union") :])
+        except ValueError as exc:
+            msg = f"cannot reconstruct Union variants from {name!r}"
+            raise ValueError(msg) from exc
+        if not isinstance(type_names, list) or not type_names:
+            msg = f"cannot reconstruct Union variants from {name!r}"
+            raise ValueError(msg)
+        variants = [_resolve_type_name(type_name) for type_name in type_names]
+        result = variants[0]
+        for variant in variants[1:]:
+            result = result | variant
+        return result
     if name.startswith("typing.Literal[") and name.endswith("]"):
         try:
             choices = json.loads(name[len("typing.Literal") :])
