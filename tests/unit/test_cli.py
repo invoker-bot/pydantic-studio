@@ -25,6 +25,10 @@ class NonFiniteAnySchema(BaseModel):
     value: Any = float("nan")
 
 
+class RequiredAnySchema(BaseModel):
+    value: Any
+
+
 def test_cli_module_docstring_describes_current_command_surface() -> None:
     docstring = cli_module.__doc__ or ""
 
@@ -301,6 +305,36 @@ class TestFillFormats:
         assert result.exit_code == 0
         data = json.loads(out.read_text(encoding="utf-8"))
         assert data["name"] == "?"
+
+    def test_fill_json_writes_required_any_placeholders(self, tmp_path) -> None:
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.unit.test_cli:RequiredAnySchema", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(out.read_text(encoding="utf-8")) == {"value": "?"}
+
+    def test_fill_yaml_writes_required_any_placeholders(self, tmp_path) -> None:
+        out = tmp_path / "out.yaml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.unit.test_cli:RequiredAnySchema", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        assert yaml.load(out.read_text(encoding="utf-8")) == {"value": "?"}
+
+    def test_fill_toml_writes_required_any_placeholders(self, tmp_path) -> None:
+        out = tmp_path / "out.toml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.unit.test_cli:RequiredAnySchema", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        assert tomllib.loads(out.read_text(encoding="utf-8")) == {"value": "?"}
 
     def test_fill_json_rejects_non_finite_defaults(self, tmp_path) -> None:
         out = tmp_path / "out.json"
