@@ -1298,7 +1298,11 @@ class FormTree(BaseModel):
     def to_output_python(self, *, by_alias: bool = False) -> dict[str, Any]:
         """Materialize and dump tree values, including configured variant metadata."""
         instance = self.to_instance()
-        data = instance.model_dump(mode="json", by_alias=by_alias)
+        data = instance.model_dump(
+            mode="json",
+            by_alias=by_alias,
+            fallback=_json_safe_any_value,
+        )
         if (
             self.variant is not None
             and self.variant.persistence == "inline_discriminator"
