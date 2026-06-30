@@ -35,6 +35,7 @@ def _write_wheel(
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
     license_files: tuple[str, ...] = ("LICENSE",),
     package_init: str | None = "pydantic_studio/__init__.py",
+    package_init_content: str = "__version__ = '0.4.0'\n",
     cli_module: str | None = "pydantic_studio/cli.py",
     cli_module_content: str = "app = object()\n",
     typed_marker: str | None = "pydantic_studio/py.typed",
@@ -65,7 +66,7 @@ def _write_wheel(
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
         zf.writestr(metadata_name, metadata)
         if package_init is not None:
-            zf.writestr(package_init, "__version__ = '0.4.0'\n")
+            zf.writestr(package_init, package_init_content)
         if cli_module is not None:
             zf.writestr(cli_module, cli_module_content)
         if typed_marker is not None:
@@ -91,6 +92,7 @@ def _write_sdist(
     readme: str | None = "README.md",
     license_files: tuple[str, ...] = ("LICENSE",),
     package_init: str | None = "src/pydantic_studio/__init__.py",
+    package_init_content: str = "__version__ = '0.4.0'\n",
     cli_module: str | None = "src/pydantic_studio/cli.py",
     cli_module_content: str = "app = object()\n",
     typed_marker: str | None = "src/pydantic_studio/py.typed",
@@ -134,7 +136,7 @@ def _write_sdist(
         if package_init is not None:
             source = dist / package_init
             source.parent.mkdir(parents=True, exist_ok=True)
-            source.write_text("__version__ = '0.4.0'\n", encoding="utf-8")
+            source.write_text(package_init_content, encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{package_init}")
         if cli_module is not None:
             source = dist / cli_module
@@ -527,6 +529,25 @@ def test_verify_distribution_metadata_rejects_missing_wheel_package_init(
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_wheel_package_version_drift(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, package_init_content='__version__ = "9.9.9"\n')
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"__version__.*9\.9\.9"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_package_init_record_entry(
     tmp_path: Path,
 ) -> None:
@@ -887,6 +908,26 @@ def test_verify_distribution_metadata_rejects_missing_sdist_package_init(
     )
 
     with pytest.raises(RuntimeError, match=r"__init__\.py"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_sdist_package_version_drift(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        package_init_content='__version__ = "9.9.9"\n',
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"__version__.*9\.9\.9"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 

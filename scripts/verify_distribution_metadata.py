@@ -338,6 +338,14 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     )
 
 
+def _project_version(pyproject: dict[str, object]) -> str:
+    project = _table(pyproject, "project", "project")
+    version = project.get("version")
+    if not isinstance(version, str):
+        raise RuntimeError("pyproject.toml project version must be a string")
+    return version
+
+
 def _project_author_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
     project = _table(pyproject, "project", "project")
     authors = project.get("authors", [])
@@ -375,12 +383,7 @@ def _project_readme(pyproject: dict[str, object]) -> str | None:
 
 
 def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:
-    project = _table(pyproject, "project", "project")
-    version = project.get("version")
-    if not isinstance(version, str):
-        raise RuntimeError("pyproject.toml project name and version must be strings")
-
-    return f"{_project_package_root(pyproject)}-{version}.dist-info"
+    return f"{_project_package_root(pyproject)}-{_project_version(pyproject)}.dist-info"
 
 
 def _project_package_root(pyproject: dict[str, object]) -> str:
@@ -446,11 +449,15 @@ def _target_names(target: ast.expr) -> tuple[str, ...]:
     return ()
 
 
-def _module_top_level_names(source: str, *, filename: str) -> frozenset[str]:
+def _parse_python_module(source: str, *, filename: str) -> ast.Module:
     try:
-        module = ast.parse(source, filename=filename)
+        return ast.parse(source, filename=filename)
     except SyntaxError as exc:
         raise RuntimeError(f"{filename} is not valid Python: {exc.msg}") from exc
+
+
+def _module_top_level_names(source: str, *, filename: str) -> frozenset[str]:
+    module = _parse_python_module(source, filename=filename)
 
     names: set[str] = set()
     for node in module.body:
@@ -466,6 +473,42 @@ def _module_top_level_names(source: str, *, filename: str) -> frozenset[str]:
         elif isinstance(node, ast.ImportFrom):
             names.update(alias.asname or alias.name for alias in node.names if alias.name != "*")
     return frozenset(names)
+
+
+def _module_string_constants(source: str, *, filename: str) -> dict[str, str]:
+    module = _parse_python_module(source, filename=filename)
+    constants: dict[str, str] = {}
+    for node in module.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant):
+            if isinstance(node.value.value, str):
+                for target in node.targets:
+                    for name in _target_names(target):
+                        constants[name] = node.value.value
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            for name in _target_names(node.target):
+                constants[name] = node.value.value
+    return constants
+
+
+def _verify_package_version_constant(
+    pyproject: dict[str, object],
+    *,
+    read_source,
+    source_prefix: str = "",
+) -> None:
+    expected_version = _project_version(pyproject)
+    package_init = f"{source_prefix}{_project_package_root(pyproject)}/__init__.py"
+    constants = _module_string_constants(read_source(package_init), filename=package_init)
+    actual_version = constants.get("__version__")
+    if actual_version != expected_version:
+        raise RuntimeError(
+            f"{package_init} __version__ {actual_version!r} does not match "
+            f"pyproject.toml project version {expected_version!r}"
+        )
 
 
 def _verify_console_script_target_objects(
@@ -665,6 +708,11 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     if missing_dependencies:
         raise RuntimeError(f"{wheel} missing dependency metadata: {missing_dependencies!r}")
 
+    _verify_package_version_constant(
+        pyproject,
+        read_source=lambda filename: _wheel_text(wheel, filename),
+    )
+
     console_scripts = _project_console_scripts(pyproject)
     if console_scripts:
         entry_points = _wheel_entry_points(wheel, dist_info_dir=wheel_dist_info_dir)
@@ -724,6 +772,11 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     ]
     if missing_files:
         raise RuntimeError(f"{sdist} missing source files: {missing_files!r}")
+    _verify_package_version_constant(
+        pyproject,
+        read_source=lambda filename: _sdist_text(sdist, filename),
+        source_prefix=f"{sdist_root}/src/",
+    )
     _verify_console_script_target_objects(
         pyproject,
         read_source=lambda filename: _sdist_text(sdist, filename),

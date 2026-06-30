@@ -15,11 +15,13 @@ structure files, purelib flag, compatibility tag, declared license files,
 package `__init__.py`, `py.typed` marker, console script target modules and
 objects, packaged web static bundle files plus the assets referenced by
 `index.html`, `RECORD` entries, and console script entry points match
-`[project.scripts]`, then confirms `pyproject.toml`, the declared README file,
-the sdist package `__init__.py`, the sdist `py.typed` marker, the sdist console
-script target modules and objects, the sdist web static bundle files plus the
-assets referenced by `index.html`, and every explicit `source-include` entry are
-present in the source archive. The Changelog, Security, and Contributing URL
+`[project.scripts]`, verifies the wheel package `__version__` matches the
+project version, then confirms `pyproject.toml`, the declared README file,
+the sdist package `__init__.py`, the sdist package `__version__`, the sdist
+`py.typed` marker, the sdist console script target modules and objects, the
+sdist web static bundle files plus the assets referenced by `index.html`, and
+every explicit `source-include` entry are present in the source archive. The
+Changelog, Security, and Contributing URL
 targets must also be listed in `source-include`.
 The package metadata exposes Source, Documentation, Issues, Changelog,
 Security, and Contributing project URLs so registry pages have clear support,
