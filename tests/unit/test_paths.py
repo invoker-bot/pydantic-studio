@@ -68,7 +68,7 @@ def test_parse_rejects_index_followed_by_letter_at_start():
         Path.parse("[2]foo")
 
 
-@pytest.mark.parametrize("raw", [".name", "name.", "database..host"])
+@pytest.mark.parametrize("raw", [".name", "name.", "database..host", "items.[0]"])
 def test_parse_rejects_empty_dotted_segment(raw: str):
     with pytest.raises(ValueError, match="empty path segment"):
         Path.parse(raw)

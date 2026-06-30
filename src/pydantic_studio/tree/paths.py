@@ -78,7 +78,7 @@ class Path:
                     )
                     raise ValueError(msg)
             elif raw[i] == ".":
-                if i == 0 or i == n - 1 or raw[i + 1] == ".":
+                if i == 0 or i == n - 1 or raw[i + 1] in (".", "["):
                     msg = f"empty path segment in path {raw!r}"
                     raise ValueError(msg)
                 i += 1  # separator between two field-name segments
