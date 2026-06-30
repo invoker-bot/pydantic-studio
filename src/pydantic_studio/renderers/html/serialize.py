@@ -270,34 +270,40 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     """
     try:
         op = _op_arg(mutation)
-        path = _path_arg(mutation)
         if op == "set_value":
+            path = _path_arg(mutation)
             value = _required_arg(mutation, "value")
             value = _maybe_coerce_typed_value(tree, path, value)
             return tree.set_value(path, value)
         if op == "add_item":
-            return tree.add_item(path)
+            return tree.add_item(_path_arg(mutation))
         if op == "remove_item":
-            return tree.remove_item(path, _required_int_arg(mutation, "index"))
+            return tree.remove_item(
+                _path_arg(mutation), _required_int_arg(mutation, "index")
+            )
         if op == "move_item":
             return tree.move_item(
-                path,
+                _path_arg(mutation),
                 _required_int_arg(mutation, "from"),
                 _required_int_arg(mutation, "to"),
             )
         if op == "add_entry":
-            return tree.add_entry(path, key=_required_string_arg(mutation, "key"))
+            return tree.add_entry(
+                _path_arg(mutation), key=_required_string_arg(mutation, "key")
+            )
         if op == "remove_entry":
-            return tree.remove_entry(path, _required_int_arg(mutation, "index"))
+            return tree.remove_entry(
+                _path_arg(mutation), _required_int_arg(mutation, "index")
+            )
         if op == "rename_key":
             return tree.rename_key(
-                path,
+                _path_arg(mutation),
                 _required_int_arg(mutation, "index"),
                 _required_string_arg(mutation, "new_key"),
             )
         if op == "select_variant":
             return tree.select_variant(
-                path, _required_int_arg(mutation, "variant_index")
+                _path_arg(mutation), _required_int_arg(mutation, "variant_index")
             )
         if op == "select_root_variant":
             return tree.select_root_variant(

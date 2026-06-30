@@ -427,6 +427,26 @@ def test_dispatch_select_root_variant_switches_root_model() -> None:
     assert tree.root.find("channel") is not None
 
 
+def test_dispatch_select_root_variant_does_not_require_path() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail),
+                VariantSpec(id="slack", model=_VariantSlack),
+            ]
+        ),
+        selected_id="email",
+    )
+
+    result = dispatch_mutation(
+        tree, {"op": "select_root_variant", "variant_id": "slack", "path": None}
+    )
+
+    assert result.ok is True
+    assert tree.schema_class is _VariantSlack
+    assert tree.root.find("channel") is not None
+
+
 def test_dispatch_select_root_variant_rejects_null_id_without_mutating() -> None:
     tree = build_variant_form_tree(
         VariantRegistry(
