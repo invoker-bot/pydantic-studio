@@ -225,6 +225,7 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     return (
         *(f"{metadata_name}: {project[field]}" for field, metadata_name in fields),
         *_project_author_metadata(pyproject),
+        *_project_readme_metadata(pyproject),
     )
 
 
@@ -243,6 +244,18 @@ def _project_author_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
     if invalid:
         raise RuntimeError(f"pyproject.toml author names must be strings: {invalid!r}")
     return tuple(f"Author: {name}" for name in names)
+
+
+def _project_readme_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
+    project = _table(pyproject, "project", "project")
+    readme = project.get("readme")
+    if readme is None:
+        return ()
+    if not isinstance(readme, str):
+        raise RuntimeError("pyproject.toml project readme must be a string")
+    if Path(readme).suffix.lower() in {".md", ".markdown"}:
+        return ("Description-Content-Type: text/markdown",)
+    return ()
 
 
 def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:

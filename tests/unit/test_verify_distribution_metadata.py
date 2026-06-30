@@ -95,6 +95,7 @@ def _write_pyproject(
 name = "pydantic-studio"
 version = "0.4.0"
 description = "Interactive editor for Pydantic models"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -137,6 +138,7 @@ def _metadata(*, omit: str | None = None) -> str:
         ("Version", "0.4.0"),
         ("Summary", "Interactive editor for Pydantic models"),
         ("Author", "pydantic-studio contributors"),
+        ("Description-Content-Type", "text/markdown"),
         ("Requires-Python", ">=3.11"),
         ("Keywords", "config,editor,fastapi,pydantic,textual"),
         ("License-Expression", "MIT"),
@@ -163,6 +165,7 @@ def _metadata(*, omit: str | None = None) -> str:
             "Version",
             "Summary",
             "Author",
+            "Description-Content-Type",
             "Requires-Python",
             "Keywords",
             "License-Expression",
@@ -678,6 +681,31 @@ def test_verify_distribution_metadata_rejects_author_metadata_drift(
     )
 
     with pytest.raises(RuntimeError, match=r"Author"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
+def test_verify_distribution_metadata_rejects_description_content_type_drift(
+    tmp_path: Path,
+    drifted_file: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    expected_metadata = _metadata()
+    drifted_metadata = expected_metadata.replace(
+        "Description-Content-Type: text/markdown",
+        "Description-Content-Type: text/plain",
+    )
+    _write_wheel(dist, drifted_metadata if drifted_file == "wheel" else expected_metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=drifted_metadata if drifted_file == "sdist" else expected_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"Description-Content-Type"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
