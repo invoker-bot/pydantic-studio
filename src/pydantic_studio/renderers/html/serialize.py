@@ -242,11 +242,7 @@ def _required_int_arg(mutation: dict[str, Any], key: str) -> int:
 
 
 def _path_arg(mutation: dict[str, Any]) -> str:
-    value = mutation.get("path", "")
-    if not isinstance(value, str):
-        msg = "path must be a string"
-        raise TypeError(msg)
-    return value
+    return _required_string_arg(mutation, "path")
 
 
 def _op_arg(mutation: dict[str, Any]) -> str:
