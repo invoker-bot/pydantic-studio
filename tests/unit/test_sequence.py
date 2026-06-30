@@ -344,3 +344,59 @@ def test_remove_item_rejects_sequence_min_length_without_mutating() -> None:
     assert result.errors == ("length must be >= 1",)
     assert [cast("StringNode", item).value for item in tags.items] == ["a"]
     assert tree.snapshots == []
+
+
+def test_set_value_replaces_sequence_items_and_undoes() -> None:
+    tree = build_form_tree(WithList, existing={"tags": ["old"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+
+    result = tree.set_value("tags", ["red", "blue"])
+
+    assert result.ok is True
+    assert [cast("StringNode", item).value for item in tags.items] == ["red", "blue"]
+    assert [item.name for item in tags.items] == ["0", "1"]
+    assert tree.undo() is True
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    assert [cast("StringNode", item).value for item in tags.items] == ["old"]
+
+
+def test_set_value_rejects_invalid_sequence_item_without_mutating() -> None:
+    tree = build_form_tree(WithList, existing={"counts": [1, 2]})
+    counts = tree.root.find("counts")
+    assert isinstance(counts, SequenceNode)
+
+    result = tree.set_value("counts", ["not-an-int"])
+
+    assert result.ok is False
+    assert result.errors == ("[0]: expected int, got str",)
+    assert [cast("IntNode", item).value for item in counts.items] == [1, 2]
+    assert [item.name for item in counts.items] == ["0", "1"]
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_sequence_length_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedList, existing={"tags": ["a"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+
+    result = tree.set_value("tags", [])
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 1",)
+    assert [cast("StringNode", item).value for item in tags.items] == ["a"]
+    assert tree.snapshots == []
+
+
+def test_set_value_replaces_fixed_tuple_items() -> None:
+    tree = build_form_tree(WithFixedTuple)
+    rgb = tree.root.find("rgb")
+    assert isinstance(rgb, SequenceNode)
+
+    result = tree.set_value("rgb", (10, 20, 30))
+
+    assert result.ok is True
+    assert [cast("IntNode", item).value for item in rgb.items] == [10, 20, 30]
+    assert [item.name for item in rgb.items] == ["0", "1", "2"]
+    assert tree.to_instance().rgb == (10, 20, 30)

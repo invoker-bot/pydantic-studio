@@ -1022,9 +1022,11 @@ class SequenceNode(FormNode):
         return tuple(values)  # both "tuple" and "tuple_fixed"
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
-        # Whole-sequence replacement isn't a typical mutation; renderers
-        # use add_item / remove_item / move_item instead. Accept anything
-        # iterable for now and let the schema do the work at submit time.
+        if not isinstance(value, (list, tuple, set, frozenset)):
+            return (
+                "expected list/tuple/set for sequence value, got "
+                f"{type(value).__name__}",
+            )
         return ()
 
 
@@ -1872,10 +1874,33 @@ class FormTree(BaseModel):
             if target.selected is None:
                 return ValidationResult.fail(["union has no selected variant"])
             write_target = target.selected
-            if not isinstance(write_target, MappingNode) and not hasattr(write_target, "value"):
+            if (
+                not isinstance(write_target, (SequenceNode, MappingNode))
+                and not hasattr(write_target, "value")
+            ):
                 return ValidationResult.fail(
                     ["selected union variant is not directly editable"]
                 )
+
+        if isinstance(write_target, SequenceNode):
+            result, items = self._build_sequence_items(write_target, value)
+            if not result.ok:
+                message = result.errors[0] if result.errors else "invalid"
+                write_target.error = message
+                target.error = message
+                return result
+
+            self._push_snapshot(_snap.take(self.root))
+            write_target.items = items
+            write_target.error = None
+            for group in walked_groups:
+                if group.omitted:
+                    group.omitted = False
+            if isinstance(target, UnionNode):
+                target.error = None
+            if self.draft_path is not None:
+                _snap.draft_save(self, self.draft_path)
+            return ValidationResult.ok()
 
         if isinstance(write_target, MappingNode):
             result, entries = self._build_mapping_entries(write_target, value)
@@ -1990,6 +2015,78 @@ class FormTree(BaseModel):
         if errors:
             return ValidationResult.fail(errors)
         return ValidationResult.ok()
+
+    def _build_sequence_items(
+        self, seq: SequenceNode, value: Any
+    ) -> tuple[ValidationResult, list[AnyNode]]:
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree.builder import default_registry
+
+        errors = list(seq.validate_value(value))
+        if errors:
+            return ValidationResult.fail(errors), []
+
+        values = list(value)
+        length_result = self._validate_sequence_length(seq, len(values))
+        if not length_result.ok:
+            return length_result, []
+
+        if seq.origin == "tuple_fixed":
+            if seq.slot_type_names is None:
+                return ValidationResult.fail(["fixed tuple has no slot_type_names"]), []
+            item_type_names = seq.slot_type_names
+        else:
+            if seq.item_type_name is None:
+                return ValidationResult.fail(["sequence has no item_type_name"]), []
+            item_type_names = [seq.item_type_name] * len(values)
+
+        if len(item_type_names) != len(values):
+            return ValidationResult.fail(
+                [f"length must be exactly {len(item_type_names)}"]
+            ), []
+
+        reg = default_registry()
+        items: list[AnyNode] = []
+        for index, (item_type_name, raw_value) in enumerate(
+            zip(item_type_names, values, strict=True)
+        ):
+            item_type = _resolve_type_name(item_type_name)
+            item_field = FieldInfo(annotation=item_type)
+            item_builder = reg.find(item_type)
+            try:
+                probe = item_builder.build(item_type, item_field, None)
+            except ValidationError as exc:
+                errors.extend(
+                    f"[{index}]: {message}"
+                    for message in _validation_error_messages(exc)
+                )
+                continue
+
+            value_errors = _validate_seed_against_node(
+                probe,
+                raw_value,
+                none_is_absent=False,
+            )
+            if value_errors:
+                errors.extend(f"[{index}]: {message}" for message in value_errors)
+                continue
+
+            try:
+                child = item_builder.build(item_type, item_field, raw_value)
+            except ValidationError as exc:
+                errors.extend(
+                    f"[{index}]: {message}"
+                    for message in _validation_error_messages(exc)
+                )
+                continue
+
+            child.name = str(index)
+            items.append(child)
+
+        if errors:
+            return ValidationResult.fail(errors), []
+        return ValidationResult.ok(), items
 
     def add_item(self, path: str, value: Any = _UNSET_VALUE) -> ValidationResult:
         """Append a default child to the SequenceNode at ``path``."""
