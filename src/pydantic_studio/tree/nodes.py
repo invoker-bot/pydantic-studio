@@ -1394,6 +1394,19 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
             for message in _validate_seed_against_node(child, value):
                 errors.append(f"{child.name}: {message}")
         return errors
+    if isinstance(node, SequenceNode):
+        if not isinstance(seed, (list, tuple, set, frozenset)):
+            return [
+                "expected list/tuple/set for sequence value, got "
+                f"{type(seed).__name__}"
+            ]
+        errors: list[str] = []
+        length = len(seed)
+        if node.min_length is not None and length < node.min_length:
+            errors.append(f"length must be >= {node.min_length}")
+        if node.max_length is not None and length > node.max_length:
+            errors.append(f"length must be <= {node.max_length}")
+        return errors
     if isinstance(node, UnionNode) and node.selected is not None:
         return _validate_seed_against_node(node.selected, seed)
     validate_value = getattr(node, "validate_value", None)

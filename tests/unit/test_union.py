@@ -34,6 +34,14 @@ class _DUJob(BaseModel):
     notifiers: list[_DUNotifier] = Field(default_factory=list)
 
 
+class _SeededListPayload(BaseModel):
+    items: list[int] = Field(default_factory=list, min_length=1)
+
+
+class _SeededListUnionHolder(BaseModel):
+    value: str | _SeededListPayload
+
+
 def test_optional_demotes_to_inner_type_node() -> None:
     """``str | None`` becomes a StringNode with required=False, NOT a UnionNode."""
     tree = build_form_tree(WithOptional)
@@ -132,6 +140,21 @@ def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     val = tree.root.find("value")
     assert isinstance(val, UnionNode)
     assert val.selected_index == 1
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
+def test_select_variant_rejects_sequence_seed_constraint_without_mutating() -> None:
+    tree = build_form_tree(_SeededListUnionHolder, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 1, seed={"items": []})
+
+    assert result.ok is False
+    assert result.errors == ("items: length must be >= 1",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
     assert isinstance(val.selected, StringNode)
     assert val.selected.value == "keep-me"
     assert tree.snapshots == []
