@@ -11,6 +11,7 @@ import tarfile
 import tomllib
 import zipfile
 from email.parser import Parser
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -50,7 +51,52 @@ def _wheel_record_entries(record: str) -> frozenset[str]:
     return frozenset(row[0] for row in csv.reader(io.StringIO(record)) if row)
 
 
-def _static_bundle_files(names: set[str], *, dist_prefix: str) -> tuple[str, ...]:
+class _StaticBundleReferenceParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.references: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "script":
+            src = attributes.get("src")
+            if src is not None and urlsplit(src).path.endswith(".js"):
+                self.references.append(src)
+        elif tag == "link":
+            href = attributes.get("href")
+            if href is not None and urlsplit(href).path.endswith(".css"):
+                self.references.append(href)
+
+
+def _static_bundle_reference_path(reference: str, *, dist_prefix: str) -> str | None:
+    parsed = urlsplit(reference)
+    if parsed.scheme or parsed.netloc:
+        return None
+    path = parsed.path.removeprefix("/")
+    path = path.removeprefix("./")
+    if path.startswith("static/dist/"):
+        return f"{dist_prefix}/{path.removeprefix('static/dist/')}"
+    if path.startswith("assets/"):
+        return f"{dist_prefix}/{path}"
+    return None
+
+
+def _static_bundle_referenced_files(index_html: str, *, dist_prefix: str) -> tuple[str, ...]:
+    parser = _StaticBundleReferenceParser()
+    parser.feed(index_html)
+    return tuple(
+        path
+        for reference in parser.references
+        if (path := _static_bundle_reference_path(reference, dist_prefix=dist_prefix)) is not None
+    )
+
+
+def _static_bundle_files(
+    names: set[str],
+    *,
+    dist_prefix: str,
+    index_html: str,
+) -> tuple[str, ...]:
     index = f"{dist_prefix}/index.html"
     asset_prefix = f"{dist_prefix}/assets/"
     stylesheets = sorted(
@@ -70,7 +116,13 @@ def _static_bundle_files(names: set[str], *, dist_prefix: str) -> tuple[str, ...
     ]
     if missing:
         raise RuntimeError(f"missing web static bundle files: {missing!r}")
-    return (index, *stylesheets, *scripts)
+    referenced_files = _static_bundle_referenced_files(index_html, dist_prefix=dist_prefix)
+    missing_referenced_files = [path for path in referenced_files if path not in names]
+    if missing_referenced_files:
+        raise RuntimeError(
+            f"web static bundle index references missing files: {missing_referenced_files!r}"
+        )
+    return tuple(dict.fromkeys((index, *stylesheets, *scripts, *referenced_files)))
 
 
 def _verify_wheel_structure(
@@ -101,9 +153,13 @@ def _verify_wheel_structure(
                 f"{wheel} missing wheel license files in {dist_info_dir}: "
                 f"{missing_license_files!r}"
             )
+        static_dist_prefix = f"{package_root}/renderers/html/static/dist"
+        static_index = f"{static_dist_prefix}/index.html"
+        static_index_html = zf.read(static_index).decode("utf-8") if static_index in names else ""
         static_bundle_files = _static_bundle_files(
             names,
-            dist_prefix=f"{package_root}/renderers/html/static/dist",
+            dist_prefix=static_dist_prefix,
+            index_html=static_index_html,
         )
         package_files = (f"{package_root}/py.typed", *static_bundle_files)
         missing_package_files = [filename for filename in package_files if filename not in names]
@@ -189,6 +245,17 @@ def _wheel_entry_points(
 def _sdist_names(sdist: Path) -> list[str]:
     with tarfile.open(sdist) as tf:
         return tf.getnames()
+
+
+def _sdist_text(sdist: Path, member_name: str) -> str:
+    with tarfile.open(sdist) as tf:
+        try:
+            member_file = tf.extractfile(member_name)
+        except KeyError:
+            return ""
+        if member_file is None:
+            return ""
+        return member_file.read().decode("utf-8")
 
 
 def _sdist_metadata(sdist: Path) -> str:
@@ -550,11 +617,13 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     ]
     if missing_files:
         raise RuntimeError(f"{sdist} missing source files: {missing_files!r}")
+    static_dist_prefix = (
+        f"{sdist_root}/src/{_project_package_root(pyproject)}/renderers/html/static/dist"
+    )
     _static_bundle_files(
         name_set,
-        dist_prefix=(
-            f"{sdist_root}/src/{_project_package_root(pyproject)}/renderers/html/static/dist"
-        ),
+        dist_prefix=static_dist_prefix,
+        index_html=_sdist_text(sdist, f"{static_dist_prefix}/index.html"),
     )
 
 

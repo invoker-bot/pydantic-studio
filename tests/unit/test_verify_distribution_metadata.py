@@ -40,6 +40,10 @@ def _write_wheel(
         "pydantic_studio/renderers/html/static/dist/assets/index-test.css",
         "pydantic_studio/renderers/html/static/dist/assets/index-test.js",
     ),
+    static_index_html: str = (
+        '<script type="module" src="/static/dist/assets/index-test.js"></script>\n'
+        '<link rel="stylesheet" href="/static/dist/assets/index-test.css">\n'
+    ),
     wheel_metadata: str | None = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     record: str | None = (
         "pydantic_studio/__init__.py,,\n"
@@ -59,7 +63,8 @@ def _write_wheel(
         if typed_marker is not None:
             zf.writestr(typed_marker, "")
         for filename in static_bundle:
-            zf.writestr(filename, filename)
+            content = static_index_html if filename.endswith("/index.html") else filename
+            zf.writestr(filename, content)
         if entry_points:
             zf.writestr(entry_points_name, entry_points)
         for filename in license_files:
@@ -82,6 +87,10 @@ def _write_sdist(
         "src/pydantic_studio/renderers/html/static/dist/index.html",
         "src/pydantic_studio/renderers/html/static/dist/assets/index-test.css",
         "src/pydantic_studio/renderers/html/static/dist/assets/index-test.js",
+    ),
+    static_index_html: str = (
+        '<script type="module" src="/static/dist/assets/index-test.js"></script>\n'
+        '<link rel="stylesheet" href="/static/dist/assets/index-test.css">\n'
     ),
     metadata: str | None = None,
     metadata_name: str = "pydantic_studio-0.4.0/PKG-INFO",
@@ -119,7 +128,8 @@ def _write_sdist(
         for filename in static_bundle:
             source = dist / filename
             source.parent.mkdir(parents=True, exist_ok=True)
-            source.write_text(filename, encoding="utf-8")
+            content = static_index_html if filename.endswith("/index.html") else filename
+            source.write_text(content, encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
 
 
@@ -590,6 +600,32 @@ def test_verify_distribution_metadata_rejects_missing_wheel_static_bundle_record
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_wheel_static_bundle_missing_referenced_script(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        static_index_html=(
+            '<script type="module" src="/static/dist/assets/missing.js"></script>\n'
+            '<link rel="stylesheet" href="/static/dist/assets/index-test.css">\n'
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"missing\.js"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_license_file(
     tmp_path: Path,
 ) -> None:
@@ -709,6 +745,29 @@ def test_verify_distribution_metadata_rejects_missing_sdist_static_bundle_styles
     )
 
     with pytest.raises(RuntimeError, match=r"static.*\.css"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_sdist_static_bundle_missing_referenced_stylesheet(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        static_index_html=(
+            '<script type="module" src="/static/dist/assets/index-test.js"></script>\n'
+            '<link rel="stylesheet" href="/static/dist/assets/missing.css">\n'
+        ),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"missing\.css"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
