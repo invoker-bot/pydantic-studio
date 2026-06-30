@@ -357,6 +357,7 @@ def edit(
 ) -> None:
     """Launch an editor for a Pydantic schema."""
     from pydantic_studio import build_form_tree
+    from pydantic_studio.exceptions import ValidationFailedError
 
     schema = _load_schema(target)
     if file is not None and file.exists():
@@ -366,22 +367,26 @@ def edit(
 
     save_path = file if file is not None else Path(f"{schema.__name__}.yaml")
 
-    if frontend == "console":
-        from pydantic_studio.renderers.console import run_console_app
+    try:
+        if frontend == "console":
+            from pydantic_studio.renderers.console import run_console_app
 
-        run_console_app(tree=tree, save_path=save_path)
-    elif frontend == "tui":
-        from pydantic_studio.renderers.textual_ import StudioApp
+            run_console_app(tree=tree, save_path=save_path)
+        elif frontend == "tui":
+            from pydantic_studio.renderers.textual_ import StudioApp
 
-        StudioApp(tree=tree, save_path=save_path).run()
-    elif frontend == "web":
-        from pydantic_studio.renderers import html as html_module
+            StudioApp(tree=tree, save_path=save_path).run()
+        elif frontend == "web":
+            from pydantic_studio.renderers import html as html_module
 
-        html_module.run_html_app(tree=tree, save_path=save_path)
-    else:
-        typer.secho(
-            f"Unknown frontend {frontend!r}. Use 'console', 'tui', or 'web'.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=2)
+            html_module.run_html_app(tree=tree, save_path=save_path)
+        else:
+            typer.secho(
+                f"Unknown frontend {frontend!r}. Use 'console', 'tui', or 'web'.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=2)
+    except (OSError, ValueError, ValidationFailedError) as e:
+        typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e

@@ -67,6 +67,21 @@ def test_edit_without_file_builds_fresh_tree(tmp_path: Path, monkeypatch) -> Non
     assert port_node.default == 8080
 
 
+def test_edit_console_failure_reports_clean_error(monkeypatch) -> None:
+    def fake_run(tree, save_path=None) -> None:
+        raise OSError("disk full")
+
+    import pydantic_studio.renderers.console as console_module
+
+    monkeypatch.setattr(console_module, "run_console_app", fake_run)
+
+    result = runner.invoke(app, ["edit", "tests.fixtures.schemas:Server"])
+
+    assert result.exit_code == 1
+    assert "edit failed" in result.output.lower()
+    assert "disk full" in result.output
+
+
 def test_edit_tui_frontend_routes_to_studio_app(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
