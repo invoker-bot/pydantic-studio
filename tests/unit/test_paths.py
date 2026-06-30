@@ -68,6 +68,12 @@ def test_parse_rejects_index_followed_by_letter_at_start():
         Path.parse("[2]foo")
 
 
+@pytest.mark.parametrize("raw", [".name", "name.", "database..host"])
+def test_parse_rejects_empty_dotted_segment(raw: str):
+    with pytest.raises(ValueError, match="empty path segment"):
+        Path.parse(raw)
+
+
 def test_render_round_trip():
     raw = "database.replicas[2].host"
     assert Path.parse(raw).render() == raw

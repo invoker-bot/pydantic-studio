@@ -78,6 +78,9 @@ class Path:
                     )
                     raise ValueError(msg)
             elif raw[i] == ".":
+                if i == 0 or i == n - 1 or raw[i + 1] == ".":
+                    msg = f"empty path segment in path {raw!r}"
+                    raise ValueError(msg)
                 i += 1  # separator between two field-name segments
             elif raw[i].isdigit():
                 # Dotted-integer segment (``tags.0`` / ``env.2``). The
