@@ -2071,7 +2071,7 @@ class FormTree(BaseModel):
         return ValidationResult.ok()
 
     def add_entry(
-        self, path: str, key: Any, value: Any = None
+        self, path: str, key: Any, value: Any = _UNSET_VALUE
     ) -> ValidationResult:
         """Append a (key, value) entry to the MappingNode at ``path``."""
         from pydantic.fields import FieldInfo
@@ -2099,7 +2099,7 @@ class FormTree(BaseModel):
             return unique_result
         value_field = FieldInfo(annotation=value_type)
         v_node = v_builder.build(value_type, value_field, None)
-        if value is not None:
+        if value is not _UNSET_VALUE:
             value_errors = v_node.validate_value(value)
             if value_errors:
                 return ValidationResult.fail(list(value_errors))

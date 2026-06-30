@@ -104,6 +104,19 @@ def test_add_entry_rejects_invalid_typed_value_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_add_entry_rejects_explicit_none_value_without_mutating() -> None:
+    tree = build_form_tree(WithDict)
+
+    result = tree.add_entry("settings", "timeout", None)
+
+    assert result.ok is False
+    assert result.errors == ("value is required",)
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    assert settings.entries == []
+    assert tree.snapshots == []
+
+
 def test_remove_entry() -> None:
     tree = build_form_tree(
         WithDict, existing={"settings": {"a": 1, "b": 2, "c": 3}}
