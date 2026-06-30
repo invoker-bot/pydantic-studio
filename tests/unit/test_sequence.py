@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from typing import cast
 
+from pydantic import BaseModel, Field
+
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import GroupNode, IntNode, SequenceNode, StringNode
 from tests.fixtures.schemas import WithFixedTuple, WithList, WithSet, WithTuple
+
+
+class ConstrainedList(BaseModel):
+    tags: list[str] = Field(default_factory=lambda: ["a"], min_length=1, max_length=2)
 
 
 def test_sequence_node_construct() -> None:
@@ -270,3 +276,43 @@ def test_add_item_fails_on_fixed_tuple() -> None:
     result = tree.add_item("rgb")
     assert result.ok is False
     assert any("fixed-length" in e for e in result.errors)
+
+
+def test_add_item_rejects_sequence_max_length_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedList, existing={"tags": ["a", "b"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+
+    result = tree.add_item("tags", "c")
+
+    assert result.ok is False
+    assert result.errors == ("length must be <= 2",)
+    assert [cast("StringNode", item).value for item in tags.items] == ["a", "b"]
+    assert tree.snapshots == []
+
+
+def test_insert_item_rejects_sequence_max_length_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedList, existing={"tags": ["a", "b"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+
+    result = tree.insert_item("tags", 1, "c")
+
+    assert result.ok is False
+    assert result.errors == ("length must be <= 2",)
+    assert [cast("StringNode", item).value for item in tags.items] == ["a", "b"]
+    assert [item.name for item in tags.items] == ["0", "1"]
+    assert tree.snapshots == []
+
+
+def test_remove_item_rejects_sequence_min_length_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedList, existing={"tags": ["a"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+
+    result = tree.remove_item("tags", 0)
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 1",)
+    assert [cast("StringNode", item).value for item in tags.items] == ["a"]
+    assert tree.snapshots == []

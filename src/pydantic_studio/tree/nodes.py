@@ -1792,6 +1792,17 @@ class FormTree(BaseModel):
             raise TypeError(msg)
         return node
 
+    @staticmethod
+    def _validate_sequence_length(seq: SequenceNode, new_length: int) -> ValidationResult:
+        errors: list[str] = []
+        if seq.min_length is not None and new_length < seq.min_length:
+            errors.append(f"length must be >= {seq.min_length}")
+        if seq.max_length is not None and new_length > seq.max_length:
+            errors.append(f"length must be <= {seq.max_length}")
+        if errors:
+            return ValidationResult.fail(errors)
+        return ValidationResult.ok()
+
     def add_item(self, path: str, value: Any = None) -> ValidationResult:
         """Append a default child to the SequenceNode at ``path``."""
         from pydantic.fields import FieldInfo
@@ -1804,6 +1815,9 @@ class FormTree(BaseModel):
             return ValidationResult.fail(["cannot add to a fixed-length tuple"])
         if seq.item_type_name is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
+        length_result = self._validate_sequence_length(seq, len(seq.items) + 1)
+        if not length_result.ok:
+            return length_result
         # Resolve + build BEFORE snapshotting — failure here must not pollute
         # the undo history (mirrors the validate-first contract of set_value).
         item_type = _resolve_type_name(seq.item_type_name)
@@ -1829,6 +1843,9 @@ class FormTree(BaseModel):
         seq = self._walk_to_sequence(path)
         if not (0 <= index < len(seq.items)):
             return ValidationResult.fail([f"index {index} out of range"])
+        length_result = self._validate_sequence_length(seq, len(seq.items) - 1)
+        if not length_result.ok:
+            return length_result
         self._push_snapshot(_snap.take(self.root))
         new_items = [it for i, it in enumerate(seq.items) if i != index]
         for i, it in enumerate(new_items):
@@ -1856,6 +1873,9 @@ class FormTree(BaseModel):
             return ValidationResult.fail([f"index {index} out of range"])
         if seq.item_type_name is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
+        length_result = self._validate_sequence_length(seq, len(seq.items) + 1)
+        if not length_result.ok:
+            return length_result
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         item_field = FieldInfo(annotation=item_type)
