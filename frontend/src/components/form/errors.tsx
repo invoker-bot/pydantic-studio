@@ -37,6 +37,14 @@ export function isReadonly(flags: FormFlags, path: string): boolean {
   return path !== "" && flags.readonlyPaths.has(path);
 }
 
+export function hasReadonlyUnder(flags: FormFlags, path: string): boolean {
+  if (path === "") return false;
+  for (const p of flags.readonlyPaths) {
+    if (p === path || p.startsWith(`${path}.`)) return true;
+  }
+  return false;
+}
+
 export function fieldAnchorId(path: string): string {
   return `field-anchor-${path}`;
 }

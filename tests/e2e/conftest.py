@@ -9,7 +9,7 @@ import re
 import socket
 import threading
 import time as _time
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import StrEnum
@@ -32,7 +32,7 @@ from pydantic import (
 from pydantic_studio import StudioServer, build_form_tree
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 
 
 class _LogLevel(StrEnum):
@@ -139,8 +139,18 @@ def fastapi_url() -> Iterator[str]:
     then picked up by mistake). Adds ~50 ms of uvicorn-startup overhead
     per test; cheap insurance for test isolation.
     """
-    port = _find_free_port()
-    tree = build_form_tree(
+    with _serve_demo() as url:
+        yield url
+
+
+@pytest.fixture
+def readonly_notifier_address_url() -> Iterator[str]:
+    with _serve_demo(readonly_paths={"notifier.address"}) as url:
+        yield url
+
+
+def _build_demo_tree():
+    return build_form_tree(
         _DemoSchema,
         existing={
             "name": "demo-service",
@@ -165,7 +175,13 @@ def fastapi_url() -> Iterator[str]:
             "salt": b"\xde\xad\xbe\xef",
         },
     )
-    server = StudioServer(tree=tree, save_path=None)
+
+
+@contextmanager
+def _serve_demo(readonly_paths: Iterable[str] = ()) -> Iterator[str]:
+    port = _find_free_port()
+    tree = _build_demo_tree()
+    server = StudioServer(tree=tree, save_path=None, readonly_paths=readonly_paths)
     config = uvicorn.Config(
         server.app,
         host="127.0.0.1",
@@ -188,7 +204,8 @@ def fastapi_url() -> Iterator[str]:
     else:
         raise RuntimeError(f"uvicorn never bound to :{port}")
 
-    yield f"http://127.0.0.1:{port}"
-
-    uvi.should_exit = True
-    thread.join(timeout=2.0)
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        uvi.should_exit = True
+        thread.join(timeout=2.0)

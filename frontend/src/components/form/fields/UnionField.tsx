@@ -7,6 +7,10 @@ import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { FormField } from "@/components/form/FormField";
+import {
+  hasReadonlyUnder,
+  useFormFlags,
+} from "@/components/form/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { shortTypeName } from "@/lib/typeName";
@@ -16,6 +20,8 @@ export function UnionField({
   path,
 }: { node: UnionNodeData; path: string }) {
   const mutation = useApplyMutation();
+  const flags = useFormFlags();
+  const readonlyVariant = hasReadonlyUnder(flags, path);
 
   const onSelect = (variant_index: number) =>
     mutation.mutate({ op: "select_variant", path, variant_index });
@@ -37,6 +43,7 @@ export function UnionField({
               type="button"
               variant={active ? "default" : "outline"}
               size="sm"
+              disabled={readonlyVariant}
               onClick={() => onSelect(index)}
             >
               {shortTypeName(variantName)}

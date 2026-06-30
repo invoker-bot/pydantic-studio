@@ -53,3 +53,14 @@ def test_switch_union_variant(page: Page, fastapi_url: str) -> None:
         f for f in notifier_field["selected"]["fields"] if f["name"] == "channel"
     )
     assert channel["value"] == "#alerts"
+
+
+def test_readonly_union_descendant_disables_variant_switch(
+    page: Page, readonly_notifier_address_url: str
+) -> None:
+    page.goto(f"{readonly_notifier_address_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    slack_chip = page.get_by_role("button", name="_SlackNotifier")
+    expect(slack_chip).to_be_visible(timeout=5000)
+    expect(slack_chip).to_be_disabled()
