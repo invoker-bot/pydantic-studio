@@ -104,10 +104,12 @@ def test_append_index():
         (("",), "invalid field segment"),
         (("foo.bar",), "invalid field segment"),
         (("0",), "invalid field segment"),
+        ((None,), "invalid path segment type"),
+        ((1.2,), "invalid path segment type"),
     ],
 )
 def test_path_constructor_rejects_invalid_segments(
-    segments: tuple[PathSegment, ...], match: str
+    segments: tuple[object, ...], match: str
 ):
     with pytest.raises(ValueError, match=match):
         Path(segments)

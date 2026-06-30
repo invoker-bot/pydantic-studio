@@ -54,6 +54,9 @@ class Path:
                     msg = f"negative index {segment} in path segments"
                     raise ValueError(msg)
                 continue
+            if not isinstance(segment, str):
+                msg = f"invalid path segment type {type(segment).__name__}"
+                raise ValueError(msg)
             if not _FIELD_RE.fullmatch(segment):
                 msg = f"invalid field segment {segment!r}"
                 raise ValueError(msg)
