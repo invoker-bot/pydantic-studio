@@ -59,14 +59,14 @@ class Path:
                     msg = f"unclosed bracket in path {raw!r}"
                     raise ValueError(msg)
                 inside = raw[i + 1 : end]
-                try:
+                if inside.startswith("-") and _DIGIT_RE.fullmatch(inside[1:]):
                     idx = int(inside)
-                except ValueError as e:
-                    msg = f"non-integer index {inside!r} in path {raw!r}"
-                    raise ValueError(msg) from e
-                if idx < 0:
                     msg = f"negative index {idx} in path {raw!r}"
                     raise ValueError(msg)
+                if not _DIGIT_RE.fullmatch(inside):
+                    msg = f"non-integer index {inside!r} in path {raw!r}"
+                    raise ValueError(msg)
+                idx = int(inside)
                 segments.append(idx)
                 i = end + 1
                 # After ']', the next character (if any) must be '.' or '[' —

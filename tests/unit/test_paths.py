@@ -51,9 +51,10 @@ def test_parse_rejects_unclosed_bracket():
         Path.parse("foo[2")
 
 
-def test_parse_rejects_non_integer_index():
+@pytest.mark.parametrize("raw", ["foo[abc]", "foo[+1]", "foo[ 1]", "foo[1 ]", "[+0]"])
+def test_parse_rejects_non_integer_index(raw: str):
     with pytest.raises(ValueError, match="non-integer"):
-        Path.parse("foo[abc]")
+        Path.parse(raw)
 
 
 def test_parse_rejects_index_followed_by_field_without_dot():
