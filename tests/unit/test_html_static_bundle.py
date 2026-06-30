@@ -128,3 +128,13 @@ def test_frontend_node_schema_strictly_covers_backend_node_kinds() -> None:
     assert frontend_kinds == backend_kinds
     assert "UnknownNodeSchema" not in schema
     assert "[extra: string]" not in schema
+
+
+def test_frontend_tree_schema_rejects_extra_top_level_fields() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+
+    assert "FormTreeSchema" in schema
+    assert ".passthrough()" not in schema
+    assert "tolerate extra top-level fields" not in schema
