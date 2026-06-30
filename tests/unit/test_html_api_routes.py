@@ -125,7 +125,7 @@ def test_api_mutations_missing_required_argument_returns_400() -> None:
     )
 
     assert response.status_code == 400
-    assert "mutation failed" in response.json()["detail"]
+    assert "index is required" in response.json()["detail"]
 
 
 def test_api_mutations_bad_numeric_argument_returns_400() -> None:
@@ -165,7 +165,7 @@ def test_api_mutations_missing_set_value_payload_returns_400() -> None:
     )
 
     assert response.status_code == 400
-    assert "mutation failed" in response.json()["detail"]
+    assert "value is required" in response.json()["detail"]
 
 
 def test_api_submit_marks_server_submitted_and_returns_ok() -> None:

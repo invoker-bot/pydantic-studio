@@ -256,7 +256,7 @@ def test_dispatch_set_value_requires_value_key_without_mutating() -> None:
     result = dispatch_mutation(tree, {"op": "set_value", "path": "name"})
 
     assert result.ok is False
-    assert any("mutation failed" in err and "value" in err for err in result.errors)
+    assert any("value is required" in err for err in result.errors)
     assert tree.root.find("name").value == "alpha"
 
 
@@ -316,6 +316,16 @@ def test_dispatch_move_item_rejects_float_target_without_mutating() -> None:
 
     assert result.ok is False
     assert any("to must be an integer" in err for err in result.errors)
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["a", "b", "c"]
+
+
+def test_dispatch_move_item_requires_to_argument_without_mutating() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
+    result = dispatch_mutation(tree, {"op": "move_item", "path": "tags", "from": 0})
+
+    assert result.ok is False
+    assert any("to is required" in err for err in result.errors)
     values = [it.value for it in tree.root.find("tags").items]
     assert values == ["a", "b", "c"]
 

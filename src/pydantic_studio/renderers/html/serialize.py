@@ -217,8 +217,16 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
     return value
 
 
+def _required_arg(mutation: dict[str, Any], key: str) -> Any:
+    try:
+        return mutation[key]
+    except KeyError as exc:
+        msg = f"{key} is required"
+        raise ValueError(msg) from exc
+
+
 def _required_string_arg(mutation: dict[str, Any], key: str) -> str:
-    value = mutation[key]
+    value = _required_arg(mutation, key)
     if not isinstance(value, str):
         msg = f"{key} must be a string"
         raise TypeError(msg)
@@ -226,7 +234,7 @@ def _required_string_arg(mutation: dict[str, Any], key: str) -> str:
 
 
 def _required_int_arg(mutation: dict[str, Any], key: str) -> int:
-    value = mutation[key]
+    value = _required_arg(mutation, key)
     if type(value) is not int:
         msg = f"{key} must be an integer"
         raise TypeError(msg)
@@ -260,7 +268,7 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     try:
         path = _path_arg(mutation)
         if op == "set_value":
-            value = mutation["value"]
+            value = _required_arg(mutation, "value")
             value = _maybe_coerce_typed_value(tree, path, value)
             return tree.set_value(path, value)
         if op == "add_item":
