@@ -2668,6 +2668,8 @@ class FormTree(BaseModel):
                 ]
             )
         v_type = _resolve_type_name(union.variant_type_names[variant_index])
+        if variant_index == union.selected_index and seed is _UNSET_VALUE:
+            return ValidationResult.ok()
         builder = default_registry().find(v_type)
         new_selected, errors = _build_seeded_node(
             builder, v_type, FieldInfo(annotation=v_type), seed

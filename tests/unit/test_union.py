@@ -124,6 +124,29 @@ def test_select_variant_switches_to_str() -> None:
     assert val.selected.value is None  # fresh; previous int 42 is discarded
 
 
+def test_select_variant_current_index_is_noop_without_seed() -> None:
+    tree = build_form_tree(WithUnion, existing={"value": "initial"})
+    assert tree.set_value("value", "edited").ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    selected_before = val.selected
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = tree.select_variant("value", 1)
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    assert val.selected is selected_before
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "edited"
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_select_variant_undo_restores() -> None:
     tree = build_form_tree(WithUnion, existing={"value": 42})
     tree.select_variant("value", 1)

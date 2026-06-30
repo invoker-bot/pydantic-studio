@@ -1002,6 +1002,28 @@ def test_dispatch_select_variant_switches_to_indexed_branch() -> None:
     assert val.selected.kind == "string"
 
 
+def test_dispatch_select_variant_current_index_is_noop_without_seed() -> None:
+    tree = build_form_tree(_UnionHolder, existing={"value": "initial"})
+    assert tree.set_value("value", "edited").ok is True
+    val = tree.root.find("value")
+    assert val.selected_index == 1
+    selected_before = val.selected
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = dispatch_mutation(
+        tree, {"op": "select_variant", "path": "value", "variant_index": 1}
+    )
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert val.selected_index == 1
+    assert val.selected is selected_before
+    assert val.selected.value == "edited"
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_dispatch_select_variant_passes_seed_to_tree() -> None:
     tree = build_form_tree(_UnionHolder, existing={"value": 42})
 
