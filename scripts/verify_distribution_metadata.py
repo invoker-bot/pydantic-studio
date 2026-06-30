@@ -50,7 +50,12 @@ def _wheel_record_entries(record: str) -> frozenset[str]:
     return frozenset(row[0] for row in csv.reader(io.StringIO(record)) if row)
 
 
-def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
+def _verify_wheel_structure(
+    wheel: Path,
+    *,
+    dist_info_dir: str,
+    license_files: Sequence[str],
+) -> None:
     with zipfile.ZipFile(wheel) as zf:
         names = set(zf.namelist())
         missing_files = [
@@ -61,6 +66,16 @@ def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
         if missing_files:
             raise RuntimeError(
                 f"{wheel} missing wheel structure files in {dist_info_dir}: {missing_files!r}"
+            )
+        missing_license_files = [
+            filename
+            for filename in license_files
+            if f"{dist_info_dir}/licenses/{filename}" not in names
+        ]
+        if missing_license_files:
+            raise RuntimeError(
+                f"{wheel} missing wheel license files in {dist_info_dir}: "
+                f"{missing_license_files!r}"
             )
         wheel_metadata = zf.read(f"{dist_info_dir}/WHEEL").decode("utf-8")
         record = zf.read(f"{dist_info_dir}/RECORD").decode("utf-8")
@@ -77,11 +92,18 @@ def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
         raise RuntimeError(f"{wheel} missing wheel metadata: {missing_metadata!r}")
 
     record_entries = _wheel_record_entries(record)
-    missing_record_entries = [
-        filename
+    record_paths = [
+        f"{dist_info_dir}/{filename}"
         for filename in ("METADATA", "WHEEL", "RECORD", "entry_points.txt")
         if f"{dist_info_dir}/{filename}" in names
-        and f"{dist_info_dir}/{filename}" not in record_entries
+    ]
+    record_paths.extend(
+        f"{dist_info_dir}/licenses/{filename}"
+        for filename in license_files
+        if f"{dist_info_dir}/licenses/{filename}" in names
+    )
+    missing_record_entries = [
+        path for path in record_paths if path not in record_entries
     ]
     if missing_record_entries:
         raise RuntimeError(
@@ -245,7 +267,7 @@ def _project_registry_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
 
     keywords = _string_sequence(project, "keywords", "[project] keywords")
     classifiers = _string_sequence(project, "classifiers", "[project] classifiers")
-    license_files = _string_sequence(project, "license-files", "[project] license-files")
+    license_files = _project_license_files(pyproject)
 
     return (
         f"Keywords: {','.join(keywords)}",
@@ -253,6 +275,11 @@ def _project_registry_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
         *(f"License-File: {filename}" for filename in license_files),
         *(f"Classifier: {classifier}" for classifier in classifiers),
     )
+
+
+def _project_license_files(pyproject: dict[str, object]) -> tuple[str, ...]:
+    project = _table(pyproject, "project", "project")
+    return _string_sequence(project, "license-files", "[project] license-files")
 
 
 def _normalize_requirement(requirement: str) -> str:
@@ -327,7 +354,7 @@ def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
             "pyproject.toml source-include missing support files: "
             f"{missing_source_include!r}"
         )
-    return source_include
+    return tuple(dict.fromkeys((*source_include, *_project_license_files(pyproject))))
 
 
 def _sdist_root(names: Sequence[str], sdist: Path) -> str:
@@ -344,7 +371,11 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     sdist = _single_file(dist_dir, "*.tar.gz")
     wheel_dist_info_dir = _wheel_dist_info_dir(pyproject)
 
-    _verify_wheel_structure(wheel, dist_info_dir=wheel_dist_info_dir)
+    _verify_wheel_structure(
+        wheel,
+        dist_info_dir=wheel_dist_info_dir,
+        license_files=_project_license_files(pyproject),
+    )
     metadata_headers = _metadata_headers(_wheel_metadata(wheel, dist_info_dir=wheel_dist_info_dir))
     missing_identity = [
         line for line in _project_identity(pyproject) if line not in metadata_headers
