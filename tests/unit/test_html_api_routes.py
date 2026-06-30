@@ -28,6 +28,10 @@ class _WithProfile(BaseModel):
     workers: int = 4
 
 
+class _WithTags(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+
+
 class _RootEmail(BaseModel):
     address: str = "ops@example.com"
 
@@ -401,6 +405,25 @@ def test_api_mutations_reject_readonly_descendant_without_mutating() -> None:
         "errors": ["profile.name is read-only — value is managed by the caller"],
     }
     assert server.tree.root.find("profile").find("name").value == "alpha"
+
+
+def test_api_mutations_reject_bracket_form_readonly_path_without_mutating() -> None:
+    tree = build_form_tree(_WithTags, existing={"tags": ["locked", "free"]})
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"tags[0]"})
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "tags.0", "value": "edited"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {
+        "ok": False,
+        "errors": ["tags.0 is read-only — value is managed by the caller"],
+    }
+    assert server.tree.root.find("tags").items[0].value == "locked"
 
 
 def test_api_mutations_reject_root_variant_switch_when_any_path_is_readonly() -> None:

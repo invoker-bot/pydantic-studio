@@ -44,7 +44,26 @@ def _tree_payload(server: StudioServer) -> dict[str, object]:
 
 
 def _paths_overlap(left: str, right: str) -> bool:
+    left_segments = _path_segments(left)
+    right_segments = _path_segments(right)
+    if left_segments is not None and right_segments is not None:
+        if not left_segments or not right_segments:
+            return left_segments == right_segments
+        return (
+            left_segments == right_segments
+            or left_segments[: len(right_segments)] == right_segments
+            or right_segments[: len(left_segments)] == left_segments
+        )
     return left == right or left.startswith(f"{right}.") or right.startswith(f"{left}.")
+
+
+def _path_segments(path: str) -> tuple[object, ...] | None:
+    from pydantic_studio.tree.paths import Path
+
+    try:
+        return Path.parse(path).segments
+    except ValueError:
+        return None
 
 
 def _readonly_mutation_error(

@@ -159,6 +159,15 @@ def readonly_tags_item_url() -> Iterator[str]:
 
 
 @pytest.fixture
+def readonly_tags_bracket_item_url() -> Iterator[str]:
+    with _serve_demo(
+        readonly_paths={"tags[0]"},
+        existing_overrides={"tags": ["locked-tag", "free-tag"]},
+    ) as url:
+        yield url
+
+
+@pytest.fixture
 def readonly_env_entry_url() -> Iterator[str]:
     with _serve_demo(
         readonly_paths={"env.0"},

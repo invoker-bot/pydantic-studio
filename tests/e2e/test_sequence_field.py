@@ -63,3 +63,18 @@ def test_readonly_sequence_descendant_disables_structural_controls(
     expect(page.get_by_role("button", name="move tags[0] down")).to_be_disabled()
     expect(page.get_by_role("button", name="remove tags[0]")).to_be_disabled()
     expect(page.get_by_role("button", name="+ Add str")).to_be_disabled()
+
+
+def test_readonly_sequence_bracket_path_disables_structural_controls(
+    page: Page, readonly_tags_bracket_item_url: str
+) -> None:
+    page.goto(f"{readonly_tags_bracket_item_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    locked_input = page.locator('input[id="field-tags.0"]')
+    expect(locked_input).to_have_value("locked-tag", timeout=5000)
+    expect(locked_input).to_be_disabled()
+
+    expect(page.get_by_role("button", name="move tags[0] down")).to_be_disabled()
+    expect(page.get_by_role("button", name="remove tags[0]")).to_be_disabled()
+    expect(page.get_by_role("button", name="+ Add str")).to_be_disabled()

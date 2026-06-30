@@ -87,7 +87,9 @@ submit/cancel outcome.
 
 A **path** identifies any node in the tree (e.g.,
 `database.replicas[2].host`). Renderers send the same path strings;
-the tree's `set_value` and friends resolve them. A draft saved from web
+the tree's `set_value` and friends resolve them. Indexed children may
+use either bracket or dotted numeric segments (`tags[0]` and `tags.0`
+resolve to the same item). A draft saved from web
 can be resumed in TUI, and vice versa, because the persisted format is
 the FormTree's own JSON dump.
 

@@ -5,6 +5,8 @@
 
 import { createContext, useContext } from "react";
 
+import { pathsEqual, pathsOverlap } from "@/components/form/path";
+
 export interface FormFlags {
   errorPaths: ReadonlySet<string>;
   readonlyPaths: ReadonlySet<string>;
@@ -34,13 +36,17 @@ export function hasErrorUnder(flags: FormFlags, path: string): boolean {
 }
 
 export function isReadonly(flags: FormFlags, path: string): boolean {
-  return path !== "" && flags.readonlyPaths.has(path);
+  if (path === "") return false;
+  for (const p of flags.readonlyPaths) {
+    if (pathsEqual(path, p)) return true;
+  }
+  return false;
 }
 
 export function hasReadonlyUnder(flags: FormFlags, path: string): boolean {
   if (path === "") return false;
   for (const p of flags.readonlyPaths) {
-    if (p === path || p.startsWith(`${path}.`)) return true;
+    if (pathsOverlap(path, p)) return true;
   }
   return false;
 }
