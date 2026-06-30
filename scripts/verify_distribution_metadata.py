@@ -83,6 +83,15 @@ def _project_urls(pyproject: dict[str, object]) -> dict[str, str]:
     return project_urls
 
 
+def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
+    project = _table(pyproject, "project", "project")
+    fields = ("name", "version")
+    invalid = [field for field in fields if not isinstance(project.get(field), str)]
+    if invalid:
+        raise RuntimeError(f"pyproject.toml project identity fields must be strings: {invalid!r}")
+    return tuple(f"{field.title()}: {project[field]}" for field in fields)
+
+
 def _source_include(pyproject: dict[str, object]) -> tuple[str, ...]:
     tool = _table(pyproject, "tool", "tool")
     uv = _table(tool, "uv", "tool.uv")
@@ -131,11 +140,21 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     sdist = _single_file(dist_dir, "*.tar.gz")
 
     metadata = _wheel_metadata(wheel)
+    missing_identity = [line for line in _project_identity(pyproject) if line not in metadata]
+    if missing_identity:
+        raise RuntimeError(f"{wheel} missing package identity metadata: {missing_identity!r}")
+
     missing_urls = [url for url in _expected_project_urls(pyproject) if url not in metadata]
     if missing_urls:
         raise RuntimeError(f"{wheel} missing project URL metadata: {missing_urls!r}")
 
     sdist_metadata = _sdist_metadata(sdist)
+    missing_sdist_identity = [
+        line for line in _project_identity(pyproject) if line not in sdist_metadata
+    ]
+    if missing_sdist_identity:
+        raise RuntimeError(f"{sdist} missing package identity metadata: {missing_sdist_identity!r}")
+
     missing_sdist_urls = [
         url for url in _expected_project_urls(pyproject) if url not in sdist_metadata
     ]

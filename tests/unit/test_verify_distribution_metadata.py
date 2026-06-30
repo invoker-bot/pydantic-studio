@@ -58,7 +58,11 @@ def _write_pyproject(
         + "".join(f', "{filename}"' for filename in extra_source_include)
     )
     root.joinpath("pyproject.toml").write_text(
-        f"""[project.urls]
+        f"""[project]
+name = "pydantic-studio"
+version = "0.4.0"
+
+[project.urls]
 Source = "https://example.invalid/pydantic-studio"
 Documentation = "https://example.invalid/docs"
 Issues = "https://example.invalid/issues"
@@ -75,6 +79,8 @@ source-include = [{source_include}]
 
 def _metadata(*, omit: str | None = None) -> str:
     lines = [
+        ("Name", "pydantic-studio"),
+        ("Version", "0.4.0"),
         ("Source", "https://example.invalid/pydantic-studio"),
         ("Documentation", "https://example.invalid/docs"),
         ("Issues", "https://example.invalid/issues"),
@@ -83,7 +89,9 @@ def _metadata(*, omit: str | None = None) -> str:
         ("Contributing", "https://example.invalid/CONTRIBUTING.md"),
     ]
     return "\n".join(
-        f"Project-URL: {label}, {url}" for label, url in lines if label != omit
+        f"{label}: {url}" if label in {"Name", "Version"} else f"Project-URL: {label}, {url}"
+        for label, url in lines
+        if label != omit
     )
 
 
@@ -186,4 +194,33 @@ def test_verify_distribution_metadata_rejects_missing_sdist_project_url(
     )
 
     with pytest.raises(RuntimeError, match=r"Contributing"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value"),
+    [("Name", "wrong-name"), ("Version", "9.9.9")],
+)
+@pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
+def test_verify_distribution_metadata_rejects_identity_metadata_drift(
+    tmp_path: Path,
+    field_name: str,
+    bad_value: str,
+    drifted_file: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    expected_metadata = _metadata()
+    old_line = next(line for line in expected_metadata.splitlines() if line.startswith(field_name))
+    drifted_metadata = expected_metadata.replace(old_line, f"{field_name}: {bad_value}")
+    _write_wheel(dist, drifted_metadata if drifted_file == "wheel" else expected_metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=drifted_metadata if drifted_file == "sdist" else expected_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=field_name):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
