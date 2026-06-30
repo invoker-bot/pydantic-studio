@@ -1886,7 +1886,24 @@ class FormTree(BaseModel):
         write_target = target
         if isinstance(target, UnionNode):
             if target.selected is None:
-                return ValidationResult.fail(["union has no selected variant"])
+                result, variant_index, selected = self._build_union_variant_for_value(
+                    target,
+                    value,
+                )
+                if not result.ok:
+                    target.error = result.errors[0] if result.errors else "invalid"
+                    return result
+
+                self._push_snapshot(_snap.take(self.root))
+                target.selected_index = variant_index
+                target.selected = selected
+                target.error = None
+                for group in walked_groups:
+                    if group.omitted:
+                        group.omitted = False
+                if self.draft_path is not None:
+                    _snap.draft_save(self, self.draft_path)
+                return ValidationResult.ok()
             write_target = target.selected
             if (
                 not isinstance(write_target, (GroupNode, SequenceNode, MappingNode))
@@ -1971,6 +1988,25 @@ class FormTree(BaseModel):
 
         errors = write_target.validate_value(value)
         if errors:
+            if isinstance(target, UnionNode):
+                result, variant_index, selected = self._build_union_variant_for_value(
+                    target,
+                    value,
+                )
+                if result.ok:
+                    self._push_snapshot(_snap.take(self.root))
+                    target.selected_index = variant_index
+                    target.selected = selected
+                    target.error = None
+                    for group in walked_groups:
+                        if group.omitted:
+                            group.omitted = False
+                    if self.draft_path is not None:
+                        _snap.draft_save(self, self.draft_path)
+                    return ValidationResult.ok()
+                write_target.error = errors[0]
+                target.error = result.errors[0] if result.errors else errors[0]
+                return result
             write_target.error = errors[0]
             target.error = errors[0]
             return ValidationResult.fail(list(errors))
@@ -2062,6 +2098,39 @@ class FormTree(BaseModel):
         if errors:
             return ValidationResult.fail(errors)
         return ValidationResult.ok()
+
+    def _build_union_variant_for_value(
+        self,
+        union: UnionNode,
+        value: Any,
+    ) -> tuple[ValidationResult, int | None, AnyNode | None]:
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree.builder import default_registry
+
+        reg = default_registry()
+        errors_by_variant: list[str] = []
+        for index, type_name in enumerate(union.variant_type_names):
+            variant_type = _resolve_type_name(type_name)
+            builder = reg.find(variant_type)
+            selected, errors = _build_seeded_node(
+                builder,
+                variant_type,
+                FieldInfo(annotation=variant_type),
+                value,
+            )
+            if not errors and selected is not None:
+                return ValidationResult.ok(), index, selected
+            detail = ", ".join(errors) if errors else "did not build a selected node"
+            errors_by_variant.append(f"variant {index} ({type_name}): {detail}")
+
+        return (
+            ValidationResult.fail(
+                ["no union variant accepted value: " + "; ".join(errors_by_variant)]
+            ),
+            None,
+            None,
+        )
 
     def _build_group_fields(
         self, group: GroupNode, value: Any

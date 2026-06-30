@@ -60,6 +60,10 @@ class _ForbidExtraUnionHolder(BaseModel):
     value: str | _ForbidExtraPayload
 
 
+class _RequiredUnionHolder(BaseModel):
+    value: int | str
+
+
 def test_optional_demotes_to_inner_type_node() -> None:
     """``str | None`` becomes a StringNode with required=False, NOT a UnionNode."""
     tree = build_form_tree(WithOptional)
@@ -146,6 +150,63 @@ def test_select_variant_with_seed_value() -> None:
     val = tree.root.find("value")
     assert isinstance(val, UnionNode)
     assert val.selected.value == "seeded"
+
+
+def test_set_value_keeps_matching_selected_union_variant() -> None:
+    tree = build_form_tree(WithUnion)
+
+    result = tree.set_value("value", 42)
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 42
+
+
+def test_set_value_switches_to_later_matching_union_variant() -> None:
+    tree = build_form_tree(WithUnion)
+
+    result = tree.set_value("value", "ready")
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "ready"
+
+
+def test_set_value_selects_matching_unselected_required_union_variant() -> None:
+    tree = build_form_tree(_RequiredUnionHolder)
+
+    result = tree.set_value("value", "ready")
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "ready"
+
+
+def test_set_value_rejects_unmatched_unselected_union_without_mutating() -> None:
+    tree = build_form_tree(_RequiredUnionHolder)
+
+    result = tree.set_value("value", ["not", "supported"])
+
+    assert result.ok is False
+    assert result.errors == (
+        "no union variant accepted value: "
+        "variant 0 (builtins.int): expected int, got list; "
+        "variant 1 (builtins.str): expected str, got list",
+    )
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index is None
+    assert val.selected is None
+    assert tree.snapshots == []
 
 
 def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
