@@ -67,12 +67,15 @@ def _sdist_names(sdist: Path) -> list[str]:
 
 def _sdist_metadata(sdist: Path) -> str:
     with tarfile.open(sdist) as tf:
+        members = tf.getmembers()
+        sdist_root = _sdist_root([member.name for member in members], sdist)
         metadata_members = [
-            member for member in tf.getmembers() if member.name.endswith("/PKG-INFO")
+            member for member in members if member.name == f"{sdist_root}/PKG-INFO"
         ]
         if len(metadata_members) != 1:
             raise RuntimeError(
-                f"expected exactly one PKG-INFO file in {sdist}, got {metadata_members!r}"
+                f"expected exactly one root PKG-INFO file in {sdist}, "
+                f"got {metadata_members!r}"
             )
         metadata_file = tf.extractfile(metadata_members[0])
         if metadata_file is None:

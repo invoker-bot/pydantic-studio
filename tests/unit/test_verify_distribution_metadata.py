@@ -44,12 +44,13 @@ def _write_sdist(
     filenames: tuple[str, ...],
     *,
     metadata: str | None = None,
+    metadata_name: str = "pydantic_studio-0.4.0/PKG-INFO",
 ) -> None:
     with tarfile.open(dist / "pydantic_studio-0.4.0.tar.gz", "w:gz") as tf:
         if metadata is not None:
             pkg_info = dist / "PKG-INFO"
             pkg_info.write_text(metadata, encoding="utf-8")
-            tf.add(pkg_info, arcname="pydantic_studio-0.4.0/PKG-INFO")
+            tf.add(pkg_info, arcname=metadata_name)
         for filename in filenames:
             source = dist / filename
             source.parent.mkdir(parents=True, exist_ok=True)
@@ -192,6 +193,26 @@ def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path)
     _write_sdist(dist, ("CHANGELOG.md", "SECURITY.md"), metadata=metadata)
 
     with pytest.raises(RuntimeError, match=r"CONTRIBUTING\.md"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_sdist_pkg_info_decoy_path(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+        metadata_name="pydantic_studio-0.4.0/docs/PKG-INFO",
+    )
+
+    with pytest.raises(RuntimeError, match=r"PKG-INFO"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
