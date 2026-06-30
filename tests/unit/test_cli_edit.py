@@ -119,3 +119,11 @@ def test_edit_unknown_frontend_errors() -> None:
         ["edit", "--frontend", "vr", "tests.fixtures.schemas:Server"],
     )
     assert result.exit_code != 0
+
+
+def test_edit_unknown_frontend_is_rejected_before_schema_import() -> None:
+    result = runner.invoke(app, ["edit", "--frontend", "vr", "nosuch:Foo"])
+
+    assert result.exit_code != 0
+    assert "frontend" in result.output.lower()
+    assert "nosuch" not in result.output.lower()

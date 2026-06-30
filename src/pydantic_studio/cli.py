@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import typer
 from pydantic import BaseModel
@@ -226,7 +226,7 @@ def edit(
             "to <Class>.yaml."
         ),
     ),
-    frontend: str = typer.Option(
+    frontend: Literal["console", "tui", "web"] = typer.Option(
         "console",
         "--frontend",
         "-f",
