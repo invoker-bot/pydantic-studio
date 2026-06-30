@@ -27,28 +27,45 @@ def _single_file(dist_dir: Path, pattern: str) -> Path:
     return matches[0]
 
 
-def _wheel_dist_info_files(names: Sequence[str], filename: str) -> list[str]:
-    suffix = f".dist-info/{filename}"
-    return [name for name in names if name.count("/") == 1 and name.endswith(suffix)]
+def _wheel_dist_info_files(
+    names: Sequence[str],
+    *,
+    dist_info_dir: str,
+    filename: str,
+) -> list[str]:
+    expected = f"{dist_info_dir}/{filename}"
+    return [name for name in names if name == expected]
 
 
-def _wheel_metadata(wheel: Path) -> str:
+def _wheel_metadata(wheel: Path, *, dist_info_dir: str) -> str:
     with zipfile.ZipFile(wheel) as zf:
-        metadata_names = _wheel_dist_info_files(zf.namelist(), "METADATA")
+        metadata_names = _wheel_dist_info_files(
+            zf.namelist(),
+            dist_info_dir=dist_info_dir,
+            filename="METADATA",
+        )
         if len(metadata_names) != 1:
             raise RuntimeError(
-                f"expected exactly one .dist-info/METADATA file in {wheel}, "
+                f"expected exactly one {dist_info_dir}/METADATA file in {wheel}, "
                 f"got {metadata_names!r}"
             )
         return zf.read(metadata_names[0]).decode("utf-8")
 
 
-def _wheel_entry_points(wheel: Path) -> configparser.SectionProxy | None:
+def _wheel_entry_points(
+    wheel: Path,
+    *,
+    dist_info_dir: str,
+) -> configparser.SectionProxy | None:
     with zipfile.ZipFile(wheel) as zf:
-        entry_point_names = _wheel_dist_info_files(zf.namelist(), "entry_points.txt")
+        entry_point_names = _wheel_dist_info_files(
+            zf.namelist(),
+            dist_info_dir=dist_info_dir,
+            filename="entry_points.txt",
+        )
         if len(entry_point_names) > 1:
             raise RuntimeError(
-                f"expected at most one entry_points.txt file in {wheel}, "
+                f"expected at most one {dist_info_dir}/entry_points.txt file in {wheel}, "
                 f"got {entry_point_names!r}"
             )
         if not entry_point_names:
@@ -130,6 +147,17 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     if invalid:
         raise RuntimeError(f"pyproject.toml project identity fields must be strings: {invalid!r}")
     return tuple(f"{metadata_name}: {project[field]}" for field, metadata_name in fields)
+
+
+def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:
+    project = _table(pyproject, "project", "project")
+    name = project.get("name")
+    version = project.get("version")
+    if not isinstance(name, str) or not isinstance(version, str):
+        raise RuntimeError("pyproject.toml project name and version must be strings")
+
+    wheel_name = re.sub(r"[-_.]+", "_", name).lower()
+    return f"{wheel_name}-{version}.dist-info"
 
 
 def _project_console_scripts(pyproject: dict[str, object]) -> dict[str, str]:
@@ -261,8 +289,9 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     pyproject = _load_pyproject(project_root)
     wheel = _single_file(dist_dir, "*.whl")
     sdist = _single_file(dist_dir, "*.tar.gz")
+    wheel_dist_info_dir = _wheel_dist_info_dir(pyproject)
 
-    metadata_headers = _metadata_headers(_wheel_metadata(wheel))
+    metadata_headers = _metadata_headers(_wheel_metadata(wheel, dist_info_dir=wheel_dist_info_dir))
     missing_identity = [
         line for line in _project_identity(pyproject) if line not in metadata_headers
     ]
@@ -291,7 +320,7 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
 
     console_scripts = _project_console_scripts(pyproject)
     if console_scripts:
-        entry_points = _wheel_entry_points(wheel)
+        entry_points = _wheel_entry_points(wheel, dist_info_dir=wheel_dist_info_dir)
         missing_entry_points = [
             f"{name} = {target}"
             for name, target in console_scripts.items()
@@ -299,7 +328,8 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         ]
         if missing_entry_points:
             raise RuntimeError(
-                f"{wheel} missing console script entry points: {missing_entry_points!r}"
+                f"{wheel} missing console script entry points in {wheel_dist_info_dir}: "
+                f"{missing_entry_points!r}"
             )
 
     sdist_metadata_headers = _metadata_headers(_sdist_metadata(sdist))
