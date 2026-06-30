@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic_studio.io._json_strict import loads_strict_json
+from pydantic_studio.io._json_strict import dumps_strict_json, loads_strict_json
 from pydantic_studio.renderers.textual_.widgets.cells.input_cell import InputCell
 
 
@@ -24,7 +24,10 @@ class AnyCell(InputCell):
             return ""
         if isinstance(value, str):
             return value
-        return json.dumps(value, ensure_ascii=False)
+        try:
+            return dumps_strict_json(value, ensure_ascii=False)
+        except (TypeError, ValueError):
+            return str(value)
 
     def parse(self, raw: str) -> tuple[bool, Any]:
         stripped = raw.strip()

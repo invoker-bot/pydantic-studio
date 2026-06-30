@@ -29,6 +29,10 @@ def loads_strict_json(text: str) -> Any:
     )
 
 
+def dumps_strict_json(value: Any, *, ensure_ascii: bool = True) -> str:
+    return json.dumps(value, ensure_ascii=ensure_ascii, allow_nan=False)
+
+
 def load_strict_json(fp: Any) -> Any:
     return json.load(
         fp,

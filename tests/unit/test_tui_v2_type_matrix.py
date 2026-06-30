@@ -188,6 +188,28 @@ def test_any_cell_preserves_non_standard_json_as_plain_text() -> None:
         assert parsed == raw
 
 
+def test_any_cell_displays_non_finite_float_as_text() -> None:
+    tree = build_form_tree(_AnySchema, existing={"payload": float("nan")})
+    node = tree.root.find("payload")
+    assert node is not None
+    cell = AnyCell(node=node, path="payload", form_tree=tree)
+
+    assert cell.display_value == "nan"
+
+
+def test_any_cell_displays_non_json_native_value_as_text() -> None:
+    class OpaqueValue:
+        def __str__(self) -> str:
+            return "opaque-value"
+
+    tree = build_form_tree(_AnySchema, existing={"payload": OpaqueValue()})
+    node = tree.root.find("payload")
+    assert node is not None
+    cell = AnyCell(node=node, path="payload", form_tree=tree)
+
+    assert cell.display_value == "opaque-value"
+
+
 @pytest.mark.asyncio
 async def test_sequence_drill_add_move_delete_and_edit_item() -> None:
     tree = build_form_tree(
