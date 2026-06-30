@@ -219,6 +219,19 @@ def test_add_item_rejects_invalid_typed_value_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_add_item_rejects_explicit_none_without_mutating() -> None:
+    tree = build_form_tree(WithList)
+
+    result = tree.add_item("counts", None)
+
+    assert result.ok is False
+    assert result.errors == ("value is required",)
+    counts = tree.root.find("counts")
+    assert isinstance(counts, SequenceNode)
+    assert counts.items == []
+    assert tree.snapshots == []
+
+
 def test_remove_item_renumbers() -> None:
     tree = build_form_tree(WithList, existing={"tags": ["a", "b", "c"]})
     tree.remove_item("tags", 1)
@@ -245,6 +258,21 @@ def test_insert_item_rejects_invalid_typed_value_without_mutating() -> None:
 
     assert result.ok is False
     assert any("expected int" in error for error in result.errors)
+    counts = tree.root.find("counts")
+    assert isinstance(counts, SequenceNode)
+    int_items = [cast("IntNode", item) for item in counts.items]
+    assert [item.value for item in int_items] == [1, 3]
+    assert [item.name for item in counts.items] == ["0", "1"]
+    assert tree.snapshots == []
+
+
+def test_insert_item_rejects_explicit_none_without_mutating() -> None:
+    tree = build_form_tree(WithList, existing={"counts": [1, 3]})
+
+    result = tree.insert_item("counts", 1, None)
+
+    assert result.ok is False
+    assert result.errors == ("value is required",)
     counts = tree.root.find("counts")
     assert isinstance(counts, SequenceNode)
     int_items = [cast("IntNode", item) for item in counts.items]

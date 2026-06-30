@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-1059%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-1061%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,7 +77,7 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 1059 tests: 1035 default unit/integration/TUI/web smoke tests plus 24
+by 1061 tests: 1037 default unit/integration/TUI/web smoke tests plus 24
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
@@ -409,7 +409,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 1035 default tests; skips tests/e2e/
+uv run pytest -q                          # 1037 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint

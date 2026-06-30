@@ -35,6 +35,7 @@ from pydantic_studio.tree.validation import ValidationResult
 
 AnyValueMode = Literal["null", "str", "int", "float", "bool", "list", "dict"]
 _MISSING_KEY = object()
+_UNSET_VALUE = object()
 
 
 def _resolve_type_name(name: str) -> Any:
@@ -1921,7 +1922,7 @@ class FormTree(BaseModel):
             return ValidationResult.fail(errors)
         return ValidationResult.ok()
 
-    def add_item(self, path: str, value: Any = None) -> ValidationResult:
+    def add_item(self, path: str, value: Any = _UNSET_VALUE) -> ValidationResult:
         """Append a default child to the SequenceNode at ``path``."""
         from pydantic.fields import FieldInfo
 
@@ -1942,7 +1943,7 @@ class FormTree(BaseModel):
         builder = default_registry().find(item_type)
         item_field = FieldInfo(annotation=item_type)
         child = builder.build(item_type, item_field, None)
-        if value is not None:
+        if value is not _UNSET_VALUE:
             errors = child.validate_value(value)
             if errors:
                 return ValidationResult.fail(list(errors))
@@ -1974,7 +1975,7 @@ class FormTree(BaseModel):
         return ValidationResult.ok()
 
     def insert_item(
-        self, path: str, index: int, value: Any = None
+        self, path: str, index: int, value: Any = _UNSET_VALUE
     ) -> ValidationResult:
         """Insert a new child at ``index`` in the SequenceNode at ``path``."""
         from pydantic.fields import FieldInfo
@@ -1998,7 +1999,7 @@ class FormTree(BaseModel):
         builder = default_registry().find(item_type)
         item_field = FieldInfo(annotation=item_type)
         child = builder.build(item_type, item_field, None)
-        if value is not None:
+        if value is not _UNSET_VALUE:
             errors = child.validate_value(value)
             if errors:
                 return ValidationResult.fail(list(errors))
