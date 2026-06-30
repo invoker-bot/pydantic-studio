@@ -5,8 +5,30 @@
 // server-side state.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { studioUrl } from "@/api/base";
 import { FormTreeSchema, type FormTree } from "@/api/schemas";
+
+const ValidationErrorSchema = z.object({
+  path: z.string(),
+  message: z.string(),
+}).strict();
+
+const ValidationEnvelopeSchema = z.object({
+  ok: z.boolean(),
+  errors: z.array(ValidationErrorSchema),
+}).strict();
+
+const MutationResultSchema = z.object({
+  ok: z.boolean(),
+  errors: z.array(z.string()),
+}).strict();
+
+const MutationResponseSchema = z.object({
+  tree: FormTreeSchema,
+  validation: ValidationEnvelopeSchema,
+  mutation_result: MutationResultSchema,
+}).strict();
 
 // Discriminated union for the JSON API mutation contract. Field edits,
 // containers, variants, and history controls all share this server-
@@ -24,11 +46,7 @@ export type Mutation =
   | { op: "select_variant"; path: string; variant_index: number }
   | { op: "select_root_variant"; variant_id: string };
 
-export interface MutationResponse {
-  tree: FormTree;
-  validation: { ok: boolean; errors: Array<{ path: string; message: string }> };
-  mutation_result: { ok: boolean; errors: readonly string[] };
-}
+export type MutationResponse = z.infer<typeof MutationResponseSchema>;
 
 export async function applyMutation(mutation: Mutation): Promise<MutationResponse> {
   const response = await fetch(studioUrl("/api/mutations"), {
@@ -45,14 +63,7 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
     throw new Error(`POST /api/mutations failed: HTTP ${response.status}`);
   }
   const raw = await response.json();
-  // The tree field always needs zod parsing; the rest is shape-stable
-  // enough that we trust it. Future polish could add a full envelope
-  // schema if we ever want stronger guarantees.
-  const parsed: MutationResponse = {
-    tree: FormTreeSchema.parse(raw.tree),
-    validation: raw.validation,
-    mutation_result: raw.mutation_result,
-  };
+  const parsed = MutationResponseSchema.parse(raw);
   // The server returns 200 even when the mutation is REJECTED by
   // validate-first (the tree is intact; mutation_result.ok=false flags
   // the rejection). Surface that as a thrown Error so useMutation's

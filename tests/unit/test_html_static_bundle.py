@@ -161,3 +161,33 @@ def test_frontend_tree_schema_requires_readonly_paths() -> None:
 
     assert "readonly_paths: z.array(z.string())," in schema
     assert "readonly_paths: z.array(z.string()).default([])" not in schema
+
+
+def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
+    mutations = (ROOT / "frontend" / "src" / "api" / "mutations.ts").read_text(
+        encoding="utf-8"
+    )
+
+    assert "MutationResponseSchema.parse(raw)" in mutations
+    assert "validation: raw.validation" not in mutations
+    assert "mutation_result: raw.mutation_result" not in mutations
+    assert re.search(
+        r"const ValidationErrorSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        mutations,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"const ValidationEnvelopeSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        mutations,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"const MutationResultSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        mutations,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"const MutationResponseSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        mutations,
+        re.DOTALL,
+    )
