@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel, Field
@@ -127,6 +127,26 @@ class TestSaveJson:
 
         with pytest.raises(ValueError, match="JSON compliant"):
             save_json(build_form_tree(FloatConfig), tmp_path / "out.json")
+
+    def test_save_rejects_mapping_keys_that_collapse_to_duplicate_json_keys(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        from pydantic_studio.io.json_ import save_json
+
+        class MappingConfig(BaseModel):
+            values: dict[Any, str] = {}
+
+        out = tmp_path / "out.json"
+        tree = build_form_tree(
+            MappingConfig,
+            existing={"values": {1: "integer key", "1": "string key"}},
+        )
+
+        with pytest.raises(ValueError, match="duplicate JSON key"):
+            save_json(tree, out)
+
+        assert not out.exists()
 
     def test_save_uses_field_aliases(self, tmp_path: Path) -> None:
         from pydantic_studio.io.json_ import save_json

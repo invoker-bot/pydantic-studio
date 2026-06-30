@@ -1282,6 +1282,16 @@ def _key_present(data: dict[Any, Any], key: Any) -> Any:
     return _MISSING_KEY
 
 
+def _reject_duplicate_mapping_json_keys(node: MappingNode) -> None:
+    seen: set[str] = set()
+    for key_node, _value_node in node.entries:
+        json_key = _json_safe_any_key(key_node.to_python())
+        if json_key in seen:
+            msg = f"duplicate JSON key {json_key!r} after mapping key normalization"
+            raise ValueError(msg)
+        seen.add(json_key)
+
+
 def _overlay_any_output_values(data: Any, node: Any, *, by_alias: bool) -> Any:
     if isinstance(node, AnyValueNode):
         return _json_safe_any_value(node.value)
@@ -1301,6 +1311,7 @@ def _overlay_any_output_values(data: Any, node: Any, *, by_alias: bool) -> Any:
             for item_data, item_node in zip(data, node.items, strict=False)
         ]
     if isinstance(node, MappingNode) and isinstance(data, dict):
+        _reject_duplicate_mapping_json_keys(node)
         out = dict(data)
         for key_node, value_node in node.entries:
             raw_key = key_node.to_python()
