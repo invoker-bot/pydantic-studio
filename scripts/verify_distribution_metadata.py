@@ -55,6 +55,7 @@ def _verify_wheel_structure(
     *,
     dist_info_dir: str,
     license_files: Sequence[str],
+    package_root: str,
 ) -> None:
     with zipfile.ZipFile(wheel) as zf:
         names = set(zf.namelist())
@@ -77,6 +78,10 @@ def _verify_wheel_structure(
                 f"{wheel} missing wheel license files in {dist_info_dir}: "
                 f"{missing_license_files!r}"
             )
+        package_files = (f"{package_root}/py.typed",)
+        missing_package_files = [filename for filename in package_files if filename not in names]
+        if missing_package_files:
+            raise RuntimeError(f"{wheel} missing wheel package files: {missing_package_files!r}")
         wheel_metadata = zf.read(f"{dist_info_dir}/WHEEL").decode("utf-8")
         record = zf.read(f"{dist_info_dir}/RECORD").decode("utf-8")
     wheel_headers = _metadata_headers(wheel_metadata)
@@ -92,11 +97,12 @@ def _verify_wheel_structure(
         raise RuntimeError(f"{wheel} missing wheel metadata: {missing_metadata!r}")
 
     record_entries = _wheel_record_entries(record)
-    record_paths = [
+    record_paths = [f"{package_root}/py.typed"]
+    record_paths.extend(
         f"{dist_info_dir}/{filename}"
         for filename in ("METADATA", "WHEEL", "RECORD", "entry_points.txt")
         if f"{dist_info_dir}/{filename}" in names
-    ]
+    )
     record_paths.extend(
         f"{dist_info_dir}/licenses/{filename}"
         for filename in license_files
@@ -267,13 +273,19 @@ def _project_readme(pyproject: dict[str, object]) -> str | None:
 
 def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:
     project = _table(pyproject, "project", "project")
-    name = project.get("name")
     version = project.get("version")
-    if not isinstance(name, str) or not isinstance(version, str):
+    if not isinstance(version, str):
         raise RuntimeError("pyproject.toml project name and version must be strings")
 
-    wheel_name = re.sub(r"[-_.]+", "_", name).lower()
-    return f"{wheel_name}-{version}.dist-info"
+    return f"{_project_package_root(pyproject)}-{version}.dist-info"
+
+
+def _project_package_root(pyproject: dict[str, object]) -> str:
+    project = _table(pyproject, "project", "project")
+    name = project.get("name")
+    if not isinstance(name, str):
+        raise RuntimeError("pyproject.toml project name and version must be strings")
+    return re.sub(r"[-_.]+", "_", name).lower()
 
 
 def _project_console_scripts(pyproject: dict[str, object]) -> dict[str, str]:
@@ -400,6 +412,7 @@ def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
         dict.fromkeys(
             (
                 "pyproject.toml",
+                f"src/{_project_package_root(pyproject)}/py.typed",
                 *source_include,
                 *((readme,) if readme is not None else ()),
                 *_project_license_files(pyproject),
@@ -426,6 +439,7 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         wheel,
         dist_info_dir=wheel_dist_info_dir,
         license_files=_project_license_files(pyproject),
+        package_root=_project_package_root(pyproject),
     )
     metadata_headers = _metadata_headers(_wheel_metadata(wheel, dist_info_dir=wheel_dist_info_dir))
     missing_identity = [

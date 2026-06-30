@@ -34,9 +34,11 @@ def _write_wheel(
     entry_points_name: str = "pydantic_studio-0.4.0.dist-info/entry_points.txt",
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
     license_files: tuple[str, ...] = ("LICENSE",),
+    typed_marker: str | None = "pydantic_studio/py.typed",
     wheel_metadata: str | None = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     record: str | None = (
         "pydantic_studio/__init__.py,,\n"
+        "pydantic_studio/py.typed,,\n"
         "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
         "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
         "pydantic_studio-0.4.0.dist-info/entry_points.txt,,\n"
@@ -46,6 +48,8 @@ def _write_wheel(
 ) -> None:
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
         zf.writestr(metadata_name, metadata)
+        if typed_marker is not None:
+            zf.writestr(typed_marker, "")
         if entry_points:
             zf.writestr(entry_points_name, entry_points)
         for filename in license_files:
@@ -63,6 +67,7 @@ def _write_sdist(
     pyproject: str | None = "pyproject.toml",
     readme: str | None = "README.md",
     license_files: tuple[str, ...] = ("LICENSE",),
+    typed_marker: str | None = "src/pydantic_studio/py.typed",
     metadata: str | None = None,
     metadata_name: str = "pydantic_studio-0.4.0/PKG-INFO",
 ) -> None:
@@ -91,6 +96,11 @@ def _write_sdist(
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(filename, encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
+        if typed_marker is not None:
+            source = dist / typed_marker
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("", encoding="utf-8")
+            tf.add(source, arcname=f"pydantic_studio-0.4.0/{typed_marker}")
 
 
 def _write_pyproject(
@@ -428,6 +438,55 @@ def test_verify_distribution_metadata_rejects_missing_wheel_record_entry(
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_missing_wheel_typed_marker(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, typed_marker=None)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"py\.typed"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_wheel_typed_marker_record_entry(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        record=(
+            "pydantic_studio/__init__.py,,\n"
+            "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
+            "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
+            "pydantic_studio-0.4.0.dist-info/entry_points.txt,,\n"
+            "pydantic_studio-0.4.0.dist-info/licenses/LICENSE,,\n"
+            "pydantic_studio-0.4.0.dist-info/RECORD,,\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"py\.typed"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_license_file(
     tmp_path: Path,
 ) -> None:
@@ -504,6 +563,26 @@ def test_verify_distribution_metadata_rejects_missing_sdist_pyproject_file(
     )
 
     with pytest.raises(RuntimeError, match=r"pyproject\.toml"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_sdist_typed_marker(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        typed_marker=None,
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"py\.typed"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
