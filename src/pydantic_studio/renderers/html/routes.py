@@ -42,6 +42,8 @@ def _readonly_mutation_error(
     server: StudioServer, mutation: dict[str, Any]
 ) -> str | None:
     op = mutation.get("op")
+    if op == "select_root_variant" and server.readonly_paths:
+        return f"root variant is {_READONLY_MESSAGE}"
     if op not in _PATH_MUTATION_OPS:
         return None
     path = mutation.get("path")

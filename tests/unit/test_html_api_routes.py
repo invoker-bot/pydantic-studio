@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.html import StudioServer
 from pydantic_studio.session import SubmitResult
+from pydantic_studio.variants import VariantRegistry, VariantSpec, build_variant_form_tree
 
 
 class _Demo(BaseModel):
@@ -25,6 +26,14 @@ class _Profile(BaseModel):
 class _WithProfile(BaseModel):
     profile: _Profile = Field(default_factory=_Profile)
     workers: int = 4
+
+
+class _RootEmail(BaseModel):
+    address: str = "ops@example.com"
+
+
+class _RootSlack(BaseModel):
+    channel: str = "#ops"
 
 
 def _client(existing: dict | None = None) -> TestClient:
@@ -365,6 +374,41 @@ def test_api_mutations_reject_readonly_descendant_without_mutating() -> None:
         "errors": ["profile.name is read-only — value is managed by the caller"],
     }
     assert server.tree.root.find("profile").find("name").value == "alpha"
+
+
+def test_api_mutations_reject_root_variant_switch_when_any_path_is_readonly() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_RootEmail),
+                VariantSpec(id="slack", model=_RootSlack),
+            ]
+        ),
+        selected_id="email",
+    )
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"address"})
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "select_root_variant", "variant_id": "slack"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {
+        "ok": False,
+        "errors": ["root variant is read-only — value is managed by the caller"],
+    }
+    assert body["validation"]["errors"][0] == {
+        "path": "",
+        "message": "root variant is read-only — value is managed by the caller",
+    }
+    assert server.tree.schema_class is _RootEmail
+    assert server.tree.variant is not None
+    assert server.tree.variant.selected_id == "email"
+    assert server.tree.root.find("address").value == "ops@example.com"
+    assert server.tree.root.find("channel") is None
 
 
 def test_run_html_app_signature_matches_run_app_contract() -> None:
