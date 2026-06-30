@@ -12,10 +12,10 @@ Description-Content-Type, Requires-Python, license files, classifiers, keywords,
 dependencies, optional extras, and every declared Project-URL in both the wheel
 `METADATA` and the sdist `PKG-INFO`, confirms the wheel `.dist-info` identity, structure files,
 purelib flag, compatibility tag, declared license files, `RECORD` entries, and
-console script entry points match `[project.scripts]`, then confirms the declared
-README file and every explicit `source-include` entry are present in the source
-archive. The Changelog, Security, and Contributing URL targets must also be
-listed in `source-include`.
+console script entry points match `[project.scripts]`, then confirms `pyproject.toml`,
+the declared README file, and every explicit `source-include` entry are present in
+the source archive. The Changelog, Security, and Contributing URL targets must
+also be listed in `source-include`.
 The package metadata exposes Source, Documentation, Issues, Changelog,
 Security, and Contributing project URLs so registry pages have clear support,
 navigation, release history, vulnerability-reporting links, and contributor

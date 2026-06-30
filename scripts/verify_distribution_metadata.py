@@ -399,6 +399,7 @@ def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
     return tuple(
         dict.fromkeys(
             (
+                "pyproject.toml",
                 *source_include,
                 *((readme,) if readme is not None else ()),
                 *_project_license_files(pyproject),

@@ -60,6 +60,7 @@ def _write_sdist(
     dist: Path,
     filenames: tuple[str, ...],
     *,
+    pyproject: str | None = "pyproject.toml",
     readme: str | None = "README.md",
     license_files: tuple[str, ...] = ("LICENSE",),
     metadata: str | None = None,
@@ -75,6 +76,11 @@ def _write_sdist(
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(filename, encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
+        if pyproject is not None:
+            source = dist / pyproject
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(pyproject, encoding="utf-8")
+            tf.add(source, arcname=f"pydantic_studio-0.4.0/{pyproject}")
         if readme is not None:
             source = dist / readme
             source.parent.mkdir(parents=True, exist_ok=True)
@@ -478,6 +484,26 @@ def test_verify_distribution_metadata_rejects_missing_sdist_readme_file(
     )
 
     with pytest.raises(RuntimeError, match=r"README\.md"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_sdist_pyproject_file(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        pyproject=None,
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"pyproject\.toml"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
