@@ -88,6 +88,18 @@ def test_set_value_none_on_omitted_optional_model_is_noop() -> None:
     assert tree.to_instance().simulate is None
 
 
+def test_set_value_dict_activates_omitted_optional_model() -> None:
+    tree = build_form_tree(Host)
+
+    result = tree.set_value("simulate", {"a": 7})
+
+    assert result.ok is True
+    simulate = tree.root.find("simulate")
+    assert simulate is not None
+    assert simulate.omitted is False
+    assert tree.to_instance().simulate == Section(a=7)
+
+
 def test_default_factory_optional_model_keeps_prefill() -> None:
     class HostFactory(BaseModel):
         simulate: Section | None = Field(default_factory=Section)

@@ -49,6 +49,15 @@ class ConstrainedStringSchema(BaseModel):
     unicode_letters: str = Field(default="abc", pattern=r"\p{L}+")
 
 
+class NestedProfile(BaseModel):
+    host: str = "localhost"
+    port: int = Field(default=5432, ge=1)
+
+
+class NestedProfileSchema(BaseModel):
+    profile: NestedProfile = Field(default_factory=NestedProfile)
+
+
 def test_set_valid_value_returns_ok() -> None:
     tree = build_form_tree(Schema)
     result = tree.set_value("name", "Alice")
@@ -224,3 +233,31 @@ def test_set_string_value_uses_pydantic_regex_engine_for_patterns() -> None:
     assert result.errors == (r"must match pattern \p{L}+",)
     assert node.value == "abc"
     assert node.error == r"must match pattern \p{L}+"
+
+
+def test_set_value_replaces_nested_group_fields_and_undoes() -> None:
+    tree = build_form_tree(
+        NestedProfileSchema,
+        existing={"profile": {"host": "old.local", "port": 5432}},
+    )
+
+    result = tree.set_value("profile", {"host": "db.local", "port": 15432})
+
+    assert result.ok is True
+    assert tree.to_instance().profile == NestedProfile(host="db.local", port=15432)
+    assert tree.undo() is True
+    assert tree.to_instance().profile == NestedProfile(host="old.local", port=5432)
+
+
+def test_set_value_rejects_invalid_nested_group_field_without_mutating() -> None:
+    tree = build_form_tree(
+        NestedProfileSchema,
+        existing={"profile": {"host": "old.local", "port": 5432}},
+    )
+
+    result = tree.set_value("profile", {"host": "db.local", "port": 0})
+
+    assert result.ok is False
+    assert result.errors == ("port: must be >= 1",)
+    assert tree.to_instance().profile == NestedProfile(host="old.local", port=5432)
+    assert tree.snapshots == []

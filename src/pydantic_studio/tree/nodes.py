@@ -1850,18 +1850,32 @@ class FormTree(BaseModel):
         last = path_obj.segments[-1]
         target = self._descend(node, last)
         if isinstance(target, GroupNode):
-            if value is not None:
-                target.error = "group fields must be edited by descendant paths"
-                return ValidationResult.fail([target.error])
-            if target.required:
-                target.error = "value is required"
-                return ValidationResult.fail([target.error])
-            if target.omitted:
+            if value is None:
+                if target.required:
+                    target.error = "value is required"
+                    return ValidationResult.fail([target.error])
+                if target.omitted:
+                    return ValidationResult.ok()
+
+                self._push_snapshot(_snap.take(self.root))
+                _reset_group_to_schema_defaults(target)
+                target.omitted = True
+                for group in walked_groups:
+                    if group.omitted:
+                        group.omitted = False
+                if self.draft_path is not None:
+                    _snap.draft_save(self, self.draft_path)
                 return ValidationResult.ok()
 
+            result, fields = self._build_group_fields(target, value)
+            if not result.ok:
+                target.error = result.errors[0] if result.errors else "invalid"
+                return result
+
             self._push_snapshot(_snap.take(self.root))
-            _reset_group_to_schema_defaults(target)
-            target.omitted = True
+            target.fields = fields
+            target.omitted = False
+            target.error = None
             for group in walked_groups:
                 if group.omitted:
                     group.omitted = False
@@ -2015,6 +2029,28 @@ class FormTree(BaseModel):
         if errors:
             return ValidationResult.fail(errors)
         return ValidationResult.ok()
+
+    def _build_group_fields(
+        self, group: GroupNode, value: Any
+    ) -> tuple[ValidationResult, list[AnyNode]]:
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree.builder import default_registry
+
+        builder = default_registry().find(group.schema_class)
+        candidate, errors = _build_seeded_node(
+            builder,
+            group.schema_class,
+            FieldInfo(annotation=group.schema_class),
+            value,
+        )
+        if errors:
+            return ValidationResult.fail(errors), []
+        if not isinstance(candidate, GroupNode):
+            return ValidationResult.fail(
+                [f"{group.schema_class.__name__} did not build a group node"]
+            ), []
+        return ValidationResult.ok(), candidate.fields
 
     def _build_sequence_items(
         self, seq: SequenceNode, value: Any
