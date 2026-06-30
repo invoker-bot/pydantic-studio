@@ -90,8 +90,11 @@ def register(app: FastAPI, server: StudioServer) -> None:
         result = server.session.submit()
         if not result.ok:
             errors = [
-                {"path": path, "message": message}
-                for path, message in zip(result.paths, result.errors, strict=False)
+                {
+                    "path": result.paths[index] if index < len(result.paths) else "",
+                    "message": message,
+                }
+                for index, message in enumerate(result.errors)
             ]
             if not errors:
                 errors = validation_envelope(server.tree)["errors"]

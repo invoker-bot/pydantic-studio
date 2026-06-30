@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.html import StudioServer
+from pydantic_studio.session import SubmitResult
 
 
 class _Demo(BaseModel):
@@ -217,6 +218,23 @@ def test_api_submit_validation_failure_returns_400_with_errors() -> None:
     assert body["ok"] is False
     assert body["errors"]
     assert server.submitted is False
+
+
+def test_api_submit_preserves_errors_without_paths() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+
+    def submit_pathless_error() -> SubmitResult:
+        return SubmitResult(ok=False, errors=("model-level failure",), paths=())
+
+    server.session.submit = submit_pathless_error
+    response = TestClient(server.app).post("/api/submit")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "ok": False,
+        "errors": [{"path": "", "message": "model-level failure"}],
+    }
 
 
 def test_api_cancel_marks_server_cancelled() -> None:
