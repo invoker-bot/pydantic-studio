@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from pydantic_studio import build_form_tree, load_yaml
+from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.console import run_console_app
 from pydantic_studio.variants import VariantRegistry, VariantSpec, build_variant_form_tree
 
@@ -45,7 +46,7 @@ def test_console_prompts_each_leaf_and_saves_yaml(tmp_path) -> None:
     input_func, prompts = _input_from(["staging", "9090", "y", "debug"])
     lines: list[str] = []
 
-    run_console_app(tree, out, input_func=input_func, print_func=lines.append)
+    outcome = run_console_app(tree, out, input_func=input_func, print_func=lines.append)
 
     reloaded = load_yaml(out, PromptSchema).to_instance()
     assert reloaded == PromptSchema(
@@ -61,6 +62,16 @@ def test_console_prompts_each_leaf_and_saves_yaml(tmp_path) -> None:
         "level (debug/info) [info]: ",
     ]
     assert lines[-1] == f"saved to {out}"
+    assert outcome == EditOutcome(status="submitted")
+
+
+def test_console_returns_submitted_outcome_without_save_path() -> None:
+    tree = build_form_tree(PromptSchema)
+    input_func, _ = _input_from(["", "", "", ""])
+
+    outcome = run_console_app(tree, None, input_func=input_func, print_func=lambda _: None)
+
+    assert outcome == EditOutcome(status="submitted")
 
 
 def test_console_blank_answers_keep_defaults(tmp_path) -> None:

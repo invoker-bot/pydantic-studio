@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-1009%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-1010%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,7 +77,7 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 1009 tests: 986 default unit/integration/TUI/web smoke tests plus 23
+by 1010 tests: 987 default unit/integration/TUI/web smoke tests plus 23
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
@@ -185,7 +185,8 @@ port [8080]: 9090
 Containers stay sequential as well: lists and mappings first ask for a
 count, then prompt through each item or entry. When all prompts are
 complete, the tree is validated through the normal save path and written
-to the configured target.
+to the configured target; `run_console_app(...)` returns
+`EditOutcome("submitted")` on that successful completion.
 
 ### Textual TUI
 
@@ -300,7 +301,7 @@ from pydantic_studio import (
     # Drafts
     save_draft, load_draft, delete_draft, find_draft, draft_newer_than,
     # Renderers
-    run_console_app,              # sequential console prompts
+    run_console_app,              # sequential console prompts -> EditOutcome
     EditSession, SubmitResult,    # shared renderer session lifecycle
     StudioApp, StudioScreen, run_app,  # Textual TUI
     EditOutcome,                  # session result: submitted | cancelled
@@ -408,7 +409,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 986 default tests; skips tests/e2e/
+uv run pytest -q                          # 987 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint

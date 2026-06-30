@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic_studio.exceptions import CancelledByUser
 from pydantic_studio.io._json_strict import loads_strict_json
+from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.textual_.widgets.cells.parse import parse_for_kind
 
 InputFunc = Callable[[str], str]
@@ -40,7 +41,7 @@ def run_console_app(
     *,
     input_func: InputFunc = input,
     print_func: PrintFunc = print,
-) -> None:
+) -> EditOutcome:
     """Edit ``tree`` by asking one console prompt per field, then save."""
 
     try:
@@ -59,12 +60,13 @@ def run_console_app(
 
     if save_path is None:
         print_func(repr(tree.to_instance()))
-        return
+        return EditOutcome(status="submitted")
 
     from pydantic_studio.io.dispatch import save_config
 
     save_config(tree, save_path)
     print_func(f"saved to {Path(save_path)}")
+    return EditOutcome(status="submitted")
 
 
 def _prompt_root_variant(
