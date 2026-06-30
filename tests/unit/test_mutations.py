@@ -138,6 +138,25 @@ def test_undo_with_single_snapshot_slot_restores_without_redo():
     assert tree.redo() is False
 
 
+def test_lowering_snapshot_limit_trims_existing_history():
+    tree = build_form_tree(Simple)
+    for i in range(5):
+        tree.set_value("name", f"v{i}")
+
+    assert len(tree.snapshots) == 5
+    assert tree.cursor == 5
+
+    tree.snapshot_limit = 2
+
+    assert len(tree.snapshots) == 2
+    assert tree.cursor == 2
+    assert tree.undo() is True
+    assert tree.root.find("name").value == "v3"
+    assert tree.redo() is True
+    assert tree.root.find("name").value == "v4"
+    assert len(tree.snapshots) == 2
+
+
 def test_snapshot_limit_default_is_50():
     tree = build_form_tree(Simple)
     assert tree.snapshot_limit == 50

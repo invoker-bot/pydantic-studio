@@ -1790,6 +1790,8 @@ class FormTree(BaseModel):
         from the validation context (which ``draft_load`` supplies)."""
         if self.schema_class is None and info.context and "schema_class" in info.context:
             self.schema_class = info.context["schema_class"]
+        if len(self.snapshots) > self.snapshot_limit:
+            self._trim_snapshot_history()
         return self
 
     def attach_variant_registry(
@@ -2657,7 +2659,7 @@ class FormTree(BaseModel):
         while len(self.snapshots) > self.snapshot_limit:
             self.snapshots.pop(0)
             if self.cursor > 0:
-                self.cursor -= 1
+                object.__setattr__(self, "cursor", self.cursor - 1)
 
     def undo(self) -> bool:
         """Restore the previous state. Returns True if anything was undone."""
