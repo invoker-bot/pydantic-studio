@@ -15,8 +15,8 @@ dependencies, optional extras, and every declared Project-URL in both the wheel
 declared license files, package `__init__.py`, `py.typed` marker, console script
 target modules and objects, packaged web static bundle files plus the assets
 referenced by `index.html`, `RECORD` entries, and console script entry points
-match `[project.scripts]`, verifies the wheel package `__version__` matches the
-project version, then confirms the sdist filename, archive root,
+exactly match `[project.scripts]`, verifies the wheel package `__version__`
+matches the project version, then confirms the sdist filename, archive root,
 `pyproject.toml`, the declared README file, the sdist package `__init__.py`, the
 sdist package `__version__`, the sdist `py.typed` marker, the sdist console
 script target modules and objects, the sdist web static bundle files plus the

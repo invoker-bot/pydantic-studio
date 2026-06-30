@@ -716,6 +716,33 @@ def test_verify_distribution_metadata_rejects_wheel_console_script_missing_targe
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_extra_wheel_console_script_entry_point(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        entry_points=(
+            "[console_scripts]\n"
+            "pydantic-studio = pydantic_studio.cli:app\n"
+            "pydantic-studio-debug = pydantic_studio.cli:app\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"unexpected console script entry points"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_typed_marker_record_entry(
     tmp_path: Path,
 ) -> None:

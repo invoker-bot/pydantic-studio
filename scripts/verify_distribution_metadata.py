@@ -758,6 +758,16 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
                 f"{wheel} missing console script entry points in {wheel_dist_info_dir}: "
                 f"{missing_entry_points!r}"
             )
+        unexpected_entry_points = [
+            name
+            for name in entry_points
+            if name not in console_scripts
+        ]
+        if unexpected_entry_points:
+            raise RuntimeError(
+                f"{wheel} unexpected console script entry points in {wheel_dist_info_dir}: "
+                f"{unexpected_entry_points!r}"
+            )
         _verify_console_script_target_objects(
             pyproject,
             read_source=lambda filename: _wheel_text(wheel, filename),
