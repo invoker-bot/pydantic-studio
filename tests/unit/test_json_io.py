@@ -62,6 +62,23 @@ class TestLoadJson:
             with pytest.raises(ValueError, match="non-finite JSON constant"):
                 load_json(src, FloatConfig)
 
+    def test_load_rejects_duplicate_keys(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.json_ import load_json
+
+        class NestedConfig(BaseModel):
+            settings: dict[str, int] = {}
+
+        cases = {
+            "top": '{"settings": {}, "settings": {"timeout": 30}}',
+            "nested": '{"settings": {"timeout": 30, "timeout": 60}}',
+        }
+        for name, content in cases.items():
+            src = tmp_path / f"{name}.json"
+            src.write_text(content, encoding="utf-8")
+
+            with pytest.raises(ValueError, match="duplicate JSON key"):
+                load_json(src, NestedConfig)
+
 
 class TestSaveJson:
     def test_save_creates_file_with_values(self, tmp_path: Path) -> None:

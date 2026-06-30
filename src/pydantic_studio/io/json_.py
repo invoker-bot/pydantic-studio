@@ -10,7 +10,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic_studio.tree.builder import build_form_tree
 
@@ -25,6 +25,16 @@ def _reject_non_finite_json_constant(value: str) -> None:
     raise ValueError(msg)
 
 
+def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    obj: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            msg = f"duplicate JSON key {key!r} is not supported"
+            raise ValueError(msg)
+        obj[key] = value
+    return obj
+
+
 def load_json(path: str | Path, schema: type[BaseModel]) -> FormTree:
     """Load a JSON file into a FormTree bound to ``schema``.
 
@@ -35,7 +45,11 @@ def load_json(path: str | Path, schema: type[BaseModel]) -> FormTree:
     """
     path = Path(path)
     with path.open("r", encoding="utf-8") as f:
-        data = json.load(f, parse_constant=_reject_non_finite_json_constant)
+        data = json.load(
+            f,
+            parse_constant=_reject_non_finite_json_constant,
+            object_pairs_hook=_object_without_duplicate_keys,
+        )
     if not isinstance(data, dict):
         msg = f"expected JSON object at top level, got {type(data).__name__}"
         raise ValueError(msg)
