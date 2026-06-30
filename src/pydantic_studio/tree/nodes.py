@@ -1384,6 +1384,7 @@ def _validate_seed_against_node(
         from pydantic_studio.types.aliases import (
             input_value_or_missing_for_field,
             is_missing_input_value,
+            top_level_input_keys,
         )
 
         if isinstance(seed, BaseModel):
@@ -1401,8 +1402,18 @@ def _validate_seed_against_node(
                 f"{type(seed).__name__}"
             ]
         errors: list[str] = []
+        fields = node.schema_class.model_fields
+        if node.schema_class.model_config.get("extra") == "forbid":
+            allowed_keys = {
+                key
+                for field_name, field_info in fields.items()
+                for key in top_level_input_keys(field_name, field_info)
+            }
+            for key in data:
+                if key not in allowed_keys:
+                    errors.append(f"extra seed field {key!r} is not permitted")
         for child in node.fields:
-            field_info = node.schema_class.model_fields.get(child.name)
+            field_info = fields.get(child.name)
             if field_info is None:
                 continue
             value = input_value_or_missing_for_field(data, child.name, field_info)

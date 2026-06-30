@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from pydantic_studio.io.yaml import save_yaml
 from pydantic_studio.variants import (
@@ -25,6 +25,12 @@ class PortSettings(BaseModel):
 
 class RequiredPortSettings(BaseModel):
     port: int
+
+
+class ForbidExtraPortSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    port: int = 443
 
 
 class CollidingDiscriminatorSettings(BaseModel):
@@ -218,6 +224,27 @@ def test_select_root_variant_rejects_explicit_none_seed_without_mutating() -> No
 
     assert result.ok is False
     assert result.errors == ("port: value is required",)
+    assert tree.schema_class is EmailSettings
+    assert tree.variant is not None
+    assert tree.variant.selected_id == "email"
+    assert tree.root.find("address") is not None
+    assert tree.root.find("port") is None
+    assert tree.snapshots == []
+
+
+def test_select_root_variant_rejects_extra_forbidden_seed_field_without_mutating() -> None:
+    registry = VariantRegistry(
+        [
+            VariantSpec(id="email", model=EmailSettings, label="Email"),
+            VariantSpec(id="port", model=ForbidExtraPortSettings, label="Port"),
+        ]
+    )
+    tree = build_variant_form_tree(registry, selected_id="email")
+
+    result = tree.select_root_variant("port", seed={"port": 8443, "stale": True})
+
+    assert result.ok is False
+    assert any("extra seed field 'stale'" in error for error in result.errors)
     assert tree.schema_class is EmailSettings
     assert tree.variant is not None
     assert tree.variant.selected_id == "email"

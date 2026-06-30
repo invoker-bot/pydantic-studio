@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import BoolNode, IntNode, StringNode, UnionNode
@@ -48,6 +48,16 @@ class _SeededMappingPayload(BaseModel):
 
 class _SeededMappingUnionHolder(BaseModel):
     value: str | _SeededMappingPayload
+
+
+class _ForbidExtraPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    count: int = 0
+
+
+class _ForbidExtraUnionHolder(BaseModel):
+    value: str | _ForbidExtraPayload
 
 
 def test_optional_demotes_to_inner_type_node() -> None:
@@ -220,6 +230,21 @@ def test_select_variant_rejects_mapping_seed_value_without_mutating() -> None:
 
     assert result.ok is False
     assert result.errors == ("settings: ['workers']: expected int, got str",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
+def test_select_variant_rejects_extra_forbidden_seed_field_without_mutating() -> None:
+    tree = build_form_tree(_ForbidExtraUnionHolder, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 1, seed={"count": 1, "stale": "ignored"})
+
+    assert result.ok is False
+    assert any("extra seed field 'stale'" in error for error in result.errors)
     val = tree.root.find("value")
     assert isinstance(val, UnionNode)
     assert val.selected_index == 0
