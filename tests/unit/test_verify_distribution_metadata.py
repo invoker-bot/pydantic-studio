@@ -30,10 +30,11 @@ def _write_wheel(
     dist: Path,
     metadata: str,
     *,
+    metadata_name: str = "pydantic_studio-0.4.0.dist-info/METADATA",
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
 ) -> None:
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
-        zf.writestr("pydantic_studio-0.4.0.dist-info/METADATA", metadata)
+        zf.writestr(metadata_name, metadata)
         if entry_points:
             zf.writestr("pydantic_studio-0.4.0.dist-info/entry_points.txt", entry_points)
 
@@ -160,6 +161,25 @@ def test_verify_distribution_metadata_accepts_expected_release_files(tmp_path: P
     )
 
     verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_wheel_metadata_decoy_path(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, metadata_name="pydantic_studio/METADATA")
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"METADATA"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
 def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path) -> None:

@@ -29,10 +29,13 @@ def _single_file(dist_dir: Path, pattern: str) -> Path:
 
 def _wheel_metadata(wheel: Path) -> str:
     with zipfile.ZipFile(wheel) as zf:
-        metadata_names = [name for name in zf.namelist() if name.endswith("METADATA")]
+        metadata_names = [
+            name for name in zf.namelist() if name.endswith(".dist-info/METADATA")
+        ]
         if len(metadata_names) != 1:
             raise RuntimeError(
-                f"expected exactly one METADATA file in {wheel}, got {metadata_names!r}"
+                f"expected exactly one .dist-info/METADATA file in {wheel}, "
+                f"got {metadata_names!r}"
             )
         return zf.read(metadata_names[0]).decode("utf-8")
 
