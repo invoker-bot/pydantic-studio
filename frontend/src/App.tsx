@@ -191,35 +191,35 @@ export default function App() {
             </Button>
           </div>
         </header>
-        {data.variant && <VariantSelector variant={data.variant} />}
-        {submitErrors.length > 0 && (
-          <div
-            data-testid="submit-errors"
-            className="rounded border border-red-300 bg-red-50 p-3 text-sm"
-          >
-            <p className="font-semibold text-red-900 mb-1">
-              {submitErrors.length} validation error
-              {submitErrors.length === 1 ? "" : "s"}:
-            </p>
-            <ul className="text-red-700 list-disc list-inside space-y-1">
-              {submitErrors.map((err, idx) => (
-                <li key={`${err.path}-${idx}`}>
-                  <button
-                    type="button"
-                    className="font-mono underline decoration-dotted underline-offset-2 hover:text-red-900"
-                    onClick={() => err.path && scrollToField(err.path)}
-                    title="jump to this field"
-                  >
-                    {err.path || "(root)"}
-                  </button>
-                  {": "}
-                  {err.message}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
         <FormFlagsContext.Provider value={flags}>
+          {data.variant && <VariantSelector variant={data.variant} />}
+          {submitErrors.length > 0 && (
+            <div
+              data-testid="submit-errors"
+              className="rounded border border-red-300 bg-red-50 p-3 text-sm"
+            >
+              <p className="font-semibold text-red-900 mb-1">
+                {submitErrors.length} validation error
+                {submitErrors.length === 1 ? "" : "s"}:
+              </p>
+              <ul className="text-red-700 list-disc list-inside space-y-1">
+                {submitErrors.map((err, idx) => (
+                  <li key={`${err.path}-${idx}`}>
+                    <button
+                      type="button"
+                      className="font-mono underline decoration-dotted underline-offset-2 hover:text-red-900"
+                      onClick={() => err.path && scrollToField(err.path)}
+                      title="jump to this field"
+                    >
+                      {err.path || "(root)"}
+                    </button>
+                    {": "}
+                    {err.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <FormField node={data.root} path="" />
         </FormFlagsContext.Provider>
       </section>

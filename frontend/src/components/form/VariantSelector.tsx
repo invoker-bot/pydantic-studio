@@ -1,5 +1,6 @@
 import type { VariantStateData } from "@/api/schemas";
 import { useApplyMutation } from "@/api/mutations";
+import { useFormFlags } from "@/components/form/errors";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -11,6 +12,8 @@ import {
 
 export function VariantSelector({ variant }: { variant: VariantStateData }) {
   const mutation = useApplyMutation();
+  const flags = useFormFlags();
+  const isRootVariantReadonly = flags.readonlyPaths.size > 0;
   const selected = variant.options.find(
     (option) => option.id === variant.selected_id,
   );
@@ -21,12 +24,17 @@ export function VariantSelector({ variant }: { variant: VariantStateData }) {
         Variant
       </Label>
       <Select
+        disabled={isRootVariantReadonly}
         value={variant.selected_id}
         onValueChange={(variant_id) =>
           mutation.mutate({ op: "select_root_variant", variant_id })
         }
       >
-        <SelectTrigger id="variant-selector" aria-label="Variant">
+        <SelectTrigger
+          id="variant-selector"
+          aria-label="Variant"
+          disabled={isRootVariantReadonly}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

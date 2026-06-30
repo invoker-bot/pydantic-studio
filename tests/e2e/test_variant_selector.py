@@ -14,7 +14,9 @@ from pydantic_studio import StudioServer
 from pydantic_studio.variants import VariantRegistry, VariantSpec, build_variant_form_tree
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
+
+    from pydantic_studio.tree import FormTree
 
 
 class WebEmail(BaseModel):
@@ -32,9 +34,9 @@ def _find_free_port() -> int:
 
 
 @contextmanager
-def _serve_tree(tree) -> Iterator[str]:
+def _serve_tree(tree: FormTree, readonly_paths: Iterable[str] = ()) -> Iterator[str]:
     port = _find_free_port()
-    server = StudioServer(tree=tree, save_path=None)
+    server = StudioServer(tree=tree, save_path=None, readonly_paths=readonly_paths)
     config = uvicorn.Config(
         server.app,
         host="127.0.0.1",
@@ -89,3 +91,26 @@ def test_web_variant_selector_switches_root_model(page: Page) -> None:
         preview = page.get_by_test_id("tree-preview")
         expect(preview).to_contain_text("class_name: slack", timeout=5000)
         expect(preview).to_contain_text("channel: '#alerts'", timeout=5000)
+
+
+def test_web_variant_selector_disables_root_switch_when_any_path_is_readonly(
+    page: Page,
+) -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=WebEmail, label="Email"),
+                VariantSpec(id="slack", model=WebSlack, label="Slack"),
+            ]
+        ),
+        selected_id="email",
+        discriminator="class_name",
+        persistence="inline_discriminator",
+    )
+
+    with _serve_tree(tree, readonly_paths={"address"}) as base_url:
+        page.goto(f"{base_url}/")
+
+        variant = page.get_by_label("Variant")
+        expect(variant).to_be_visible(timeout=5000)
+        expect(variant).to_be_disabled()
