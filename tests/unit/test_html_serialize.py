@@ -54,12 +54,20 @@ class _WithList(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class _WithIntList(BaseModel):
+    counts: list[int] = Field(default_factory=list)
+
+
 class _WithDict(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
 
 
 class _WithIntDict(BaseModel):
     ports: dict[int, str] = Field(default_factory=dict)
+
+
+class _WithIntValueDict(BaseModel):
+    weights: dict[str, int] = Field(default_factory=dict)
 
 
 class _UnionHolder(BaseModel):
@@ -301,6 +309,18 @@ def test_dispatch_add_item_passes_value_to_tree() -> None:
     assert values == ["a", "seeded"]
 
 
+def test_dispatch_add_item_coerces_typed_value() -> None:
+    tree = build_form_tree(_WithIntList, existing={"counts": [1]})
+
+    result = dispatch_mutation(
+        tree, {"op": "add_item", "path": "counts", "value": "2"}
+    )
+
+    assert result.ok is True
+    values = [it.value for it in tree.root.find("counts").items]
+    assert values == [1, 2]
+
+
 def test_dispatch_remove_item_pops_indexed_entry() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
     result = dispatch_mutation(
@@ -376,6 +396,19 @@ def test_dispatch_add_entry_passes_value_to_tree() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
     assert pairs == [("TZ", "UTC"), ("LOG", "debug")]
+
+
+def test_dispatch_add_entry_coerces_typed_value() -> None:
+    tree = build_form_tree(_WithIntValueDict, existing={"weights": {"base": 1}})
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "add_entry", "path": "weights", "key": "extra", "value": "2"},
+    )
+
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("weights").entries]
+    assert pairs == [("base", 1), ("extra", 2)]
 
 
 def test_dispatch_add_entry_rejects_null_key_without_mutating() -> None:

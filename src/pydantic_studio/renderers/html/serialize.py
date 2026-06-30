@@ -244,6 +244,25 @@ def _maybe_coerce_wire_value_for_node(node: Any, value: Any) -> Any:
     return value
 
 
+def _sequence_item_arg(tree: FormTree, path: str, value: Any) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import SequenceNode, _resolve_type_name
+
+    try:
+        node = _resolve(tree, path)
+        if not isinstance(node, SequenceNode) or node.item_type_name is None:
+            return value
+        item_type = _resolve_type_name(node.item_type_name)
+        item_node = default_registry().find(item_type).build(
+            item_type, FieldInfo(annotation=item_type), None
+        )
+    except Exception:
+        return value
+    return _maybe_coerce_wire_value_for_node(item_node, value)
+
+
 def _mapping_key_template(tree: FormTree, path: str) -> Any:
     from pydantic.fields import FieldInfo
 
@@ -260,6 +279,22 @@ def _mapping_key_template(tree: FormTree, path: str) -> Any:
     )
 
 
+def _mapping_value_template(tree: FormTree, path: str) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import MappingNode, _resolve_type_name
+
+    node = _resolve(tree, path)
+    if not isinstance(node, MappingNode):
+        msg = f"{path!r} is not a MappingNode"
+        raise TypeError(msg)
+    value_type = _resolve_type_name(node.value_type_name)
+    return default_registry().find(value_type).build(
+        value_type, FieldInfo(annotation=value_type), None
+    )
+
+
 def _mapping_key_arg(tree: FormTree, mutation: dict[str, Any], key: str) -> Any:
     path = _path_arg(mutation)
     value = _required_arg(mutation, key)
@@ -268,6 +303,11 @@ def _mapping_key_arg(tree: FormTree, mutation: dict[str, Any], key: str) -> Any:
         msg = f"{key} must be a string"
         raise TypeError(msg)
     return _maybe_coerce_wire_value_for_node(key_node, value)
+
+
+def _mapping_value_arg(tree: FormTree, path: str, value: Any) -> Any:
+    value_node = _mapping_value_template(tree, path)
+    return _maybe_coerce_wire_value_for_node(value_node, value)
 
 
 def _required_arg(mutation: dict[str, Any], key: str) -> Any:
@@ -327,7 +367,8 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
         if op == "add_item":
             path = _path_arg(mutation)
             if "value" in mutation:
-                return tree.add_item(path, mutation["value"])
+                value = _sequence_item_arg(tree, path, mutation["value"])
+                return tree.add_item(path, value)
             return tree.add_item(path)
         if op == "remove_item":
             return tree.remove_item(
@@ -343,7 +384,12 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
             path = _path_arg(mutation)
             key = _mapping_key_arg(tree, mutation, "key")
             if "value" in mutation:
-                return tree.add_entry(path, key=key, value=mutation["value"])
+                value = _mapping_value_arg(tree, path, mutation["value"])
+                return tree.add_entry(
+                    path,
+                    key=key,
+                    value=value,
+                )
             return tree.add_entry(path, key=key)
         if op == "remove_entry":
             return tree.remove_entry(
