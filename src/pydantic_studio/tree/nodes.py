@@ -2384,6 +2384,8 @@ class FormTree(BaseModel):
             return ValidationResult.fail(
                 [f"to_index {to_index} out of range"]
             )
+        if from_index == to_index:
+            return ValidationResult.ok()
         self._push_snapshot(_snap.take(self.root))
         items = list(seq.items)
         item = items.pop(from_index)

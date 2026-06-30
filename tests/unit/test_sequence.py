@@ -290,6 +290,25 @@ def test_move_item_reorders() -> None:
     assert [it.value for it in str_items] == ["b", "c", "a"]
 
 
+def test_move_item_same_index_is_noop_without_snapshot() -> None:
+    tree = build_form_tree(WithList, existing={"tags": ["a", "b", "c"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    items_before = list(tags.items)
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = tree.move_item("tags", 1, 1)
+
+    assert result.ok is True
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    assert tags.items == items_before
+    assert [item.name for item in tags.items] == ["0", "1", "2"]
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_add_item_pushes_snapshot_so_undo_works() -> None:
     tree = build_form_tree(WithList)
     tree.add_item("tags", "x")

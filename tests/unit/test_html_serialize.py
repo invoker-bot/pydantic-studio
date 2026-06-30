@@ -764,6 +764,25 @@ def test_dispatch_move_item_reorders_sequence() -> None:
     assert values == ["b", "c", "a"]
 
 
+def test_dispatch_move_item_same_index_is_noop_without_snapshot() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
+    tags = tree.root.find("tags")
+    items_before = list(tags.items)
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = dispatch_mutation(
+        tree, {"op": "move_item", "path": "tags", "from": 1, "to": 1}
+    )
+
+    assert result.ok is True
+    tags = tree.root.find("tags")
+    assert tags.items == items_before
+    assert [item.name for item in tags.items] == ["0", "1", "2"]
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_dispatch_move_item_rejects_float_target_without_mutating() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
     result = dispatch_mutation(
