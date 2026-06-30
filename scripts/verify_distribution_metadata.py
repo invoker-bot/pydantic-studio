@@ -222,7 +222,27 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     invalid = [field for field, _metadata_name in fields if not isinstance(project.get(field), str)]
     if invalid:
         raise RuntimeError(f"pyproject.toml project identity fields must be strings: {invalid!r}")
-    return tuple(f"{metadata_name}: {project[field]}" for field, metadata_name in fields)
+    return (
+        *(f"{metadata_name}: {project[field]}" for field, metadata_name in fields),
+        *_project_author_metadata(pyproject),
+    )
+
+
+def _project_author_metadata(pyproject: dict[str, object]) -> tuple[str, ...]:
+    project = _table(pyproject, "project", "project")
+    authors = project.get("authors", [])
+    if not isinstance(authors, list) or not all(isinstance(author, dict) for author in authors):
+        raise RuntimeError("pyproject.toml [project] authors must be tables")
+
+    names = [author.get("name") for author in authors if isinstance(author.get("name"), str)]
+    invalid = [
+        author
+        for author in authors
+        if "name" in author and not isinstance(author.get("name"), str)
+    ]
+    if invalid:
+        raise RuntimeError(f"pyproject.toml author names must be strings: {invalid!r}")
+    return tuple(f"Author: {name}" for name in names)
 
 
 def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:

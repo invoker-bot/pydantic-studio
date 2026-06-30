@@ -7,7 +7,7 @@ formats, smoke-tests wheel and sdist installs, uploads the distributions as
 one release artifact, and then publishes that artifact to PyPI and piesource.
 The artifact upload fails immediately if no distributions are present and
 retains that artifact for 30 days for release troubleshooting.
-The release metadata verifier checks the package Name, Version, Summary,
+The release metadata verifier checks the package Name, Version, Summary, Author,
 Requires-Python, license files, classifiers, keywords, dependencies, optional
 extras, and every declared Project-URL in both the wheel `METADATA` and the
 sdist `PKG-INFO`, confirms the wheel `.dist-info` identity, structure files,
