@@ -34,7 +34,13 @@ def _write_wheel(
     entry_points_name: str = "pydantic_studio-0.4.0.dist-info/entry_points.txt",
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
     wheel_metadata: str | None = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
-    record: str | None = "pydantic_studio/__init__.py,,\n",
+    record: str | None = (
+        "pydantic_studio/__init__.py,,\n"
+        "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
+        "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
+        "pydantic_studio-0.4.0.dist-info/entry_points.txt,,\n"
+        "pydantic_studio-0.4.0.dist-info/RECORD,,\n"
+    ),
 ) -> None:
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
         zf.writestr(metadata_name, metadata)
@@ -361,6 +367,33 @@ def test_verify_distribution_metadata_rejects_wrong_wheel_purelib_flag(
     )
 
     with pytest.raises(RuntimeError, match=r"Root-Is-Purelib"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_wheel_record_entry(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        record=(
+            "pydantic_studio/__init__.py,,\n"
+            "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
+            "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"RECORD"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 

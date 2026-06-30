@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import csv
+import io
 import re
 import tarfile
 import tomllib
@@ -44,6 +46,10 @@ def _wheel_filename_tag(wheel: Path) -> str:
     return "-".join(parts[-3:])
 
 
+def _wheel_record_entries(record: str) -> frozenset[str]:
+    return frozenset(row[0] for row in csv.reader(io.StringIO(record)) if row)
+
+
 def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
     with zipfile.ZipFile(wheel) as zf:
         names = set(zf.namelist())
@@ -57,6 +63,7 @@ def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
                 f"{wheel} missing wheel structure files in {dist_info_dir}: {missing_files!r}"
             )
         wheel_metadata = zf.read(f"{dist_info_dir}/WHEEL").decode("utf-8")
+        record = zf.read(f"{dist_info_dir}/RECORD").decode("utf-8")
     wheel_headers = _metadata_headers(wheel_metadata)
     missing_metadata = [
         line
@@ -68,6 +75,19 @@ def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
     ]
     if missing_metadata:
         raise RuntimeError(f"{wheel} missing wheel metadata: {missing_metadata!r}")
+
+    record_entries = _wheel_record_entries(record)
+    missing_record_entries = [
+        filename
+        for filename in ("METADATA", "WHEEL", "RECORD", "entry_points.txt")
+        if f"{dist_info_dir}/{filename}" in names
+        and f"{dist_info_dir}/{filename}" not in record_entries
+    ]
+    if missing_record_entries:
+        raise RuntimeError(
+            f"{wheel} missing wheel RECORD entries in {dist_info_dir}: "
+            f"{missing_record_entries!r}"
+        )
 
 
 def _wheel_metadata(wheel: Path, *, dist_info_dir: str) -> str:
