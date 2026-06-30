@@ -227,9 +227,9 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     - a coercion fails (e.g., non-numeric ``index``)
     - the path doesn't resolve to a node
 
-    Any of these surface to the client via the route layer's standard
-    200 response (with ``validation.ok = false``); the route only 500s
-    on a real server bug, never on a malformed request.
+    The route layer turns malformed requests into 400 responses and keeps
+    valid mutation validation failures in the standard 200 response with
+    ``validation.ok = false``.
     """
     op = mutation.get("op")
     path = mutation.get("path", "")

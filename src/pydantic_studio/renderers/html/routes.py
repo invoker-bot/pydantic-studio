@@ -56,9 +56,10 @@ def register(app: FastAPI, server: StudioServer) -> None:
         # Unknown / malformed op -> 400 so the client knows it's a request
         # bug, not a state issue. Validation failures of valid ops keep
         # 200 (the tree is untouched, ``validation`` reports what failed).
-        # Malformed-request exceptions use the "mutation failed: " prefix;
-        # only the "unknown op" family promotes to 400.
-        if not result.ok and any("unknown op" in err for err in result.errors):
+        if not result.ok and any(
+            "unknown op" in err or err.startswith("mutation failed:")
+            for err in result.errors
+        ):
             return JSONResponse(
                 status_code=400, content={"detail": "; ".join(result.errors)}
             )

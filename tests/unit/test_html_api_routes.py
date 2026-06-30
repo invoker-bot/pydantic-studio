@@ -116,6 +116,30 @@ def test_api_mutations_invalid_json_returns_400() -> None:
     assert "invalid JSON" in response.json()["detail"]
 
 
+def test_api_mutations_missing_required_argument_returns_400() -> None:
+    client = _client({"name": "alpha", "workers": 4})
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "remove_item", "path": "name"},
+    )
+
+    assert response.status_code == 400
+    assert "mutation failed" in response.json()["detail"]
+
+
+def test_api_mutations_bad_numeric_argument_returns_400() -> None:
+    client = _client({"name": "alpha", "workers": 4})
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "remove_item", "path": "name", "index": "nan"},
+    )
+
+    assert response.status_code == 400
+    assert "mutation failed" in response.json()["detail"]
+
+
 def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
     server, client = _server_and_client({"name": "alpha", "workers": 4})
     response = client.post("/api/submit")
