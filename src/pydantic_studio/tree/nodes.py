@@ -1673,7 +1673,13 @@ class FormTree(BaseModel):
         # the undo history (mirrors the validate-first contract of set_value).
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
-        child = builder.build(item_type, FieldInfo(annotation=item_type), value)
+        item_field = FieldInfo(annotation=item_type)
+        child = builder.build(item_type, item_field, None)
+        if value is not None:
+            errors = child.validate_value(value)
+            if errors:
+                return ValidationResult.fail(list(errors))
+            child = builder.build(item_type, item_field, value)
         child.name = str(len(seq.items))
         self._push_snapshot(_snap.take(self.root))
         seq.items = [*seq.items, child]
@@ -1717,7 +1723,13 @@ class FormTree(BaseModel):
             return ValidationResult.fail(["sequence has no item_type_name"])
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
-        child = builder.build(item_type, FieldInfo(annotation=item_type), value)
+        item_field = FieldInfo(annotation=item_type)
+        child = builder.build(item_type, item_field, None)
+        if value is not None:
+            errors = child.validate_value(value)
+            if errors:
+                return ValidationResult.fail(list(errors))
+            child = builder.build(item_type, item_field, value)
         self._push_snapshot(_snap.take(self.root))
         new_items = [*seq.items[:index], child, *seq.items[index:]]
         for i, it in enumerate(new_items):

@@ -200,6 +200,19 @@ def test_add_item_with_explicit_value() -> None:
     assert cast("StringNode", tags.items[0]).value == "hello"
 
 
+def test_add_item_rejects_invalid_typed_value_without_mutating() -> None:
+    tree = build_form_tree(WithList)
+
+    result = tree.add_item("counts", "not-an-int")
+
+    assert result.ok is False
+    assert any("expected int" in error for error in result.errors)
+    counts = tree.root.find("counts")
+    assert isinstance(counts, SequenceNode)
+    assert counts.items == []
+    assert tree.snapshots == []
+
+
 def test_remove_item_renumbers() -> None:
     tree = build_form_tree(WithList, existing={"tags": ["a", "b", "c"]})
     tree.remove_item("tags", 1)
@@ -217,6 +230,21 @@ def test_insert_item_at_index() -> None:
     assert isinstance(tags, SequenceNode)
     str_items = [cast("StringNode", it) for it in tags.items]
     assert [it.value for it in str_items] == ["a", "b", "c"]
+
+
+def test_insert_item_rejects_invalid_typed_value_without_mutating() -> None:
+    tree = build_form_tree(WithList, existing={"counts": [1, 3]})
+
+    result = tree.insert_item("counts", 1, "not-an-int")
+
+    assert result.ok is False
+    assert any("expected int" in error for error in result.errors)
+    counts = tree.root.find("counts")
+    assert isinstance(counts, SequenceNode)
+    int_items = [cast("IntNode", item) for item in counts.items]
+    assert [item.value for item in int_items] == [1, 3]
+    assert [item.name for item in counts.items] == ["0", "1"]
+    assert tree.snapshots == []
 
 
 def test_move_item_reorders() -> None:
