@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from pydantic_studio.tree.builder import build_form_tree
 from tests.fixtures.schemas import Person, Simple
@@ -108,3 +109,17 @@ def test_snapshot_buffer_evicts_oldest():
 def test_snapshot_limit_default_is_50():
     tree = build_form_tree(Simple)
     assert tree.snapshot_limit == 50
+
+
+@pytest.mark.parametrize("limit", [0, -1, True])
+def test_snapshot_limit_rejects_invalid_assignment(limit: object):
+    tree = build_form_tree(Simple)
+
+    with pytest.raises(ValidationError, match="snapshot_limit"):
+        tree.snapshot_limit = limit
+
+    assert tree.snapshot_limit == 50
+    tree.set_value("name", "x")
+    assert len(tree.snapshots) == 1
+    assert tree.undo() is True
+    assert tree.root.find("name").value is None

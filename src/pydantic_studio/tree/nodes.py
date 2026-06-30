@@ -1688,7 +1688,11 @@ class VariantState(BaseModel):
 class FormTree(BaseModel):
     """Root container: schema reference, root group, and history (added later)."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
 
     schema_class: type[BaseModel] | None = None  # may be re-attached via context on load
     schema_name: str
@@ -1696,7 +1700,7 @@ class FormTree(BaseModel):
     created_at: datetime
     snapshots: list[bytes] = []
     cursor: int = 0
-    snapshot_limit: int = 50
+    snapshot_limit: int = Field(default=50, ge=1, strict=True)
     draft_path: FsPath | None = None
     variant: VariantState | None = None
 
