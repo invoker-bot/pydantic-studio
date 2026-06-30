@@ -22,6 +22,13 @@ class ConstrainedIntSchema(BaseModel):
     even: int = Field(default=2, multiple_of=2)
 
 
+class ConstrainedStringSchema(BaseModel):
+    at_least: str = Field(default="good", min_length=3)
+    at_most: str = Field(default="good", max_length=5)
+    contains_marker: str = Field(default="abc", pattern="abc")
+    unicode_letters: str = Field(default="abc", pattern=r"\p{L}+")
+
+
 def test_set_valid_value_returns_ok() -> None:
     tree = build_form_tree(Schema)
     result = tree.set_value("name", "Alice")
@@ -90,3 +97,43 @@ def test_set_int_value_rejects_constraint_violations_without_mutating(
     assert result.errors == (message,)
     assert node.value == 2
     assert node.error == message
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        ("at_least", "xy", "length must be >= 3"),
+        ("at_most", "toolong", "length must be <= 5"),
+        ("contains_marker", "ab", "must match pattern abc"),
+    ],
+)
+def test_set_string_value_rejects_constraint_violations_without_mutating(
+    path: str, value: str, message: str
+) -> None:
+    tree = build_form_tree(ConstrainedStringSchema)
+    node = tree.root.find(path)
+    assert node is not None
+    expected_default = "abc" if path == "contains_marker" else "good"
+    assert node.value == expected_default
+    assert node.default == expected_default
+
+    result = tree.set_value(path, value)
+
+    assert result.ok is False
+    assert result.errors == (message,)
+    assert node.value == node.default
+    assert node.error == message
+
+
+def test_set_string_value_uses_pydantic_regex_engine_for_patterns() -> None:
+    tree = build_form_tree(ConstrainedStringSchema)
+    node = tree.root.find("unicode_letters")
+    assert node is not None
+    assert node.value == "abc"
+
+    result = tree.set_value("unicode_letters", "123")
+
+    assert result.ok is False
+    assert result.errors == (r"must match pattern \p{L}+",)
+    assert node.value == "abc"
+    assert node.error == r"must match pattern \p{L}+"

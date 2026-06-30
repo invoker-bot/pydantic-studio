@@ -22,6 +22,8 @@ from pydantic import (
     ConfigDict,
     Discriminator,
     Field,
+    TypeAdapter,
+    ValidationError,
     ValidationInfo,
     field_serializer,
     field_validator,
@@ -179,7 +181,7 @@ class StringNode(FormNode):
 
     min_length: int | None = None
     max_length: int | None = None
-    pattern: str | None = None  # regex source; rendered as a label, not enforced here
+    pattern: str | None = None
     multiline: bool = False
     secret: bool = False
 
@@ -188,7 +190,17 @@ class StringNode(FormNode):
             return () if not self.required else ("value is required",)
         if not isinstance(value, str):
             return (f"expected str, got {type(value).__name__}",)
-        return ()
+        errors: list[str] = []
+        if self.min_length is not None and len(value) < self.min_length:
+            errors.append(f"length must be >= {self.min_length}")
+        if self.max_length is not None and len(value) > self.max_length:
+            errors.append(f"length must be <= {self.max_length}")
+        if self.pattern is not None:
+            try:
+                TypeAdapter(Annotated[str, Field(pattern=self.pattern)]).validate_python(value)
+            except ValidationError:
+                errors.append(f"must match pattern {self.pattern}")
+        return tuple(errors)
 
     def to_python(self) -> str | None:
         return self.value
