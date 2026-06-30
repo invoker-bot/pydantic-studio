@@ -279,6 +279,29 @@ def _sequence_item_arg(tree: FormTree, path: str, value: Any) -> Any:
     return _maybe_coerce_wire_value_for_node(item_node, value)
 
 
+def _union_variant_seed_arg(
+    tree: FormTree, path: str, variant_index: int, seed: Any
+) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import UnionNode, _resolve_type_name
+
+    try:
+        node = _resolve(tree, path)
+        if not isinstance(node, UnionNode):
+            return seed
+        if not (0 <= variant_index < len(node.variant_type_names)):
+            return seed
+        variant_type = _resolve_type_name(node.variant_type_names[variant_index])
+        variant_node = default_registry().find(variant_type).build(
+            variant_type, FieldInfo(annotation=variant_type), None
+        )
+    except Exception:
+        return seed
+    return _maybe_coerce_wire_value_for_node(variant_node, seed)
+
+
 def _mapping_key_template(tree: FormTree, path: str) -> Any:
     from pydantic.fields import FieldInfo
 
@@ -437,7 +460,10 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
             path = _path_arg(mutation)
             variant_index = _required_int_arg(mutation, "variant_index")
             if "seed" in mutation:
-                return tree.select_variant(path, variant_index, mutation["seed"])
+                seed = _union_variant_seed_arg(
+                    tree, path, variant_index, mutation["seed"]
+                )
+                return tree.select_variant(path, variant_index, seed)
             return tree.select_variant(
                 path,
                 variant_index,

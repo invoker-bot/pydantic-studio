@@ -611,6 +611,21 @@ def test_dispatch_select_variant_passes_seed_to_tree() -> None:
     assert val.selected.value == "seeded"
 
 
+def test_dispatch_select_variant_coerces_seed_for_target_variant() -> None:
+    tree = build_form_tree(_UnionHolder, existing={"value": "seeded"})
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "select_variant", "path": "value", "variant_index": 0, "seed": "2"},
+    )
+
+    assert result.ok is True
+    val = tree.root.find("value")
+    assert val.selected_index == 0
+    assert val.selected.kind == "int"
+    assert val.selected.value == 2
+
+
 def test_dispatch_select_variant_rejects_string_index_without_mutating() -> None:
     tree = build_form_tree(_UnionHolder, existing={"value": 42})
     result = dispatch_mutation(
