@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 
 import pytest
 from pydantic import BaseModel, Field
@@ -30,6 +31,15 @@ class ConstrainedFloatSchema(BaseModel):
     above: float = Field(default=0.5, gt=0.0)
     below: float = Field(default=0.5, lt=1.0)
     quarter_step: float = Field(default=0.5, multiple_of=0.25)
+
+
+class ConstrainedDecimalSchema(BaseModel):
+    at_least: Decimal = Field(default=Decimal("1.00"), ge=Decimal("1.00"))
+    at_most: Decimal = Field(default=Decimal("1.00"), le=Decimal("2.00"))
+    above: Decimal = Field(default=Decimal("1.00"), gt=Decimal("0.00"))
+    below: Decimal = Field(default=Decimal("1.00"), lt=Decimal("2.00"))
+    digit_limit: Decimal = Field(default=Decimal("1.00"), max_digits=4)
+    cents: Decimal = Field(default=Decimal("1.00"), decimal_places=2)
 
 
 class ConstrainedStringSchema(BaseModel):
@@ -147,6 +157,33 @@ def test_set_float_value_rejects_nan_against_bounds_without_mutating() -> None:
     assert result.errors == ("must be >= 0.5",)
     assert node.value == 0.5
     assert node.error == "must be >= 0.5"
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        ("at_least", Decimal("0.99"), "must be >= 1.00"),
+        ("at_most", Decimal("2.01"), "must be <= 2.00"),
+        ("above", Decimal("0.00"), "must be > 0.00"),
+        ("below", Decimal("2.00"), "must be < 2.00"),
+        ("digit_limit", Decimal("123.45"), "must have no more than 4 digits"),
+        ("cents", Decimal("1.001"), "must have no more than 2 decimal places"),
+    ],
+)
+def test_set_decimal_value_rejects_constraint_violations_without_mutating(
+    path: str, value: Decimal, message: str
+) -> None:
+    tree = build_form_tree(ConstrainedDecimalSchema)
+    node = tree.root.find(path)
+    assert node is not None
+    assert node.value == Decimal("1.00")
+
+    result = tree.set_value(path, value)
+
+    assert result.ok is False
+    assert result.errors == (message,)
+    assert node.value == Decimal("1.00")
+    assert node.error == message
 
 
 @pytest.mark.parametrize(

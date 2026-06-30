@@ -325,17 +325,41 @@ class DecimalNode(FormNode):
         if isinstance(value, bool):
             return (f"expected Decimal, got {type(value).__name__}",)
         if isinstance(value, Decimal):
-            return ()
+            decimal_value = value
         # Pydantic coerces int / float / str via Decimal(str(...)). Mirror
         # that behavior so validate_value does not flag values the schema
         # would happily accept.
-        if isinstance(value, (int, float, str)):
+        elif isinstance(value, (int, float, str)):
             try:
-                Decimal(str(value)) if isinstance(value, float) else Decimal(value)
+                decimal_value = Decimal(str(value)) if isinstance(value, float) else Decimal(value)
             except (InvalidOperation, ValueError):
                 return (f"cannot convert {value!r} to Decimal",)
-            return ()
-        return (f"expected Decimal, got {type(value).__name__}",)
+        else:
+            return (f"expected Decimal, got {type(value).__name__}",)
+        errors: list[str] = []
+        if self.ge is not None and decimal_value < self.ge:
+            errors.append(f"must be >= {self.ge}")
+        if self.le is not None and decimal_value > self.le:
+            errors.append(f"must be <= {self.le}")
+        if self.gt is not None and decimal_value <= self.gt:
+            errors.append(f"must be > {self.gt}")
+        if self.lt is not None and decimal_value >= self.lt:
+            errors.append(f"must be < {self.lt}")
+        if self.max_digits is not None:
+            try:
+                TypeAdapter(Annotated[Decimal, Field(max_digits=self.max_digits)]).validate_python(
+                    decimal_value
+                )
+            except ValidationError:
+                errors.append(f"must have no more than {self.max_digits} digits")
+        if self.decimal_places is not None:
+            try:
+                TypeAdapter(
+                    Annotated[Decimal, Field(decimal_places=self.decimal_places)]
+                ).validate_python(decimal_value)
+            except ValidationError:
+                errors.append(f"must have no more than {self.decimal_places} decimal places")
+        return tuple(errors)
 
     def to_python(self) -> Decimal | None:
         return self.value
