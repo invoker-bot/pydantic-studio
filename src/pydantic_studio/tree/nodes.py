@@ -42,12 +42,37 @@ def _resolve_type_name(name: str) -> Any:
     """Look up a fully-qualified type name (``module.Qualname``).
 
     Handles ``builtins.str`` etc. specially so unit tests don't need to
-    import builtins. ``typing.Union[...]`` and ``typing.Literal[...]`` are
-    rebuilt from their JSON-encoded arguments (the inverse of ``_fq``'s
-    structural encodings) so containers restore parametrized forms instead of
-    builder-less bare typing objects. Raises ValueError on miss with a
-    diagnostic message.
+    import builtins. ``typing.List[...]``, ``typing.Dict[...]``,
+    ``typing.Set[...]``, ``typing.Tuple[...]``, ``typing.Union[...]`` and
+    ``typing.Literal[...]`` are rebuilt from their JSON-encoded arguments (the
+    inverse of ``_fq``'s structural encodings) so containers restore
+    parametrized forms instead of builder-less bare typing objects. Raises
+    ValueError on miss with a diagnostic message.
     """
+    container_specs = {
+        "typing.List": (1, lambda args: list[args[0]]),
+        "typing.Dict": (2, lambda args: dict[args[0], args[1]]),
+        "typing.Set": (1, lambda args: set[args[0]]),
+        "typing.Tuple": (None, lambda args: tuple[tuple(args)]),
+    }
+    for prefix, (expected_length, factory) in container_specs.items():
+        if name.startswith(f"{prefix}[") and name.endswith("]"):
+            try:
+                type_names = json.loads(name[len(prefix) :])
+            except ValueError as exc:
+                msg = f"cannot reconstruct {prefix} arguments from {name!r}"
+                raise ValueError(msg) from exc
+            if not isinstance(type_names, list):
+                msg = f"cannot reconstruct {prefix} arguments from {name!r}"
+                raise ValueError(msg)
+            if expected_length is not None and len(type_names) != expected_length:
+                msg = f"cannot reconstruct {prefix} arguments from {name!r}"
+                raise ValueError(msg)
+            if expected_length is None and not type_names:
+                msg = f"cannot reconstruct {prefix} arguments from {name!r}"
+                raise ValueError(msg)
+            args = [_resolve_type_name(type_name) for type_name in type_names]
+            return factory(args)
     if name.startswith("typing.Union[") and name.endswith("]"):
         try:
             type_names = json.loads(name[len("typing.Union") :])

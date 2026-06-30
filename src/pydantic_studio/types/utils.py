@@ -9,7 +9,7 @@ its element types).
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from pydantic_core import PydanticUndefined
 
@@ -47,11 +47,14 @@ def _fq(t: Any) -> str:
     anyway, and every builder strips ``Annotated`` internally, so the
     round-trippable name is the inner type's name.
 
-    Union element types are also encoded structurally. A PEP 604 union's
+    Parameterized container and union element types are also encoded
+    structurally. A PEP 604 union's
     bare ``__module__`` / ``__qualname__`` pair is only a display string
     such as ``types.str | my.Model``, which can't be imported later when a
     container mutator needs to build a new child node. We preserve each
-    variant's own ``_fq`` encoding as JSON under ``typing.Union[...]``.
+    variant's own ``_fq`` encoding as JSON under ``typing.Union[...]``. The
+    same applies to nested containers such as ``list[list[int]]``, where the
+    bare name would collapse to ``builtins.list`` and lose its item type.
 
     Most other types then serialize as ``module.Qualname`` and rebuild via
     ``getattr``. ``Literal[...]`` is special: its bare name is just
@@ -66,6 +69,16 @@ def _fq(t: Any) -> str:
     if is_union_type(stripped):
         payload = json.dumps([_fq(arg) for arg in get_union_args(stripped)])
         return f"typing.Union{payload}"
+    origin = get_origin(stripped)
+    container_names = {
+        list: "typing.List",
+        dict: "typing.Dict",
+        set: "typing.Set",
+        tuple: "typing.Tuple",
+    }
+    if origin in container_names:
+        payload = json.dumps([_fq(arg) for arg in get_args(stripped)])
+        return f"{container_names[origin]}{payload}"
     if is_literal_type(stripped):
         try:
             payload = json.dumps(list(get_args(stripped)))

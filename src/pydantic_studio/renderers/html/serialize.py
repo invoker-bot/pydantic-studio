@@ -401,7 +401,7 @@ def _sequence_item_arg(tree: FormTree, path: str, value: Any) -> Any:
         )
     except Exception:
         return value
-    return _maybe_coerce_wire_value_for_node(item_node, value)
+    return _maybe_coerce_wire_seed_for_node(item_node, value)
 
 
 def _union_variant_seed_arg(
@@ -495,7 +495,7 @@ def _mapping_key_arg(tree: FormTree, mutation: dict[str, Any], key: str) -> Any:
 
 def _mapping_value_arg(tree: FormTree, path: str, value: Any) -> Any:
     value_node = _mapping_value_template(tree, path)
-    return _maybe_coerce_wire_value_for_node(value_node, value)
+    return _maybe_coerce_wire_seed_for_node(value_node, value)
 
 
 def _required_arg(mutation: dict[str, Any], key: str) -> Any:

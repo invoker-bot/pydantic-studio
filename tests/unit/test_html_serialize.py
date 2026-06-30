@@ -62,6 +62,10 @@ class _WithIntList(BaseModel):
     counts: list[int] = Field(default_factory=list)
 
 
+class _WithIntMatrix(BaseModel):
+    matrix: list[list[int]] = Field(default_factory=list)
+
+
 class _WithDict(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
 
@@ -72,6 +76,10 @@ class _WithIntDict(BaseModel):
 
 class _WithIntValueDict(BaseModel):
     weights: dict[str, int] = Field(default_factory=dict)
+
+
+class _WithIntListValueDict(BaseModel):
+    buckets: dict[str, list[int]] = Field(default_factory=dict)
 
 
 class _UnionHolder(BaseModel):
@@ -413,6 +421,18 @@ def test_dispatch_set_value_coerces_sequence_replacement_items() -> None:
     assert [item.value for item in counts.items] == [3, 4]
 
 
+def test_dispatch_set_value_coerces_nested_sequence_replacement_items() -> None:
+    tree = build_form_tree(_WithIntMatrix, existing={"matrix": [[1]]})
+
+    result = dispatch_mutation(
+        tree, {"op": "set_value", "path": "matrix", "value": [["2", "3"]]}
+    )
+
+    assert result.ok is True
+    matrix = tree.root.find("matrix")
+    assert [[cell.value for cell in row.items] for row in matrix.items] == [[2, 3]]
+
+
 def test_dispatch_set_value_coerces_mapping_replacement_values() -> None:
     tree = build_form_tree(_WithIntValueDict, existing={"weights": {"base": 1}})
 
@@ -543,6 +563,18 @@ def test_dispatch_add_item_coerces_typed_value() -> None:
     assert values == [1, 2]
 
 
+def test_dispatch_add_item_coerces_nested_sequence_seed_values() -> None:
+    tree = build_form_tree(_WithIntMatrix)
+
+    result = dispatch_mutation(
+        tree, {"op": "add_item", "path": "matrix", "value": ["2", "3"]}
+    )
+
+    assert result.ok is True
+    row = tree.root.find("matrix").items[0]
+    assert [cell.value for cell in row.items] == [2, 3]
+
+
 def test_dispatch_add_item_coerces_structured_seed_value() -> None:
     tree = build_form_tree(_WithStructuredSeedList)
 
@@ -618,6 +650,19 @@ def test_dispatch_insert_item_coerces_typed_value() -> None:
     assert result.ok is True
     values = [it.value for it in tree.root.find("counts").items]
     assert values == [1, 2, 3]
+
+
+def test_dispatch_insert_item_coerces_nested_sequence_seed_values() -> None:
+    tree = build_form_tree(_WithIntMatrix, existing={"matrix": [[1]]})
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "insert_item", "path": "matrix", "index": 0, "value": ["2", "3"]},
+    )
+
+    assert result.ok is True
+    rows = tree.root.find("matrix").items
+    assert [[cell.value for cell in row.items] for row in rows] == [[2, 3], [1]]
 
 
 def test_dispatch_insert_item_coerces_structured_seed_value() -> None:
@@ -771,6 +816,20 @@ def test_dispatch_add_entry_coerces_typed_value() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("weights").entries]
     assert pairs == [("base", 1), ("extra", 2)]
+
+
+def test_dispatch_add_entry_coerces_nested_sequence_seed_value() -> None:
+    tree = build_form_tree(_WithIntListValueDict)
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "add_entry", "path": "buckets", "key": "first", "value": ["2", "3"]},
+    )
+
+    assert result.ok is True
+    key, value = tree.root.find("buckets").entries[0]
+    assert key.value == "first"
+    assert [cell.value for cell in value.items] == [2, 3]
 
 
 def test_dispatch_add_entry_coerces_structured_seed_value() -> None:
