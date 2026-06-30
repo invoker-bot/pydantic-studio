@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import tomllib
+
 from ruamel.yaml import YAML
 from typer.testing import CliRunner
 
@@ -193,6 +196,17 @@ class TestFillFormats:
         content = out.read_text(encoding="utf-8")
         assert "name =" in content or 'name = "prod"' in content
 
+    def test_fill_toml_writes_required_placeholders(self, tmp_path) -> None:
+        out = tmp_path / "out.toml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:Simple", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        data = tomllib.loads(out.read_text(encoding="utf-8"))
+        assert data["name"] == "?"
+
     def test_fill_emits_json(self, tmp_path) -> None:
         out = tmp_path / "out.json"
         result = runner.invoke(
@@ -203,6 +217,17 @@ class TestFillFormats:
         content = out.read_text(encoding="utf-8")
         assert content.lstrip().startswith("{")
         assert '"name"' in content
+
+    def test_fill_json_writes_required_placeholders(self, tmp_path) -> None:
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:Simple", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(out.read_text(encoding="utf-8"))
+        assert data["name"] == "?"
 
 
 class TestRunFormats:

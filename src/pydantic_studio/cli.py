@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import io
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -29,6 +30,8 @@ from pydantic_studio.tree.nodes import (
 
 _JSON_VALUE_ADAPTER = TypeAdapter(object)
 _YAML_SUFFIXES = {".yaml", ".yml"}
+_TOML_SUFFIXES = {".toml"}
+_JSON_SUFFIXES = {".json"}
 
 app = typer.Typer(
     name="pydantic-studio",
@@ -116,7 +119,7 @@ def _json_ready(value: Any) -> Any:
 
 
 def _stub_value(node: Any) -> Any:
-    """Return a YAML-stub value, preserving defaults and marking missing required leaves."""
+    """Return a config-stub value, preserving defaults and marking missing required leaves."""
     if isinstance(node, GroupNode):
         if node.omitted and not node.required:
             return None
@@ -134,6 +137,15 @@ def _stub_value(node: Any) -> Any:
     return _json_ready(node.to_python())
 
 
+def _fill_stub_data(tree: Any) -> dict[str, Any]:
+    """Build root stub data without requiring a complete valid model instance."""
+    data = _stub_value(tree.root)
+    if not isinstance(data, dict):
+        msg = f"expected root stub to be a dict, got {type(data).__name__}"
+        raise ValueError(msg)
+    return data
+
+
 def _fill_yaml_payload(tree: Any) -> str:
     """Render a YAML config stub without requiring a complete valid instance."""
     from pydantic_studio.io.yaml import _build_commented_map, _yaml
@@ -142,14 +154,39 @@ def _fill_yaml_payload(tree: Any) -> str:
     if schema_class is None:
         msg = "FormTree.schema_class is None; cannot render YAML"
         raise ValueError(msg)
-    data = _stub_value(tree.root)
-    if not isinstance(data, dict):
-        msg = f"expected root stub to be a dict, got {type(data).__name__}"
-        raise ValueError(msg)
-    cm = _build_commented_map(data, schema_class, None)
+    cm = _build_commented_map(_fill_stub_data(tree), schema_class, None)
     buf = io.StringIO()
     _yaml().dump(cm, buf)
     return buf.getvalue()
+
+
+def _fill_toml_payload(tree: Any) -> str:
+    """Render a TOML config stub without requiring a complete valid instance."""
+    import tomlkit
+
+    from pydantic_studio.io.toml import _build_document
+
+    schema_class = tree.schema_class
+    if schema_class is None:
+        msg = "FormTree.schema_class is None; cannot render TOML"
+        raise ValueError(msg)
+    return tomlkit.dumps(_build_document(_fill_stub_data(tree), schema_class))
+
+
+def _fill_json_payload(tree: Any) -> str:
+    """Render a JSON config stub without requiring a complete valid instance."""
+    return json.dumps(_fill_stub_data(tree), indent=2)
+
+
+def _fill_payload_for_path(tree: Any, path: Path) -> str | None:
+    suffix = path.suffix.lower()
+    if suffix in _YAML_SUFFIXES:
+        return _fill_yaml_payload(tree)
+    if suffix in _TOML_SUFFIXES:
+        return _fill_toml_payload(tree)
+    if suffix in _JSON_SUFFIXES:
+        return _fill_json_payload(tree)
+    return None
 
 
 def _write_text_atomic(path: Path, payload: str) -> None:
@@ -208,8 +245,9 @@ def fill(
     schema = _load_schema(target)
     tree = build_form_tree(schema)
     if out is not None:
-        if out.suffix.lower() in _YAML_SUFFIXES:
-            _write_text_atomic(out, _fill_yaml_payload(tree))
+        payload = _fill_payload_for_path(tree, out)
+        if payload is not None:
+            _write_text_atomic(out, payload)
         else:
             save_config(tree, out)
         typer.echo(f"Wrote {out}")
