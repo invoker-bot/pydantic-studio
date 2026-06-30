@@ -7,6 +7,7 @@ the abstract base ``FormNode``.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 from datetime import date, datetime, time, timedelta
@@ -29,6 +30,7 @@ from pydantic import (
 from pydantic_studio.tree.validation import ValidationResult
 
 AnyValueMode = Literal["null", "str", "int", "float", "bool", "list", "dict"]
+_MISSING_KEY = object()
 
 
 def _resolve_type_name(name: str) -> Any:
@@ -716,8 +718,6 @@ class BytesNode(FormNode):
         Convert them back to ``bytes`` before field assignment so Pydantic
         receives the correct type.
         """
-        import contextlib
-
         if not isinstance(data, dict):
             return data
         for key in ("value", "default"):
@@ -1223,6 +1223,65 @@ def _collect_missing_required(node: Any, base: str, out: list[str]) -> None:
         out.append(base)
 
 
+def _field_output_key(field_name: str, field_info: Any, *, by_alias: bool) -> str:
+    if not by_alias:
+        return field_name
+    serialization_alias = getattr(field_info, "serialization_alias", None)
+    if isinstance(serialization_alias, str) and serialization_alias:
+        return serialization_alias
+    alias = getattr(field_info, "alias", None)
+    if isinstance(alias, str) and alias:
+        return alias
+    return field_name
+
+
+def _key_present(data: dict[Any, Any], key: Any) -> Any:
+    with contextlib.suppress(TypeError):
+        if key in data:
+            return key
+    return _MISSING_KEY
+
+
+def _overlay_any_output_values(data: Any, node: Any, *, by_alias: bool) -> Any:
+    if isinstance(node, AnyValueNode):
+        return _json_safe_any_value(node.value)
+    if isinstance(node, GroupNode) and isinstance(data, dict):
+        out = dict(data)
+        for child in node.fields:
+            field_info = node.schema_class.model_fields.get(child.name)
+            if field_info is None:
+                continue
+            key = _field_output_key(child.name, field_info, by_alias=by_alias)
+            if key in out:
+                out[key] = _overlay_any_output_values(out[key], child, by_alias=by_alias)
+        return out
+    if isinstance(node, SequenceNode) and isinstance(data, list):
+        return [
+            _overlay_any_output_values(item_data, item_node, by_alias=by_alias)
+            for item_data, item_node in zip(data, node.items, strict=False)
+        ]
+    if isinstance(node, MappingNode) and isinstance(data, dict):
+        out = dict(data)
+        for key_node, value_node in node.entries:
+            raw_key = key_node.to_python()
+            safe_key = _json_safe_any_value(raw_key)
+            for output_key in (
+                _key_present(out, raw_key),
+                _key_present(out, safe_key),
+                _key_present(out, str(safe_key)),
+            ):
+                if output_key is not _MISSING_KEY:
+                    break
+            if output_key is not _MISSING_KEY:
+                out[output_key] = _overlay_any_output_values(
+                    out[output_key], value_node, by_alias=by_alias
+                )
+        return out
+    if isinstance(node, UnionNode) and node.selected is not None:
+        return _overlay_any_output_values(data, node.selected, by_alias=by_alias)
+    return data
+
+
 class VariantOption(BaseModel):
     """Serializable metadata for one selectable root model variant."""
 
@@ -1303,6 +1362,7 @@ class FormTree(BaseModel):
             by_alias=by_alias,
             fallback=_json_safe_any_value,
         )
+        data = _overlay_any_output_values(data, self.root, by_alias=by_alias)
         if (
             self.variant is not None
             and self.variant.persistence == "inline_discriminator"
