@@ -6,6 +6,10 @@ import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
+import {
+  hasReadonlyUnder,
+  useFormFlags,
+} from "@/components/form/errors";
 import { FormField } from "@/components/form/FormField";
 import { childPath } from "@/components/form/path";
 import { Button } from "@/components/ui/button";
@@ -17,6 +21,8 @@ export function SequenceField({
   path,
 }: { node: SequenceNodeData; path: string }) {
   const mutation = useApplyMutation();
+  const flags = useFormFlags();
+  const readonlyStructure = hasReadonlyUnder(flags, path);
 
   const onAdd = () => mutation.mutate({ op: "add_item", path });
   const onRemove = (index: number) =>
@@ -54,7 +60,7 @@ export function SequenceField({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={index === 0}
+                  disabled={readonlyStructure || index === 0}
                   onClick={() => onMove(index, index - 1)}
                   aria-label={`move ${node.name}[${index}] up`}
                 >
@@ -64,7 +70,7 @@ export function SequenceField({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={index === node.items.length - 1}
+                  disabled={readonlyStructure || index === node.items.length - 1}
                   onClick={() => onMove(index, index + 1)}
                   aria-label={`move ${node.name}[${index}] down`}
                 >
@@ -74,6 +80,7 @@ export function SequenceField({
                   type="button"
                   variant="ghost"
                   size="sm"
+                  disabled={readonlyStructure}
                   onClick={() => onRemove(index)}
                   aria-label={`remove ${node.name}[${index}]`}
                 >
@@ -91,6 +98,7 @@ export function SequenceField({
           variant="outline"
           size="sm"
           className="w-full border-dashed text-zinc-500"
+          disabled={readonlyStructure}
           onClick={onAdd}
         >
           + Add {itemLabel}

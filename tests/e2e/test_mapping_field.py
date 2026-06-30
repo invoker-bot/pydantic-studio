@@ -131,3 +131,17 @@ def test_add_entry_uses_typed_default_key_for_int_mapping(page: Page) -> None:
 
         preview = page.get_by_test_id("tree-preview")
         expect(preview).to_contain_text("443:", timeout=5000)
+
+
+def test_readonly_mapping_descendant_disables_structural_controls(
+    page: Page, readonly_env_entry_url: str
+) -> None:
+    page.goto(f"{readonly_env_entry_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    key_input = page.get_by_label("entry key").first
+    expect(key_input).to_have_value("LOCKED", timeout=5000)
+    expect(key_input).to_be_disabled()
+
+    expect(page.get_by_role("button", name="remove entry").first).to_be_disabled()
+    expect(page.get_by_role("button", name="+ Add Entry").first).to_be_disabled()

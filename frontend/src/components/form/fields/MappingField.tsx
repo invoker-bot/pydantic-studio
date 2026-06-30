@@ -8,6 +8,10 @@ import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
+import {
+  hasReadonlyUnder,
+  useFormFlags,
+} from "@/components/form/errors";
 import { FormField } from "@/components/form/FormField";
 import { childPath } from "@/components/form/path";
 import { Button } from "@/components/ui/button";
@@ -53,6 +57,8 @@ export function MappingField({
   path,
 }: { node: MappingNodeData; path: string }) {
   const mutation = useApplyMutation();
+  const flags = useFormFlags();
+  const readonlyStructure = hasReadonlyUnder(flags, path);
 
   const onAdd = () => {
     mutation.mutate({ op: "add_entry", path, key: nextDefaultKey(node) });
@@ -82,6 +88,7 @@ export function MappingField({
             valuePath={childPath(path, index)}
             onRenameKey={(new_key) => onRenameKey(index, new_key)}
             onRemove={() => onRemove(index)}
+            readonlyStructure={readonlyStructure}
           />
         ))}
         <Button
@@ -89,6 +96,7 @@ export function MappingField({
           variant="outline"
           size="sm"
           className="w-full border-dashed text-zinc-500"
+          disabled={readonlyStructure}
           onClick={onAdd}
         >
           + Add Entry
@@ -105,12 +113,14 @@ function MappingEntry({
   valuePath,
   onRenameKey,
   onRemove,
+  readonlyStructure,
 }: {
   entryKey: string;
   valueNode: FormNodeData;
   valuePath: string;
   onRenameKey: (new_key: string) => void;
   onRemove: () => void;
+  readonlyStructure: boolean;
 }) {
   const [keyLocal, setKeyLocal] = useState(entryKey);
   useEffect(() => setKeyLocal(entryKey), [entryKey]);
@@ -126,11 +136,13 @@ function MappingEntry({
           }}
           className="h-7 text-xs font-mono"
           aria-label="entry key"
+          disabled={readonlyStructure}
         />
         <Button
           type="button"
           variant="ghost"
           size="sm"
+          disabled={readonlyStructure}
           onClick={onRemove}
           aria-label="remove entry"
         >

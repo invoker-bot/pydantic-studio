@@ -149,38 +149,62 @@ def readonly_notifier_address_url() -> Iterator[str]:
         yield url
 
 
-def _build_demo_tree():
+@pytest.fixture
+def readonly_tags_item_url() -> Iterator[str]:
+    with _serve_demo(
+        readonly_paths={"tags.0"},
+        existing_overrides={"tags": ["locked-tag", "free-tag"]},
+    ) as url:
+        yield url
+
+
+@pytest.fixture
+def readonly_env_entry_url() -> Iterator[str]:
+    with _serve_demo(
+        readonly_paths={"env.0"},
+        existing_overrides={"env": {"LOCKED": "value"}},
+    ) as url:
+        yield url
+
+
+def _build_demo_tree(existing_overrides: dict[str, object] | None = None):
+    existing = {
+        "name": "demo-service",
+        "workers": 4,
+        "debug": False,
+        "level": _LogLevel.INFO,
+        "ratio": 1.0,
+        "price": Decimal("0.00"),
+        "log_dir": FsPath("/tmp"),
+        "homepage": "https://example.com",
+        "contact": "ops@example.com",
+        "starts_on": date(2025, 1, 1),
+        "cron_at": time(2, 30, 0),
+        "last_run": datetime(2025, 1, 1, 12, 0, 0),
+        "ttl": timedelta(hours=1),
+        "bind_ip": IPv4Address("127.0.0.1"),
+        "subnet": IPv4Network("10.0.0.0/24"),
+        "request_id": UUID("00000000-0000-0000-0000-000000000000"),
+        "api_key": "placeholder",
+        "api_key_bytes": b"placeholder",
+        "pattern_field": re.compile(r"^[a-z]+$", re.IGNORECASE),
+        "salt": b"\xde\xad\xbe\xef",
+    }
+    if existing_overrides:
+        existing.update(existing_overrides)
     return build_form_tree(
         _DemoSchema,
-        existing={
-            "name": "demo-service",
-            "workers": 4,
-            "debug": False,
-            "level": _LogLevel.INFO,
-            "ratio": 1.0,
-            "price": Decimal("0.00"),
-            "log_dir": FsPath("/tmp"),
-            "homepage": "https://example.com",
-            "contact": "ops@example.com",
-            "starts_on": date(2025, 1, 1),
-            "cron_at": time(2, 30, 0),
-            "last_run": datetime(2025, 1, 1, 12, 0, 0),
-            "ttl": timedelta(hours=1),
-            "bind_ip": IPv4Address("127.0.0.1"),
-            "subnet": IPv4Network("10.0.0.0/24"),
-            "request_id": UUID("00000000-0000-0000-0000-000000000000"),
-            "api_key": "placeholder",
-            "api_key_bytes": b"placeholder",
-            "pattern_field": re.compile(r"^[a-z]+$", re.IGNORECASE),
-            "salt": b"\xde\xad\xbe\xef",
-        },
+        existing=existing,
     )
 
 
 @contextmanager
-def _serve_demo(readonly_paths: Iterable[str] = ()) -> Iterator[str]:
+def _serve_demo(
+    readonly_paths: Iterable[str] = (),
+    existing_overrides: dict[str, object] | None = None,
+) -> Iterator[str]:
     port = _find_free_port()
-    tree = _build_demo_tree()
+    tree = _build_demo_tree(existing_overrides)
     server = StudioServer(tree=tree, save_path=None, readonly_paths=readonly_paths)
     config = uvicorn.Config(
         server.app,

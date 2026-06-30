@@ -48,3 +48,18 @@ def test_add_remove_and_edit_sequence_item(
     )
     assert len(tags_field["items"]) == 1
     assert tags_field["items"][0]["value"] == "alpha-tag"
+
+
+def test_readonly_sequence_descendant_disables_structural_controls(
+    page: Page, readonly_tags_item_url: str
+) -> None:
+    page.goto(f"{readonly_tags_item_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    locked_input = page.locator('input[id="field-tags.0"]')
+    expect(locked_input).to_have_value("locked-tag", timeout=5000)
+    expect(locked_input).to_be_disabled()
+
+    expect(page.get_by_role("button", name="move tags[0] down")).to_be_disabled()
+    expect(page.get_by_role("button", name="remove tags[0]")).to_be_disabled()
+    expect(page.get_by_role("button", name="+ Add str")).to_be_disabled()
