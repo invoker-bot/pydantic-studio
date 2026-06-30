@@ -1699,7 +1699,7 @@ class FormTree(BaseModel):
     root: GroupNode
     created_at: datetime
     snapshots: list[bytes] = []
-    cursor: int = 0
+    cursor: int = Field(default=0, ge=0, strict=True)
     snapshot_limit: int = Field(default=50, ge=1, strict=True)
     draft_path: FsPath | None = None
     variant: VariantState | None = None
@@ -1707,6 +1707,15 @@ class FormTree(BaseModel):
     # Stashed source CommentedMap for round-trip save (preserves comments).
     # Excluded from JSON snapshots — re-populated only via load_yaml.
     yaml_source: Any = Field(default=None, exclude=True, repr=False)
+
+    @field_validator("cursor")
+    @classmethod
+    def _validate_cursor_assignment(cls, value: int, info: ValidationInfo) -> int:
+        snapshots = info.data.get("snapshots") if info.data else None
+        if snapshots is not None and value > len(snapshots):
+            msg = f"cursor {value} exceeds snapshot history length {len(snapshots)}"
+            raise ValueError(msg)
+        return value
 
     def to_python(self) -> dict[str, Any]:
         # The root group is always required, so to_python never returns
@@ -1855,8 +1864,8 @@ class FormTree(BaseModel):
         # Root variant switches replace the schema as well as values. Existing
         # root-only snapshots belong to the old schema, so keeping them would
         # let undo restore an incompatible root.
-        self.snapshots = []
         self.cursor = 0
+        self.snapshots = []
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()

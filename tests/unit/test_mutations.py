@@ -123,3 +123,28 @@ def test_snapshot_limit_rejects_invalid_assignment(limit: object):
     assert len(tree.snapshots) == 1
     assert tree.undo() is True
     assert tree.root.find("name").value is None
+
+
+@pytest.mark.parametrize("cursor", [-1, True])
+def test_cursor_rejects_invalid_assignment(cursor: object):
+    tree = build_form_tree(Simple)
+
+    with pytest.raises(ValidationError, match="cursor"):
+        tree.cursor = cursor
+
+    assert tree.cursor == 0
+    tree.set_value("name", "x")
+    assert tree.undo() is True
+    assert tree.root.find("name").value is None
+
+
+def test_cursor_rejects_position_past_snapshot_tail():
+    tree = build_form_tree(Simple)
+    tree.set_value("name", "x")
+
+    with pytest.raises(ValidationError, match="cursor"):
+        tree.cursor = len(tree.snapshots) + 1
+
+    assert tree.cursor == len(tree.snapshots)
+    assert tree.undo() is True
+    assert tree.root.find("name").value is None
