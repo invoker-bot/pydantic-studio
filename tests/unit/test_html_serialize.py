@@ -321,6 +321,30 @@ def test_dispatch_add_item_coerces_typed_value() -> None:
     assert values == [1, 2]
 
 
+def test_dispatch_insert_item_inserts_at_index() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a", "c"]})
+
+    result = dispatch_mutation(
+        tree, {"op": "insert_item", "path": "tags", "index": 1, "value": "b"}
+    )
+
+    assert result.ok is True
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["a", "b", "c"]
+
+
+def test_dispatch_insert_item_coerces_typed_value() -> None:
+    tree = build_form_tree(_WithIntList, existing={"counts": [1, 3]})
+
+    result = dispatch_mutation(
+        tree, {"op": "insert_item", "path": "counts", "index": 1, "value": "2"}
+    )
+
+    assert result.ok is True
+    values = [it.value for it in tree.root.find("counts").items]
+    assert values == [1, 2, 3]
+
+
 def test_dispatch_remove_item_pops_indexed_entry() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
     result = dispatch_mutation(

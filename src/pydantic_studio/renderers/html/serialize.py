@@ -370,6 +370,13 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
                 value = _sequence_item_arg(tree, path, mutation["value"])
                 return tree.add_item(path, value)
             return tree.add_item(path)
+        if op == "insert_item":
+            path = _path_arg(mutation)
+            index = _required_int_arg(mutation, "index")
+            if "value" in mutation:
+                value = _sequence_item_arg(tree, path, mutation["value"])
+                return tree.insert_item(path, index, value)
+            return tree.insert_item(path, index)
         if op == "remove_item":
             return tree.remove_item(
                 _path_arg(mutation), _required_int_arg(mutation, "index")
