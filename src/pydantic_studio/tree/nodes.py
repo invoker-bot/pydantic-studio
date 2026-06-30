@@ -2586,6 +2586,8 @@ class FormTree(BaseModel):
             return ValidationResult.fail(errors)
         if candidate_key is None:
             return ValidationResult.fail(["mapping key did not build a child node"])
+        if candidate_key.to_python() == _old_key_node.to_python():
+            return ValidationResult.ok()
         candidate_key.name = "key"
         unique_result = self._validate_mapping_unique_key(
             mp,

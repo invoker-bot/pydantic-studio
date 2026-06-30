@@ -142,6 +142,27 @@ def test_rename_key() -> None:
     assert v.value == 1
 
 
+def test_rename_key_same_normalized_key_is_noop_without_snapshot() -> None:
+    tree = build_form_tree(
+        WithDict, existing={"settings": {"port": 80, "rps": 100}}
+    )
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    entries_before = list(settings.entries)
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = tree.rename_key("settings", 0, "port")
+
+    assert result.ok is True
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    assert settings.entries == entries_before
+    assert settings.to_python() == {"port": 80, "rps": 100}
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_add_entry_pushes_snapshot_for_undo() -> None:
     tree = build_form_tree(WithDict)
     tree.add_entry("settings", "k", 1)

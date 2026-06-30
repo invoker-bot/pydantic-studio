@@ -968,6 +968,26 @@ def test_dispatch_rename_key_changes_key_at_index() -> None:
     assert pairs == [("TIMEZONE", "UTC")]
 
 
+def test_dispatch_rename_key_same_normalized_key_is_noop_without_snapshot() -> None:
+    tree = build_form_tree(_WithIntDict, existing={"ports": {80: "http"}})
+    ports = tree.root.find("ports")
+    entries_before = list(ports.entries)
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "rename_key", "path": "ports", "index": 0, "new_key": "80"},
+    )
+
+    assert result.ok is True
+    ports = tree.root.find("ports")
+    assert ports.entries == entries_before
+    assert [(k.value, v.value) for k, v in ports.entries] == [(80, "http")]
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_dispatch_rename_key_coerces_typed_mapping_key() -> None:
     tree = build_form_tree(_WithIntDict, existing={"ports": {80: "http"}})
 
