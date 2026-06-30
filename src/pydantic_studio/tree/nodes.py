@@ -1889,12 +1889,45 @@ class FormTree(BaseModel):
                 return ValidationResult.fail(["union has no selected variant"])
             write_target = target.selected
             if (
-                not isinstance(write_target, (SequenceNode, MappingNode))
+                not isinstance(write_target, (GroupNode, SequenceNode, MappingNode))
                 and not hasattr(write_target, "value")
             ):
                 return ValidationResult.fail(
                     ["selected union variant is not directly editable"]
                 )
+
+        if isinstance(write_target, GroupNode):
+            if value is None:
+                if write_target.required:
+                    write_target.error = "value is required"
+                    target.error = write_target.error
+                    return ValidationResult.fail([write_target.error])
+                if write_target.omitted:
+                    return ValidationResult.ok()
+
+                self._push_snapshot(_snap.take(self.root))
+                _reset_group_to_schema_defaults(write_target)
+                write_target.omitted = True
+            else:
+                result, fields = self._build_group_fields(write_target, value)
+                if not result.ok:
+                    message = result.errors[0] if result.errors else "invalid"
+                    write_target.error = message
+                    target.error = message
+                    return result
+
+                self._push_snapshot(_snap.take(self.root))
+                write_target.fields = fields
+                write_target.omitted = False
+                write_target.error = None
+            for group in walked_groups:
+                if group.omitted:
+                    group.omitted = False
+            if isinstance(target, UnionNode):
+                target.error = None
+            if self.draft_path is not None:
+                _snap.draft_save(self, self.draft_path)
+            return ValidationResult.ok()
 
         if isinstance(write_target, SequenceNode):
             result, items = self._build_sequence_items(write_target, value)

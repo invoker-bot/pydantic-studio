@@ -238,6 +238,28 @@ def test_select_variant_rejects_mapping_seed_value_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_set_value_replaces_selected_group_union_variant_and_undoes() -> None:
+    tree = build_form_tree(_SeededListUnionHolder, existing={"value": {"items": [1]}})
+
+    result = tree.set_value("value", {"items": [2, 3]})
+
+    assert result.ok is True
+    assert tree.to_instance().value == _SeededListPayload(items=[2, 3])
+    assert tree.undo() is True
+    assert tree.to_instance().value == _SeededListPayload(items=[1])
+
+
+def test_set_value_rejects_invalid_selected_group_union_variant_without_mutating() -> None:
+    tree = build_form_tree(_SeededListUnionHolder, existing={"value": {"items": [1]}})
+
+    result = tree.set_value("value", {"items": []})
+
+    assert result.ok is False
+    assert result.errors == ("items: length must be >= 1",)
+    assert tree.to_instance().value == _SeededListPayload(items=[1])
+    assert tree.snapshots == []
+
+
 def test_select_variant_rejects_extra_forbidden_seed_field_without_mutating() -> None:
     tree = build_form_tree(_ForbidExtraUnionHolder, existing={"value": "keep-me"})
 
