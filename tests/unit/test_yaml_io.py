@@ -38,6 +38,19 @@ class TestLoadYaml:
         assert instance.port == 8080
         assert instance.debug is False
 
+    def test_load_non_mapping_top_level_raises_clear_error(
+        self, tmp_path: Path
+    ) -> None:
+        for name, content in {
+            "list": "- name\n- port\n",
+            "scalar": "42\n",
+        }.items():
+            src = tmp_path / f"{name}.yaml"
+            src.write_text(content, encoding="utf-8")
+
+            with pytest.raises(ValueError, match="expected YAML mapping at top level"):
+                load_yaml(src, Server)
+
     def test_load_preserves_source_for_round_trip(self, tmp_path: Path) -> None:
         src = tmp_path / "config.yaml"
         src.write_text(

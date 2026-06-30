@@ -65,6 +65,9 @@ def load_yaml(path: str | Path, schema: type[BaseModel]) -> FormTree:
         cm: Any = yaml.load(f)
     if cm is None:  # empty file
         cm = {}
+    if not isinstance(cm, Mapping):
+        msg = f"expected YAML mapping at top level, got {type(cm).__name__}"
+        raise ValueError(msg)
     _warn_unknown_yaml_fields(_unknown_key_paths(cm, schema))
     # CommentedMap is a dict subclass — pass directly to build_form_tree.
     # Unknown keys are filtered automatically because GroupBuilder iterates
