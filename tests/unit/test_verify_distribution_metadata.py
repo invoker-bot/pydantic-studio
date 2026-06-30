@@ -61,6 +61,7 @@ def _write_pyproject(
         f"""[project]
 name = "pydantic-studio"
 version = "0.4.0"
+requires-python = ">=3.11"
 
 [project.urls]
 Source = "https://example.invalid/pydantic-studio"
@@ -81,6 +82,7 @@ def _metadata(*, omit: str | None = None) -> str:
     lines = [
         ("Name", "pydantic-studio"),
         ("Version", "0.4.0"),
+        ("Requires-Python", ">=3.11"),
         ("Source", "https://example.invalid/pydantic-studio"),
         ("Documentation", "https://example.invalid/docs"),
         ("Issues", "https://example.invalid/issues"),
@@ -89,7 +91,9 @@ def _metadata(*, omit: str | None = None) -> str:
         ("Contributing", "https://example.invalid/CONTRIBUTING.md"),
     ]
     return "\n".join(
-        f"{label}: {url}" if label in {"Name", "Version"} else f"Project-URL: {label}, {url}"
+        f"{label}: {url}"
+        if label in {"Name", "Version", "Requires-Python"}
+        else f"Project-URL: {label}, {url}"
         for label, url in lines
         if label != omit
     )
@@ -223,4 +227,29 @@ def test_verify_distribution_metadata_rejects_identity_metadata_drift(
     )
 
     with pytest.raises(RuntimeError, match=field_name):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+@pytest.mark.parametrize("drifted_file", ["wheel", "sdist"])
+def test_verify_distribution_metadata_rejects_requires_python_metadata_drift(
+    tmp_path: Path,
+    drifted_file: str,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    expected_metadata = _metadata()
+    drifted_metadata = expected_metadata.replace(
+        "Requires-Python: >=3.11",
+        "Requires-Python: >=3.12",
+    )
+    _write_wheel(dist, drifted_metadata if drifted_file == "wheel" else expected_metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=drifted_metadata if drifted_file == "sdist" else expected_metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"Requires-Python"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)

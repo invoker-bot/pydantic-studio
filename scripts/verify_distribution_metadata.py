@@ -85,11 +85,15 @@ def _project_urls(pyproject: dict[str, object]) -> dict[str, str]:
 
 def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     project = _table(pyproject, "project", "project")
-    fields = ("name", "version")
-    invalid = [field for field in fields if not isinstance(project.get(field), str)]
+    fields = (
+        ("name", "Name"),
+        ("version", "Version"),
+        ("requires-python", "Requires-Python"),
+    )
+    invalid = [field for field, _metadata_name in fields if not isinstance(project.get(field), str)]
     if invalid:
         raise RuntimeError(f"pyproject.toml project identity fields must be strings: {invalid!r}")
-    return tuple(f"{field.title()}: {project[field]}" for field in fields)
+    return tuple(f"{metadata_name}: {project[field]}" for field, metadata_name in fields)
 
 
 def _source_include(pyproject: dict[str, object]) -> tuple[str, ...]:
