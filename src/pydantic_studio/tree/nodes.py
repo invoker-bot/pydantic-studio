@@ -2153,6 +2153,12 @@ class FormTree(BaseModel):
             return ValidationResult.fail(errors)
         return ValidationResult.ok()
 
+    @staticmethod
+    def _validate_index_argument(name: str, value: Any) -> ValidationResult:
+        if isinstance(value, bool) or not isinstance(value, int):
+            return ValidationResult.fail([f"{name} must be an integer"])
+        return ValidationResult.ok()
+
     def _build_union_variant_for_value(
         self,
         union: UnionNode,
@@ -2317,6 +2323,9 @@ class FormTree(BaseModel):
         from pydantic_studio.tree import snapshots as _snap
 
         seq = self._walk_to_sequence(path)
+        index_result = self._validate_index_argument("index", index)
+        if not index_result.ok:
+            return index_result
         if not (0 <= index < len(seq.items)):
             return ValidationResult.fail([f"index {index} out of range"])
         length_result = self._validate_sequence_length(seq, len(seq.items) - 1)
@@ -2345,6 +2354,9 @@ class FormTree(BaseModel):
             return ValidationResult.fail(
                 ["cannot insert into a fixed-length tuple"]
             )
+        index_result = self._validate_index_argument("index", index)
+        if not index_result.ok:
+            return index_result
         if not (0 <= index <= len(seq.items)):
             return ValidationResult.fail([f"index {index} out of range"])
         if seq.item_type_name is None:
@@ -2376,6 +2388,12 @@ class FormTree(BaseModel):
         from pydantic_studio.tree import snapshots as _snap
 
         seq = self._walk_to_sequence(path)
+        from_index_result = self._validate_index_argument("from_index", from_index)
+        if not from_index_result.ok:
+            return from_index_result
+        to_index_result = self._validate_index_argument("to_index", to_index)
+        if not to_index_result.ok:
+            return to_index_result
         if not (0 <= from_index < len(seq.items)):
             return ValidationResult.fail(
                 [f"from_index {from_index} out of range"]
@@ -2552,6 +2570,9 @@ class FormTree(BaseModel):
         from pydantic_studio.tree import snapshots as _snap
 
         mp = self._walk_to_mapping(path)
+        index_result = self._validate_index_argument("index", index)
+        if not index_result.ok:
+            return index_result
         if not (0 <= index < len(mp.entries)):
             return ValidationResult.fail([f"index {index} out of range"])
         length_result = self._validate_mapping_length(mp, len(mp.entries) - 1)
@@ -2573,6 +2594,9 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
 
         mp = self._walk_to_mapping(path)
+        index_result = self._validate_index_argument("index", index)
+        if not index_result.ok:
+            return index_result
         if not (0 <= index < len(mp.entries)):
             return ValidationResult.fail([f"index {index} out of range"])
         _old_key_node, value_node = mp.entries[index]
@@ -2664,6 +2688,9 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
 
         union = self._walk_to_union(path)
+        index_result = self._validate_index_argument("variant_index", variant_index)
+        if not index_result.ok:
+            return index_result
         if not (0 <= variant_index < len(union.variant_type_names)):
             return ValidationResult.fail(
                 [

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
+import pytest
 from pydantic import BaseModel, ConfigDict, Field
 
 from pydantic_studio import build_form_tree
@@ -163,6 +164,29 @@ def test_select_variant_out_of_range_returns_error() -> None:
     result = tree.select_variant("value", 99)
     assert result.ok is False
     assert any("out of range" in e for e in result.errors)
+
+
+@pytest.mark.parametrize("bad_index", [True, 1.2])
+def test_select_variant_rejects_non_integer_index_without_mutating(bad_index) -> None:
+    tree = build_form_tree(WithUnion, existing={"value": 42})
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    selected_before = val.selected
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = tree.select_variant("value", bad_index)
+
+    assert result.ok is False
+    assert result.errors == ("variant_index must be an integer",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert val.selected is selected_before
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 42
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
 
 
 def test_select_variant_with_seed_value() -> None:

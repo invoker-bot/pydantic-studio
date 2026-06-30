@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
@@ -209,6 +210,40 @@ def test_remove_entry_rejects_mapping_min_length_without_mutating() -> None:
     assert result.errors == ("length must be >= 1",)
     assert settings.to_python() == {"a": 1}
     assert tree.snapshots == []
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_error"),
+    [
+        (lambda tree: tree.remove_entry("settings", True), "index must be an integer"),
+        (lambda tree: tree.remove_entry("settings", 1.2), "index must be an integer"),
+        (lambda tree: tree.rename_key("settings", True, "x"), "index must be an integer"),
+        (lambda tree: tree.rename_key("settings", 1.2, "x"), "index must be an integer"),
+    ],
+)
+def test_mapping_index_mutations_reject_non_integer_indexes_without_mutating(
+    operation,
+    expected_error: str,
+) -> None:
+    tree = build_form_tree(
+        WithDict, existing={"settings": {"a": 1, "b": 2, "c": 3}}
+    )
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    entries_before = list(settings.entries)
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = operation(tree)
+
+    assert result.ok is False
+    assert result.errors == (expected_error,)
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    assert settings.entries == entries_before
+    assert settings.to_python() == {"a": 1, "b": 2, "c": 3}
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
 
 
 def test_rename_key_rejects_duplicate_key_without_mutating() -> None:

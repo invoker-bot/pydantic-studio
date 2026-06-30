@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
+import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
@@ -279,6 +280,43 @@ def test_insert_item_rejects_explicit_none_without_mutating() -> None:
     assert [item.value for item in int_items] == [1, 3]
     assert [item.name for item in counts.items] == ["0", "1"]
     assert tree.snapshots == []
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_error"),
+    [
+        (lambda tree: tree.insert_item("tags", True, "x"), "index must be an integer"),
+        (lambda tree: tree.insert_item("tags", 1.2, "x"), "index must be an integer"),
+        (lambda tree: tree.remove_item("tags", True), "index must be an integer"),
+        (lambda tree: tree.remove_item("tags", 1.2), "index must be an integer"),
+        (lambda tree: tree.move_item("tags", True, 0), "from_index must be an integer"),
+        (lambda tree: tree.move_item("tags", 1.2, 0), "from_index must be an integer"),
+        (lambda tree: tree.move_item("tags", 0, True), "to_index must be an integer"),
+        (lambda tree: tree.move_item("tags", 0, 1.2), "to_index must be an integer"),
+    ],
+)
+def test_sequence_index_mutations_reject_non_integer_indexes_without_mutating(
+    operation,
+    expected_error: str,
+) -> None:
+    tree = build_form_tree(WithList, existing={"tags": ["a", "b", "c"]})
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    items_before = list(tags.items)
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = operation(tree)
+
+    assert result.ok is False
+    assert result.errors == (expected_error,)
+    tags = tree.root.find("tags")
+    assert isinstance(tags, SequenceNode)
+    assert tags.items == items_before
+    assert [cast("StringNode", item).value for item in tags.items] == ["a", "b", "c"]
+    assert [item.name for item in tags.items] == ["0", "1", "2"]
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
 
 
 def test_move_item_reorders() -> None:
