@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import json
 import sys
+from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
@@ -82,13 +83,15 @@ def _resolve_type_name(name: str) -> Any:
 
 def _json_safe_any_value(value: Any) -> Any:
     try:
-        return json.loads(json.dumps(value, allow_nan=False))
-    except (TypeError, ValueError, OverflowError):
-        if isinstance(value, dict):
-            return {
-                str(_json_safe_any_value(k)): _json_safe_any_value(v)
-                for k, v in value.items()
-            }
+        return json.loads(
+            json.dumps(value, allow_nan=False),
+            object_pairs_hook=_reject_duplicate_json_key_pairs,
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        if _is_duplicate_json_key_error(exc):
+            raise
+        if isinstance(value, Mapping):
+            return _json_safe_any_mapping(value)
         if isinstance(value, (list, tuple, set)):
             return [_json_safe_any_value(item) for item in value]
         if isinstance(value, (bytes, bytearray)):
@@ -96,6 +99,43 @@ def _json_safe_any_value(value: Any) -> Any:
         if hasattr(value, "get_secret_value"):
             return "**********"
         return str(value)
+
+
+def _reject_duplicate_json_key_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in out:
+            msg = f"duplicate JSON key {key!r} after Any value normalization"
+            raise ValueError(msg)
+        out[key] = item
+    return out
+
+
+def _is_duplicate_json_key_error(exc: BaseException) -> bool:
+    return isinstance(exc, ValueError) and str(exc).startswith("duplicate JSON key ")
+
+
+def _json_safe_any_mapping(value: Mapping[Any, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, item in value.items():
+        safe_key = _json_safe_any_key(key)
+        if safe_key in out:
+            msg = f"duplicate JSON key {safe_key!r} after Any value normalization"
+            raise ValueError(msg)
+        out[safe_key] = _json_safe_any_value(item)
+    return out
+
+
+def _json_safe_any_key(key: Any) -> str:
+    safe_key = _json_safe_any_value(key)
+    try:
+        pairs = json.loads(
+            json.dumps({safe_key: None}, allow_nan=False),
+            object_pairs_hook=lambda pairs: pairs,
+        )
+    except (TypeError, ValueError, OverflowError):
+        return str(safe_key)
+    return pairs[0][0]
 
 
 class FormNode(BaseModel):
