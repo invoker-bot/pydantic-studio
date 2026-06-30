@@ -211,7 +211,8 @@ class NoneBuilder:
     """
 
     def matches(self, type_: type) -> bool:
-        return strip_annotated(type_) is type(None)
+        stripped = strip_annotated(type_)
+        return stripped is None or stripped is type(None)
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> Any:
         del type_, existing  # the only legal value is None

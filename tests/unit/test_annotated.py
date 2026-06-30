@@ -129,6 +129,8 @@ def test_fq_round_trips_parameterized_container_type_names() -> None:
     from pydantic_studio.tree.nodes import _resolve_type_name
     from pydantic_studio.types.utils import _fq
 
+    assert _resolve_type_name(_fq(None)) is type(None)
+    assert _resolve_type_name(_fq(type(None))) is type(None)
     assert _resolve_type_name(_fq(list[int])) == list[int]
     assert _resolve_type_name(_fq(dict[str, int])) == dict[str, int]
     assert _resolve_type_name(_fq(set[int])) == set[int]

@@ -138,6 +138,29 @@ class TestBuildItemsIsinstanceGuard:
         assert len(flags.items) == 2
 
 
+class TestNoneTypeNameRoundTrip:
+    """Containers whose item annotation is None should rebuild NoneBuilder
+    children through the persisted item_type_name."""
+
+    def test_add_item_to_list_of_none(self) -> None:
+        from pydantic import BaseModel
+
+        class HasNulls(BaseModel):
+            nulls: list[None] = []
+
+        tree = build_form_tree(HasNulls)
+
+        result = tree.add_item("nulls")
+
+        assert result.ok is True, result.errors
+        nulls = tree.root.find("nulls")
+        assert nulls is not None
+        assert len(nulls.items) == 1
+        assert nulls.items[0].kind == "any"
+        assert nulls.items[0].mode == "null"
+        assert nulls.items[0].to_python() is None
+
+
 class TestItemLevelSetValue:
     """set_value should accept paths into sequence items and mapping entries."""
 

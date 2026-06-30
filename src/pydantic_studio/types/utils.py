@@ -66,6 +66,8 @@ def _fq(t: Any) -> str:
     fall back to the bare name.
     """
     stripped = strip_annotated(t)
+    if stripped is None or stripped is type(None):
+        return "builtins.NoneType"
     if is_union_type(stripped):
         payload = json.dumps([_fq(arg) for arg in get_union_args(stripped)])
         return f"typing.Union{payload}"

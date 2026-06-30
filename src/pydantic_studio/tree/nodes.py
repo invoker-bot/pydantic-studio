@@ -110,6 +110,8 @@ def _resolve_type_name(name: str) -> Any:
         raise ValueError(msg)
     module_name, qualname = parts
     if module_name == "builtins":
+        if qualname == "NoneType":
+            return type(None)
         builtin = (
             __builtins__.get(qualname)
             if isinstance(__builtins__, dict)
