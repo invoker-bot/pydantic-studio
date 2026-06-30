@@ -207,6 +207,19 @@ class TestFillFormats:
         data = tomllib.loads(out.read_text(encoding="utf-8"))
         assert data["name"] == "?"
 
+    def test_fill_toml_omits_optional_none_values(self, tmp_path) -> None:
+        out = tmp_path / "out.toml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:WithOptional", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        content = out.read_text(encoding="utf-8")
+        assert "nickname" not in content
+        assert "age" not in content
+        assert tomllib.loads(content) == {}
+
     def test_fill_emits_json(self, tmp_path) -> None:
         out = tmp_path / "out.json"
         result = runner.invoke(

@@ -72,6 +72,8 @@ def _build_document(data: dict[str, Any], schema: type[BaseModel]) -> Any:
     """Construct a tomlkit Document with description comments per key."""
     doc = document()
     for field_name, value in data.items():
+        if value is None:
+            continue
         if field_name in schema.model_fields:
             continue
         doc.add(field_name, value)
@@ -79,6 +81,8 @@ def _build_document(data: dict[str, Any], schema: type[BaseModel]) -> Any:
         if field_name not in data:
             continue
         value = data[field_name]
+        if value is None:
+            continue
         nested_schema = _nested_schema_class(field_info)
         if isinstance(value, dict) and nested_schema is not None:
             doc.add(field_name, _build_document(value, nested_schema))

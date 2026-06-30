@@ -23,7 +23,8 @@ AppSettings
 Emit a config stub populated with defaults. Writes YAML to stdout if
 `--out` is omitted; format inferred from extension otherwise.
 Required fields without defaults are emitted as the string `?` so each
-stub remains valid in its target format while you fill it in.
+stub remains valid in its target format while you fill it in. TOML stubs
+omit `None` values because TOML has no null value.
 
 ```bash
 $ pydantic-studio fill mypkg.config:AppSettings --out config.yaml

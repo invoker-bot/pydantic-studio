@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pydantic_studio import build_form_tree
-from tests.fixtures.schemas import Server
+from tests.fixtures.schemas import Server, WithOptional
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -91,3 +91,19 @@ class TestSaveToml:
         content = out.read_text(encoding="utf-8")
         assert "Service identifier" in content
         assert "Listening port" in content
+
+    def test_save_omits_none_values_that_toml_cannot_represent(
+        self, tmp_path: Path
+    ) -> None:
+        from pydantic_studio.io.toml import load_toml, save_toml
+
+        out = tmp_path / "optional.toml"
+        tree = build_form_tree(WithOptional)
+        save_toml(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert "nickname" not in content
+        assert "age" not in content
+        reloaded = load_toml(out, WithOptional).to_instance()
+        assert reloaded.nickname is None
+        assert reloaded.age is None
