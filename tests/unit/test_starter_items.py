@@ -161,6 +161,100 @@ class TestNoneTypeNameRoundTrip:
         assert nulls.items[0].to_python() is None
 
 
+class TestNestedSeedValidation:
+    """Seeded structural mutations should fail cleanly before mutating."""
+
+    def test_add_item_rejects_invalid_nested_sequence_seed(self) -> None:
+        from pydantic import BaseModel
+
+        class HasNestedLists(BaseModel):
+            rows: list[list[int]] = []
+
+        tree = build_form_tree(HasNestedLists)
+        snapshots_before = len(tree.snapshots)
+
+        result = tree.add_item("rows", ["not-an-int"])
+
+        assert result.ok is False
+        assert result.errors
+        rows = tree.root.find("rows")
+        assert rows is not None
+        assert rows.items == []
+        assert len(tree.snapshots) == snapshots_before
+
+    def test_insert_item_rejects_invalid_nested_sequence_seed(self) -> None:
+        from pydantic import BaseModel
+
+        class HasNestedLists(BaseModel):
+            rows: list[list[int]] = []
+
+        tree = build_form_tree(HasNestedLists)
+        snapshots_before = len(tree.snapshots)
+
+        result = tree.insert_item("rows", 0, ["not-an-int"])
+
+        assert result.ok is False
+        assert result.errors
+        rows = tree.root.find("rows")
+        assert rows is not None
+        assert rows.items == []
+        assert len(tree.snapshots) == snapshots_before
+
+    def test_add_entry_rejects_invalid_nested_key_seed(self) -> None:
+        from pydantic import BaseModel
+
+        class HasNestedKeys(BaseModel):
+            values: dict[tuple[int, int], str] = {}
+
+        tree = build_form_tree(HasNestedKeys)
+        snapshots_before = len(tree.snapshots)
+
+        result = tree.add_entry("values", ("not-an-int", 1), "value")
+
+        assert result.ok is False
+        assert result.errors
+        values = tree.root.find("values")
+        assert values is not None
+        assert values.entries == []
+        assert len(tree.snapshots) == snapshots_before
+
+    def test_rename_key_rejects_invalid_nested_key_seed(self) -> None:
+        from pydantic import BaseModel
+
+        class HasNestedKeys(BaseModel):
+            values: dict[tuple[int, int], str] = {}
+
+        tree = build_form_tree(HasNestedKeys, existing={"values": {(1, 2): "ok"}})
+        snapshots_before = len(tree.snapshots)
+
+        result = tree.rename_key("values", 0, ("not-an-int", 2))
+
+        assert result.ok is False
+        assert result.errors
+        values = tree.root.find("values")
+        assert values is not None
+        assert values.to_python() == {(1, 2): "ok"}
+        assert len(tree.snapshots) == snapshots_before
+
+    def test_add_entry_rejects_invalid_nested_value_seed(self) -> None:
+        from pydantic import BaseModel
+
+        class HasNestedValues(BaseModel):
+            values: dict[str, list[int]] = {}
+
+        tree = build_form_tree(HasNestedValues)
+        snapshots_before = len(tree.snapshots)
+
+        result = tree.add_entry("values", "bad", ["not-an-int"])
+
+        assert result.ok is False
+        assert result.errors
+        values = tree.root.find("values")
+        assert values is not None
+        assert values.entries == []
+        assert len(tree.snapshots) == snapshots_before
+
+
 class TestItemLevelSetValue:
     """set_value should accept paths into sequence items and mapping entries."""
 

@@ -490,7 +490,7 @@ def _mapping_key_arg(tree: FormTree, mutation: dict[str, Any], key: str) -> Any:
     if key_node.kind == "string" and not isinstance(value, str):
         msg = f"{key} must be a string"
         raise TypeError(msg)
-    return _maybe_coerce_wire_value_for_node(key_node, value)
+    return _maybe_coerce_wire_seed_for_node(key_node, value)
 
 
 def _mapping_value_arg(tree: FormTree, path: str, value: Any) -> Any:

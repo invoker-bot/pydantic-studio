@@ -2298,12 +2298,11 @@ class FormTree(BaseModel):
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         item_field = FieldInfo(annotation=item_type)
-        child = builder.build(item_type, item_field, None)
-        if value is not _UNSET_VALUE:
-            errors = child.validate_value(value)
-            if errors:
-                return ValidationResult.fail(list(errors))
-            child = builder.build(item_type, item_field, value)
+        child, errors = _build_seeded_node(builder, item_type, item_field, value)
+        if errors:
+            return ValidationResult.fail(errors)
+        if child is None:
+            return ValidationResult.fail(["sequence item did not build a child node"])
         child.name = str(len(seq.items))
         self._push_snapshot(_snap.take(self.root))
         seq.items = [*seq.items, child]
@@ -2354,12 +2353,11 @@ class FormTree(BaseModel):
         item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
         item_field = FieldInfo(annotation=item_type)
-        child = builder.build(item_type, item_field, None)
-        if value is not _UNSET_VALUE:
-            errors = child.validate_value(value)
-            if errors:
-                return ValidationResult.fail(list(errors))
-            child = builder.build(item_type, item_field, value)
+        child, errors = _build_seeded_node(builder, item_type, item_field, value)
+        if errors:
+            return ValidationResult.fail(errors)
+        if child is None:
+            return ValidationResult.fail(["sequence item did not build a child node"])
         self._push_snapshot(_snap.take(self.root))
         new_items = [*seq.items[:index], child, *seq.items[index:]]
         for i, it in enumerate(new_items):
@@ -2521,21 +2519,22 @@ class FormTree(BaseModel):
         k_builder = reg.find(key_type)
         v_builder = reg.find(value_type)
         key_field = FieldInfo(annotation=key_type)
-        k_node = k_builder.build(key_type, key_field, None)
-        key_errors = k_node.validate_value(key)
+        k_node, key_errors = _build_seeded_node(k_builder, key_type, key_field, key)
         if key_errors:
-            return ValidationResult.fail(list(key_errors))
-        k_node = k_builder.build(key_type, key_field, key)
+            return ValidationResult.fail(key_errors)
+        if k_node is None:
+            return ValidationResult.fail(["mapping key did not build a child node"])
         unique_result = self._validate_mapping_unique_key(mp, k_node.to_python())
         if not unique_result.ok:
             return unique_result
         value_field = FieldInfo(annotation=value_type)
-        v_node = v_builder.build(value_type, value_field, None)
-        if value is not _UNSET_VALUE:
-            value_errors = v_node.validate_value(value)
-            if value_errors:
-                return ValidationResult.fail(list(value_errors))
-            v_node = v_builder.build(value_type, value_field, value)
+        v_node, value_errors = _build_seeded_node(
+            v_builder, value_type, value_field, value
+        )
+        if value_errors:
+            return ValidationResult.fail(value_errors)
+        if v_node is None:
+            return ValidationResult.fail(["mapping value did not build a child node"])
         k_node.name = "key"
         v_node.name = "value"
         self._push_snapshot(_snap.take(self.root))
@@ -2576,11 +2575,13 @@ class FormTree(BaseModel):
         key_type = _resolve_type_name(mp.key_type_name)
         key_field = FieldInfo(annotation=key_type)
         key_builder = default_registry().find(key_type)
-        candidate_key = key_builder.build(key_type, key_field, None)
-        errors = candidate_key.validate_value(new_key)
+        candidate_key, errors = _build_seeded_node(
+            key_builder, key_type, key_field, new_key
+        )
         if errors:
-            return ValidationResult.fail(list(errors))
-        candidate_key = key_builder.build(key_type, key_field, new_key)
+            return ValidationResult.fail(errors)
+        if candidate_key is None:
+            return ValidationResult.fail(["mapping key did not build a child node"])
         candidate_key.name = "key"
         unique_result = self._validate_mapping_unique_key(
             mp,
