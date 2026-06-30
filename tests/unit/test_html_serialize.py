@@ -670,6 +670,31 @@ def test_dispatch_select_variant_coerces_structured_seed_values() -> None:
     ] == [(80, 8080)]
 
 
+def test_dispatch_select_variant_rejects_duplicate_coerced_seed_mapping_keys() -> None:
+    tree = build_form_tree(_StructuredUnionHolder, existing={"value": "seeded"})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "select_variant",
+            "path": "value",
+            "variant_index": 1,
+            "seed": {
+                "count": "2",
+                "counts": [],
+                "ports": {"80": "8080", "080": "9090"},
+            },
+        },
+    )
+
+    assert result.ok is False
+    assert any("duplicate key 80" in error for error in result.errors)
+    val = tree.root.find("value")
+    assert val.selected_index == 0
+    assert val.selected.kind == "string"
+    assert val.selected.value == "seeded"
+
+
 def test_dispatch_select_variant_rejects_string_index_without_mutating() -> None:
     tree = build_form_tree(_UnionHolder, existing={"value": 42})
     result = dispatch_mutation(

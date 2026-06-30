@@ -280,7 +280,7 @@ def _maybe_coerce_wire_seed_for_node(node: Any, seed: Any) -> Any:
             is_missing_input_value,
         )
 
-        coerced: dict[str, Any] = {}
+        coerced_fields: dict[str, Any] = {}
         for child in node.fields:
             field_info = node.schema_class.model_fields.get(child.name)
             if field_info is None:
@@ -288,8 +288,8 @@ def _maybe_coerce_wire_seed_for_node(node: Any, seed: Any) -> Any:
             value = input_value_or_missing_for_field(seed, child.name, field_info)
             if is_missing_input_value(value):
                 continue
-            coerced[child.name] = _maybe_coerce_wire_seed_for_node(child, value)
-        return coerced
+            coerced_fields[child.name] = _maybe_coerce_wire_seed_for_node(child, value)
+        return coerced_fields
     if isinstance(node, SequenceNode):
         if not isinstance(seed, list | tuple):
             return seed
@@ -327,12 +327,16 @@ def _maybe_coerce_wire_seed_for_node(node: Any, seed: Any) -> Any:
         value_node = registry.find(value_type).build(
             value_type, FieldInfo(annotation=value_type), None
         )
-        return {
-            _maybe_coerce_wire_seed_for_node(key_node, key): (
-                _maybe_coerce_wire_seed_for_node(value_node, value)
+        coerced_entries: dict[Any, Any] = {}
+        for key, value in seed.items():
+            coerced_key = _maybe_coerce_wire_seed_for_node(key_node, key)
+            if coerced_key in coerced_entries:
+                msg = f"duplicate key {coerced_key!r} after coercion"
+                raise ValueError(msg)
+            coerced_entries[coerced_key] = _maybe_coerce_wire_seed_for_node(
+                value_node, value
             )
-            for key, value in seed.items()
-        }
+        return coerced_entries
     if isinstance(node, UnionNode) and node.selected is not None:
         return _maybe_coerce_wire_seed_for_node(node.selected, seed)
     return _maybe_coerce_wire_value_for_node(node, seed)
