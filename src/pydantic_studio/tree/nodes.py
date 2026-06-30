@@ -96,6 +96,13 @@ def _resolve_type_name(name: str) -> Any:
         except ValueError as exc:
             msg = f"cannot reconstruct Literal choices from {name!r}"
             raise ValueError(msg) from exc
+        if not isinstance(choices, list) or any(
+            choice is not None
+            and not isinstance(choice, str | int | float | bool)
+            for choice in choices
+        ):
+            msg = f"cannot reconstruct Literal choices from {name!r}"
+            raise ValueError(msg)
         return Literal[tuple(choices)]  # type: ignore[misc]
     parts = name.rsplit(".", 1)
     if len(parts) != 2:

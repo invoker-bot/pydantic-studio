@@ -152,3 +152,17 @@ def test_resolve_type_name_rejects_non_string_structural_type_names(
 
     with pytest.raises(ValueError, match="type name"):
         _resolve_type_name(encoded)
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        "typing.Literal[[\"nested\"]]",
+        "typing.Literal[{\"x\": \"y\"}]",
+    ],
+)
+def test_resolve_type_name_rejects_non_scalar_literal_choices(encoded: str) -> None:
+    from pydantic_studio.tree.nodes import _resolve_type_name
+
+    with pytest.raises(ValueError, match="Literal choices"):
+        _resolve_type_name(encoded)
