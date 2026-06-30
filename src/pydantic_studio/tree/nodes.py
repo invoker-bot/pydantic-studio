@@ -1406,6 +1406,36 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
             errors.append(f"length must be >= {node.min_length}")
         if node.max_length is not None and length > node.max_length:
             errors.append(f"length must be <= {node.max_length}")
+        from pydantic.fields import FieldInfo
+
+        from pydantic_studio.tree.builder import default_registry
+
+        values = list(seed)
+        item_type_names = (
+            node.slot_type_names
+            if node.origin == "tuple_fixed"
+            else [node.item_type_name] * len(values)
+        )
+        registry = default_registry()
+        for index, value in enumerate(values):
+            if item_type_names is None or index >= len(item_type_names):
+                continue
+            item_type_name = item_type_names[index]
+            if item_type_name is None:
+                continue
+            item_type = _resolve_type_name(item_type_name)
+            try:
+                child = registry.find(item_type).build(
+                    item_type,
+                    FieldInfo(annotation=item_type),
+                    value,
+                )
+            except ValidationError as exc:
+                for message in _validation_error_messages(exc):
+                    errors.append(f"[{index}]: {message}")
+                continue
+            for message in _validate_seed_against_node(child, value):
+                errors.append(f"[{index}]: {message}")
         return errors
     if isinstance(node, UnionNode) and node.selected is not None:
         return _validate_seed_against_node(node.selected, seed)

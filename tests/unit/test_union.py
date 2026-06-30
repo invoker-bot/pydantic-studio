@@ -160,6 +160,21 @@ def test_select_variant_rejects_sequence_seed_constraint_without_mutating() -> N
     assert tree.snapshots == []
 
 
+def test_select_variant_rejects_sequence_seed_item_without_mutating() -> None:
+    tree = build_form_tree(_SeededListUnionHolder, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 1, seed={"items": ["1"]})
+
+    assert result.ok is False
+    assert result.errors == ("items: [0]: expected int, got str",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
 def test_discriminated_union_in_list_preserves_inner_field_values() -> None:
     """Regression: ``UnionBuilder._preselect`` validates a dict seed into
     a BaseModel instance and passes that instance to the inner builder.
