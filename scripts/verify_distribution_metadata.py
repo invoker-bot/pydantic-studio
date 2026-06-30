@@ -216,6 +216,7 @@ def _project_identity(pyproject: dict[str, object]) -> tuple[str, ...]:
     fields = (
         ("name", "Name"),
         ("version", "Version"),
+        ("description", "Summary"),
         ("requires-python", "Requires-Python"),
     )
     invalid = [field for field, _metadata_name in fields if not isinstance(project.get(field), str)]
