@@ -14,6 +14,7 @@ from pydantic import (
 )
 
 from pydantic_studio.tree.nodes import GroupNode
+from pydantic_studio.types.aliases import flat_field_input_keys
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -51,6 +52,19 @@ def _parse_existing(field_info: FieldInfo, raw: Any) -> Any:
         return TypeAdapter(annotation).validate_python(raw)
     except ValidationError:
         return raw
+
+
+def _lookup_existing_value(
+    existing: dict[str, Any],
+    field_name: str,
+    field_info: FieldInfo,
+) -> Any:
+    """Return the first non-None value matching a field input key."""
+    for key in flat_field_input_keys(field_name, field_info):
+        value = existing.get(key)
+        if value is not None:
+            return value
+    return None
 
 
 class GroupBuilder:
@@ -95,9 +109,7 @@ class GroupBuilder:
             if child_type is None:
                 child_type = str  # fallback — shouldn't happen in practice
             child_builder = self._registry.find(child_type)
-            child_existing = existing_dict.get(fname)
-            if child_existing is None and finfo.alias:
-                child_existing = existing_dict.get(finfo.alias)
+            child_existing = _lookup_existing_value(existing_dict, fname, finfo)
             if child_existing is not None and _has_transforming_validator(finfo):
                 child_existing = _parse_existing(finfo, child_existing)
             child = child_builder.build(child_type, finfo, child_existing)

@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Literal
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from pydantic.fields import FieldInfo
 
 from pydantic_studio.exceptions import NoBuilderError
@@ -191,6 +191,20 @@ def test_group_builder_populates_existing_values():
     # unspecified fields fall back to schema defaults as editable values
     assert n.find("enabled").value is True
     assert n.find("enabled").default is True
+
+
+def test_group_builder_populates_flat_validation_alias_values():
+    class AliasConfig(BaseModel):
+        api_key: str = Field(default="secret", validation_alias="api-key")
+        token: str = Field(default="token", validation_alias=AliasChoices("token", "auth-token"))
+
+    tree = build_form_tree(
+        AliasConfig,
+        existing={"api-key": "rotated", "auth-token": "bearer"},
+    )
+
+    assert tree.root.find("api_key").value == "rotated"
+    assert tree.root.find("token").value == "bearer"
 
 
 def test_group_builder_recursive_existing_values():

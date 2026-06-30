@@ -24,6 +24,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from pydantic_studio.tree.builder import build_form_tree
+from pydantic_studio.types.aliases import flat_field_input_keys
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -247,11 +248,12 @@ def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
 
 def _field_info_for_key(schema: type[BaseModel], key: str) -> FieldInfo | None:
     """Return field metadata addressed by a model field name or alias."""
-    field_info = schema.model_fields.get(key)
-    if field_info is not None:
-        return field_info
     return next(
-        (candidate for candidate in schema.model_fields.values() if candidate.alias == key),
+        (
+            field_info
+            for field_name, field_info in schema.model_fields.items()
+            if key in flat_field_input_keys(field_name, field_info)
+        ),
         None,
     )
 
