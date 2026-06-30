@@ -325,7 +325,10 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
             value = _maybe_coerce_typed_value(tree, path, value)
             return tree.set_value(path, value)
         if op == "add_item":
-            return tree.add_item(_path_arg(mutation))
+            path = _path_arg(mutation)
+            if "value" in mutation:
+                return tree.add_item(path, mutation["value"])
+            return tree.add_item(path)
         if op == "remove_item":
             return tree.remove_item(
                 _path_arg(mutation), _required_int_arg(mutation, "index")
@@ -338,7 +341,10 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
             )
         if op == "add_entry":
             path = _path_arg(mutation)
-            return tree.add_entry(path, key=_mapping_key_arg(tree, mutation, "key"))
+            key = _mapping_key_arg(tree, mutation, "key")
+            if "value" in mutation:
+                return tree.add_entry(path, key=key, value=mutation["value"])
+            return tree.add_entry(path, key=key)
         if op == "remove_entry":
             return tree.remove_entry(
                 _path_arg(mutation), _required_int_arg(mutation, "index")

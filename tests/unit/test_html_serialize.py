@@ -289,6 +289,18 @@ def test_dispatch_add_item_appends_to_sequence() -> None:
     assert len(tree.root.find("tags").items) == 2
 
 
+def test_dispatch_add_item_passes_value_to_tree() -> None:
+    tree = build_form_tree(_WithList, existing={"tags": ["a"]})
+
+    result = dispatch_mutation(
+        tree, {"op": "add_item", "path": "tags", "value": "seeded"}
+    )
+
+    assert result.ok is True
+    values = [it.value for it in tree.root.find("tags").items]
+    assert values == ["a", "seeded"]
+
+
 def test_dispatch_remove_item_pops_indexed_entry() -> None:
     tree = build_form_tree(_WithList, existing={"tags": ["a", "b", "c"]})
     result = dispatch_mutation(
@@ -351,6 +363,19 @@ def test_dispatch_add_entry_appends_new_key() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
     assert pairs == [("TZ", "UTC"), ("LOG", None)]
+
+
+def test_dispatch_add_entry_passes_value_to_tree() -> None:
+    tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC"}})
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "add_entry", "path": "env", "key": "LOG", "value": "debug"},
+    )
+
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
+    assert pairs == [("TZ", "UTC"), ("LOG", "debug")]
 
 
 def test_dispatch_add_entry_rejects_null_key_without_mutating() -> None:
