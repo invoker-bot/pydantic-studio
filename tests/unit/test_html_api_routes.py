@@ -36,6 +36,10 @@ class _RootSlack(BaseModel):
     channel: str = "#ops"
 
 
+class _RootRequiredSlack(BaseModel):
+    channel: str
+
+
 def _client(existing: dict | None = None) -> TestClient:
     tree = build_form_tree(_Demo, existing=existing)
     server = StudioServer(tree=tree, save_path=None)
@@ -409,6 +413,38 @@ def test_api_mutations_reject_root_variant_switch_when_any_path_is_readonly() ->
     assert server.tree.variant.selected_id == "email"
     assert server.tree.root.find("address").value == "ops@example.com"
     assert server.tree.root.find("channel") is None
+
+
+def test_api_mutations_root_variant_validation_error_uses_root_path() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_RootEmail),
+                VariantSpec(id="slack", model=_RootRequiredSlack),
+            ]
+        ),
+        selected_id="email",
+    )
+    client = TestClient(StudioServer(tree=tree, save_path=None).app)
+
+    response = client.post(
+        "/api/mutations",
+        json={
+            "op": "select_root_variant",
+            "variant_id": "slack",
+            "path": None,
+            "seed": {"channel": None},
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"]["ok"] is False
+    assert body["validation"]["errors"][0]["path"] == ""
+    assert "channel: value is required" in body["validation"]["errors"][0]["message"]
+    assert tree.schema_class is _RootEmail
+    assert tree.root.find("address") is not None
+    assert tree.root.find("channel") is None
 
 
 def test_run_html_app_signature_matches_run_app_contract() -> None:

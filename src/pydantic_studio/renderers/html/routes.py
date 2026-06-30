@@ -54,6 +54,11 @@ def _readonly_mutation_error(
     return None
 
 
+def _mutation_error_path(mutation: dict[str, Any]) -> str:
+    path = mutation.get("path")
+    return path if isinstance(path, str) else ""
+
+
 def register(app: FastAPI, server: StudioServer) -> None:
     """Wire the SPA shell and JSON API routes onto the FastAPI app."""
 
@@ -107,7 +112,7 @@ def register(app: FastAPI, server: StudioServer) -> None:
         # render the rejection without needing a second request.
         validation = validation_envelope(server.tree)
         if not result.ok:
-            mutation_path = str(mutation.get("path", ""))
+            mutation_path = _mutation_error_path(mutation)
             validation = {
                 "ok": False,
                 "errors": [
