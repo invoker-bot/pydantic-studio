@@ -35,6 +35,7 @@ def _write_wheel(
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
     license_files: tuple[str, ...] = ("LICENSE",),
     package_init: str | None = "pydantic_studio/__init__.py",
+    cli_module: str | None = "pydantic_studio/cli.py",
     typed_marker: str | None = "pydantic_studio/py.typed",
     static_bundle: tuple[str, ...] = (
         "pydantic_studio/renderers/html/static/dist/index.html",
@@ -48,6 +49,7 @@ def _write_wheel(
     wheel_metadata: str | None = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     record: str | None = (
         "pydantic_studio/__init__.py,,\n"
+        "pydantic_studio/cli.py,,\n"
         "pydantic_studio/py.typed,,\n"
         "pydantic_studio/renderers/html/static/dist/index.html,,\n"
         "pydantic_studio/renderers/html/static/dist/assets/index-test.css,,\n"
@@ -63,6 +65,8 @@ def _write_wheel(
         zf.writestr(metadata_name, metadata)
         if package_init is not None:
             zf.writestr(package_init, "__version__ = '0.4.0'\n")
+        if cli_module is not None:
+            zf.writestr(cli_module, "app = object()\n")
         if typed_marker is not None:
             zf.writestr(typed_marker, "")
         for filename in static_bundle:
@@ -86,6 +90,7 @@ def _write_sdist(
     readme: str | None = "README.md",
     license_files: tuple[str, ...] = ("LICENSE",),
     package_init: str | None = "src/pydantic_studio/__init__.py",
+    cli_module: str | None = "src/pydantic_studio/cli.py",
     typed_marker: str | None = "src/pydantic_studio/py.typed",
     static_bundle: tuple[str, ...] = (
         "src/pydantic_studio/renderers/html/static/dist/index.html",
@@ -129,6 +134,11 @@ def _write_sdist(
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text("__version__ = '0.4.0'\n", encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{package_init}")
+        if cli_module is not None:
+            source = dist / cli_module
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("app = object()\n", encoding="utf-8")
+            tf.add(source, arcname=f"pydantic_studio-0.4.0/{cli_module}")
         if typed_marker is not None:
             source = dist / typed_marker
             source.parent.mkdir(parents=True, exist_ok=True)
@@ -548,6 +558,59 @@ def test_verify_distribution_metadata_rejects_missing_wheel_package_init_record_
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_missing_wheel_console_script_module(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, cli_module=None)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"cli\.py"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_wheel_console_script_module_record_entry(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        record=(
+            "pydantic_studio/__init__.py,,\n"
+            "pydantic_studio/py.typed,,\n"
+            "pydantic_studio/renderers/html/static/dist/index.html,,\n"
+            "pydantic_studio/renderers/html/static/dist/assets/index-test.css,,\n"
+            "pydantic_studio/renderers/html/static/dist/assets/index-test.js,,\n"
+            "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
+            "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
+            "pydantic_studio-0.4.0.dist-info/entry_points.txt,,\n"
+            "pydantic_studio-0.4.0.dist-info/licenses/LICENSE,,\n"
+            "pydantic_studio-0.4.0.dist-info/RECORD,,\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"cli\.py"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_typed_marker_record_entry(
     tmp_path: Path,
 ) -> None:
@@ -803,6 +866,26 @@ def test_verify_distribution_metadata_rejects_missing_sdist_package_init(
     )
 
     with pytest.raises(RuntimeError, match=r"__init__\.py"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_sdist_console_script_module(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        cli_module=None,
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"cli\.py"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 

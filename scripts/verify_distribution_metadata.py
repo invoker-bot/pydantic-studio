@@ -131,6 +131,7 @@ def _verify_wheel_structure(
     dist_info_dir: str,
     license_files: Sequence[str],
     package_root: str,
+    package_files: Sequence[str],
 ) -> None:
     with zipfile.ZipFile(wheel) as zf:
         names = set(zf.namelist())
@@ -161,12 +162,10 @@ def _verify_wheel_structure(
             dist_prefix=static_dist_prefix,
             index_html=static_index_html,
         )
-        package_files = (
-            f"{package_root}/__init__.py",
-            f"{package_root}/py.typed",
-            *static_bundle_files,
-        )
-        missing_package_files = [filename for filename in package_files if filename not in names]
+        required_package_files = (*package_files, *static_bundle_files)
+        missing_package_files = [
+            filename for filename in required_package_files if filename not in names
+        ]
         if missing_package_files:
             raise RuntimeError(f"{wheel} missing wheel package files: {missing_package_files!r}")
         wheel_metadata = zf.read(f"{dist_info_dir}/WHEEL").decode("utf-8")
@@ -184,7 +183,7 @@ def _verify_wheel_structure(
         raise RuntimeError(f"{wheel} missing wheel metadata: {missing_metadata!r}")
 
     record_entries = _wheel_record_entries(record)
-    record_paths = list(package_files)
+    record_paths = list(required_package_files)
     record_paths.extend(
         f"{dist_info_dir}/{filename}"
         for filename in ("METADATA", "WHEEL", "RECORD", "entry_points.txt")
@@ -403,6 +402,33 @@ def _project_console_scripts(pyproject: dict[str, object]) -> dict[str, str]:
     return {name: target for name, target in scripts.items() if isinstance(name, str)}
 
 
+def _project_console_script_module_files(pyproject: dict[str, object]) -> tuple[str, ...]:
+    module_files: list[str] = []
+    for target in _project_console_scripts(pyproject).values():
+        module, separator, _attribute = target.partition(":")
+        if not separator or not module:
+            raise RuntimeError(f"pyproject.toml console script target is invalid: {target!r}")
+        module_files.append(f"{module.replace('.', '/')}.py")
+    return tuple(dict.fromkeys(module_files))
+
+
+def _project_package_files(pyproject: dict[str, object]) -> tuple[str, ...]:
+    package_root = _project_package_root(pyproject)
+    return tuple(
+        dict.fromkeys(
+            (
+                f"{package_root}/__init__.py",
+                f"{package_root}/py.typed",
+                *_project_console_script_module_files(pyproject),
+            )
+        )
+    )
+
+
+def _project_source_package_files(pyproject: dict[str, object]) -> tuple[str, ...]:
+    return tuple(f"src/{filename}" for filename in _project_package_files(pyproject))
+
+
 def _string_sequence(table: dict[str, object], key: str, path: str) -> tuple[str, ...]:
     value = table.get(key)
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
@@ -510,8 +536,7 @@ def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
         dict.fromkeys(
             (
                 "pyproject.toml",
-                f"src/{_project_package_root(pyproject)}/__init__.py",
-                f"src/{_project_package_root(pyproject)}/py.typed",
+                *_project_source_package_files(pyproject),
                 *source_include,
                 *((readme,) if readme is not None else ()),
                 *_project_license_files(pyproject),
@@ -539,6 +564,7 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         dist_info_dir=wheel_dist_info_dir,
         license_files=_project_license_files(pyproject),
         package_root=_project_package_root(pyproject),
+        package_files=_project_package_files(pyproject),
     )
     metadata_headers = _metadata_headers(_wheel_metadata(wheel, dist_info_dir=wheel_dist_info_dir))
     missing_identity = [
