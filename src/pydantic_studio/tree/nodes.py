@@ -1929,6 +1929,17 @@ class FormTree(BaseModel):
             raise TypeError(msg)
         return node
 
+    @staticmethod
+    def _validate_mapping_length(mp: MappingNode, new_length: int) -> ValidationResult:
+        errors: list[str] = []
+        if mp.min_length is not None and new_length < mp.min_length:
+            errors.append(f"length must be >= {mp.min_length}")
+        if mp.max_length is not None and new_length > mp.max_length:
+            errors.append(f"length must be <= {mp.max_length}")
+        if errors:
+            return ValidationResult.fail(errors)
+        return ValidationResult.ok()
+
     def add_entry(
         self, path: str, key: Any, value: Any = None
     ) -> ValidationResult:
@@ -1939,6 +1950,9 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
 
         mp = self._walk_to_mapping(path)
+        length_result = self._validate_mapping_length(mp, len(mp.entries) + 1)
+        if not length_result.ok:
+            return length_result
         key_type = _resolve_type_name(mp.key_type_name)
         value_type = _resolve_type_name(mp.value_type_name)
         reg = default_registry()
@@ -1972,6 +1986,9 @@ class FormTree(BaseModel):
         mp = self._walk_to_mapping(path)
         if not (0 <= index < len(mp.entries)):
             return ValidationResult.fail([f"index {index} out of range"])
+        length_result = self._validate_mapping_length(mp, len(mp.entries) - 1)
+        if not length_result.ok:
+            return length_result
         self._push_snapshot(_snap.take(self.root))
         mp.entries = [e for i, e in enumerate(mp.entries) if i != index]
         if self.draft_path is not None:

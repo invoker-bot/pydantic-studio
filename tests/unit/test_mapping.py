@@ -13,6 +13,12 @@ class WithIntDict(BaseModel):
     ports: dict[int, str] = Field(default_factory=dict)
 
 
+class ConstrainedDict(BaseModel):
+    settings: dict[str, int] = Field(
+        default_factory=lambda: {"a": 1}, min_length=1, max_length=2
+    )
+
+
 def test_dict_builder_constructs_mapping_node() -> None:
     tree = build_form_tree(WithDict)
     settings = tree.root.find("settings")
@@ -124,3 +130,29 @@ def test_add_entry_pushes_snapshot_for_undo() -> None:
     settings = tree.root.find("settings")
     assert isinstance(settings, MappingNode)
     assert settings.entries == []
+
+
+def test_add_entry_rejects_mapping_max_length_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedDict, existing={"settings": {"a": 1, "b": 2}})
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+
+    result = tree.add_entry("settings", "c", 3)
+
+    assert result.ok is False
+    assert result.errors == ("length must be <= 2",)
+    assert settings.to_python() == {"a": 1, "b": 2}
+    assert tree.snapshots == []
+
+
+def test_remove_entry_rejects_mapping_min_length_without_mutating() -> None:
+    tree = build_form_tree(ConstrainedDict, existing={"settings": {"a": 1}})
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+
+    result = tree.remove_entry("settings", 0)
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 1",)
+    assert settings.to_python() == {"a": 1}
+    assert tree.snapshots == []
