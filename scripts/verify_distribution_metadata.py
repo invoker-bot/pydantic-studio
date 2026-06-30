@@ -242,6 +242,13 @@ def _expected_sdist_files(pyproject: dict[str, object]) -> tuple[str, ...]:
     return source_include
 
 
+def _sdist_root(names: Sequence[str], sdist: Path) -> str:
+    roots = {name.split("/", 1)[0] for name in names if "/" in name}
+    if len(roots) != 1:
+        raise RuntimeError(f"expected exactly one source root in {sdist}, found {sorted(roots)!r}")
+    return roots.pop()
+
+
 def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = None) -> None:
     project_root = project_root or Path.cwd()
     pyproject = _load_pyproject(project_root)
@@ -320,10 +327,12 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
         raise RuntimeError(f"{sdist} missing dependency metadata: {missing_sdist_dependencies!r}")
 
     names = _sdist_names(sdist)
+    name_set = set(names)
+    sdist_root = _sdist_root(names, sdist)
     missing_files = [
         filename
         for filename in _expected_sdist_files(pyproject)
-        if not any(name.endswith(f"/{filename}") for name in names)
+        if f"{sdist_root}/{filename}" not in name_set
     ]
     if missing_files:
         raise RuntimeError(f"{sdist} missing source files: {missing_files!r}")

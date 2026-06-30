@@ -51,6 +51,7 @@ def _write_sdist(
             tf.add(pkg_info, arcname="pydantic_studio-0.4.0/PKG-INFO")
         for filename in filenames:
             source = dist / filename
+            source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(filename, encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
 
@@ -171,6 +172,25 @@ def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path)
     _write_sdist(dist, ("CHANGELOG.md", "SECURITY.md"), metadata=metadata)
 
     with pytest.raises(RuntimeError, match=r"CONTRIBUTING\.md"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_nested_sdist_file_decoy(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("docs/CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"CHANGELOG\.md"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
