@@ -337,6 +337,33 @@ def test_verify_distribution_metadata_rejects_wrong_wheel_compatibility_tag(
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_wrong_wheel_purelib_flag(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        wheel_metadata=(
+            "Wheel-Version: 1.0\n"
+            "Root-Is-Purelib: false\n"
+            "Tag: py3-none-any\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"Root-Is-Purelib"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_sdist_file(tmp_path: Path) -> None:
     verifier = _load_verifier()
     dist = tmp_path / "dist"

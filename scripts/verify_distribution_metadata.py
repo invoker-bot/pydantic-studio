@@ -57,9 +57,17 @@ def _verify_wheel_structure(wheel: Path, *, dist_info_dir: str) -> None:
                 f"{wheel} missing wheel structure files in {dist_info_dir}: {missing_files!r}"
             )
         wheel_metadata = zf.read(f"{dist_info_dir}/WHEEL").decode("utf-8")
-    expected_tag = f"Tag: {_wheel_filename_tag(wheel)}"
-    if expected_tag not in _metadata_headers(wheel_metadata):
-        raise RuntimeError(f"{wheel} missing wheel tag metadata: {[expected_tag]!r}")
+    wheel_headers = _metadata_headers(wheel_metadata)
+    missing_metadata = [
+        line
+        for line in (
+            "Root-Is-Purelib: true",
+            f"Tag: {_wheel_filename_tag(wheel)}",
+        )
+        if line not in wheel_headers
+    ]
+    if missing_metadata:
+        raise RuntimeError(f"{wheel} missing wheel metadata: {missing_metadata!r}")
 
 
 def _wheel_metadata(wheel: Path, *, dist_info_dir: str) -> str:
