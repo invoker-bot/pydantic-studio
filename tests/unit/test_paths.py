@@ -115,6 +115,12 @@ def test_path_constructor_rejects_invalid_segments(
         Path(segments)
 
 
+@pytest.mark.parametrize("segments", ["foo", ["foo"]])
+def test_path_constructor_rejects_non_tuple_segments(segments: object):
+    with pytest.raises(ValueError, match="path segments must be a tuple"):
+        Path(segments)  # type: ignore[arg-type]
+
+
 def test_append_rejects_invalid_segment():
     with pytest.raises(ValueError, match="negative index"):
         Path(("foo",)).append(-1)

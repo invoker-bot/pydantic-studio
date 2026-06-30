@@ -45,6 +45,9 @@ class Path:
     segments: tuple[PathSegment, ...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.segments, tuple):
+            msg = "path segments must be a tuple"
+            raise ValueError(msg)
         for segment in self.segments:
             if isinstance(segment, bool):
                 msg = "boolean path segments are not valid indexes"
