@@ -1117,6 +1117,33 @@ def test_dispatch_select_root_variant_switches_root_model() -> None:
     assert tree.root.find("channel") is not None
 
 
+def test_dispatch_select_root_variant_current_id_is_noop_without_seed() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail),
+                VariantSpec(id="slack", model=_VariantSlack),
+            ]
+        ),
+        selected_id="email",
+    )
+    assert tree.set_value("address", "edited@example.com").ok is True
+    root_before = tree.root
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = dispatch_mutation(
+        tree, {"op": "select_root_variant", "variant_id": "email"}
+    )
+
+    assert result.ok is True
+    assert tree.schema_class is _VariantEmail
+    assert tree.root is root_before
+    assert tree.root.find("address").value == "edited@example.com"
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_dispatch_select_root_variant_passes_seed_to_tree() -> None:
     tree = build_variant_form_tree(
         VariantRegistry(

@@ -132,6 +132,25 @@ def test_select_root_variant_rebuilds_schema_and_root() -> None:
     assert tree.root.find("address") is None
 
 
+def test_select_root_variant_current_id_is_noop_without_seed() -> None:
+    tree = build_variant_form_tree(_registry(), selected_id="email")
+    assert tree.set_value("address", "edited@example.com").ok is True
+    root_before = tree.root
+    snapshots_before = list(tree.snapshots)
+    cursor_before = tree.cursor
+
+    result = tree.select_root_variant("email")
+
+    assert result.ok is True
+    assert tree.schema_class is EmailSettings
+    assert tree.variant is not None
+    assert tree.variant.selected_id == "email"
+    assert tree.root is root_before
+    assert tree.root.find("address").value == "edited@example.com"
+    assert tree.snapshots == snapshots_before
+    assert tree.cursor == cursor_before
+
+
 def test_select_root_variant_rejects_unknown_id_without_mutating() -> None:
     tree = build_variant_form_tree(_registry(), selected_id="email")
 

@@ -1823,6 +1823,8 @@ class FormTree(BaseModel):
             return ValidationResult.fail(
                 [f"unknown variant id {variant_id!r}; known variants: {known}"]
             )
+        if variant_id == self.variant.selected_id and seed is _UNSET_VALUE:
+            return ValidationResult.ok()
 
         from pydantic.fields import FieldInfo
 
