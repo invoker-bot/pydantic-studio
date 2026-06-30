@@ -27,11 +27,14 @@ def _single_file(dist_dir: Path, pattern: str) -> Path:
     return matches[0]
 
 
+def _wheel_dist_info_files(names: Sequence[str], filename: str) -> list[str]:
+    suffix = f".dist-info/{filename}"
+    return [name for name in names if name.count("/") == 1 and name.endswith(suffix)]
+
+
 def _wheel_metadata(wheel: Path) -> str:
     with zipfile.ZipFile(wheel) as zf:
-        metadata_names = [
-            name for name in zf.namelist() if name.endswith(".dist-info/METADATA")
-        ]
+        metadata_names = _wheel_dist_info_files(zf.namelist(), "METADATA")
         if len(metadata_names) != 1:
             raise RuntimeError(
                 f"expected exactly one .dist-info/METADATA file in {wheel}, "
@@ -42,9 +45,7 @@ def _wheel_metadata(wheel: Path) -> str:
 
 def _wheel_entry_points(wheel: Path) -> configparser.SectionProxy | None:
     with zipfile.ZipFile(wheel) as zf:
-        entry_point_names = [
-            name for name in zf.namelist() if name.endswith(".dist-info/entry_points.txt")
-        ]
+        entry_point_names = _wheel_dist_info_files(zf.namelist(), "entry_points.txt")
         if len(entry_point_names) > 1:
             raise RuntimeError(
                 f"expected at most one entry_points.txt file in {wheel}, "

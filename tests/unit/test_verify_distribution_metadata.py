@@ -31,12 +31,13 @@ def _write_wheel(
     metadata: str,
     *,
     metadata_name: str = "pydantic_studio-0.4.0.dist-info/METADATA",
+    entry_points_name: str = "pydantic_studio-0.4.0.dist-info/entry_points.txt",
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
 ) -> None:
     with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
         zf.writestr(metadata_name, metadata)
         if entry_points:
-            zf.writestr("pydantic_studio-0.4.0.dist-info/entry_points.txt", entry_points)
+            zf.writestr(entry_points_name, entry_points)
 
 
 def _write_sdist(
@@ -180,6 +181,52 @@ def test_verify_distribution_metadata_rejects_wheel_metadata_decoy_path(
     )
 
     with pytest.raises(RuntimeError, match=r"METADATA"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_nested_wheel_dist_info_metadata_decoy(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        metadata_name="pydantic_studio/nested.dist-info/METADATA",
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"METADATA"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_nested_wheel_dist_info_entry_point_decoy(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        entry_points_name="pydantic_studio/nested.dist-info/entry_points.txt",
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"pydantic-studio"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
