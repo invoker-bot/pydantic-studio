@@ -1777,7 +1777,12 @@ class FormTree(BaseModel):
         reg = default_registry()
         k_builder = reg.find(key_type)
         v_builder = reg.find(value_type)
-        k_node = k_builder.build(key_type, FieldInfo(annotation=key_type), key)
+        key_field = FieldInfo(annotation=key_type)
+        k_node = k_builder.build(key_type, key_field, None)
+        key_errors = k_node.validate_value(key)
+        if key_errors:
+            return ValidationResult.fail(list(key_errors))
+        k_node = k_builder.build(key_type, key_field, key)
         v_node = v_builder.build(value_type, FieldInfo(annotation=value_type), value)
         k_node.name = "key"
         v_node.name = "value"

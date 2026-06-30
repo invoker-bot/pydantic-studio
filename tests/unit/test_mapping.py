@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from pydantic import BaseModel, Field
+
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import IntNode, MappingNode, StringNode
 from tests.fixtures.schemas import WithDict
+
+
+class WithIntDict(BaseModel):
+    ports: dict[int, str] = Field(default_factory=dict)
 
 
 def test_dict_builder_constructs_mapping_node() -> None:
@@ -58,6 +64,19 @@ def test_add_entry_appends() -> None:
     k, v = settings.entries[0]
     assert k.value == "timeout"
     assert v.value == 30
+
+
+def test_add_entry_rejects_invalid_typed_key_without_mutating() -> None:
+    tree = build_form_tree(WithIntDict)
+
+    result = tree.add_entry("ports", "not-an-int", "http")
+
+    assert result.ok is False
+    assert any("expected int" in error for error in result.errors)
+    ports = tree.root.find("ports")
+    assert isinstance(ports, MappingNode)
+    assert ports.entries == []
+    assert tree.snapshots == []
 
 
 def test_remove_entry() -> None:

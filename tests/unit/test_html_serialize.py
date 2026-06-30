@@ -58,6 +58,10 @@ class _WithDict(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
 
 
+class _WithIntDict(BaseModel):
+    ports: dict[int, str] = Field(default_factory=dict)
+
+
 class _UnionHolder(BaseModel):
     value: int | str
 
@@ -359,6 +363,16 @@ def test_dispatch_add_entry_rejects_null_key_without_mutating() -> None:
     assert pairs == [("TZ", "UTC")]
 
 
+def test_dispatch_add_entry_coerces_typed_mapping_key() -> None:
+    tree = build_form_tree(_WithIntDict)
+
+    result = dispatch_mutation(tree, {"op": "add_entry", "path": "ports", "key": "8080"})
+
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("ports").entries]
+    assert pairs == [(8080, None)]
+
+
 def test_dispatch_remove_entry_drops_indexed_pair() -> None:
     tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC", "LOG": "info"}})
     result = dispatch_mutation(
@@ -378,6 +392,19 @@ def test_dispatch_rename_key_changes_key_at_index() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
     assert pairs == [("TIMEZONE", "UTC")]
+
+
+def test_dispatch_rename_key_coerces_typed_mapping_key() -> None:
+    tree = build_form_tree(_WithIntDict, existing={"ports": {80: "http"}})
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "rename_key", "path": "ports", "index": 0, "new_key": "443"},
+    )
+
+    assert result.ok is True
+    pairs = [(k.value, v.value) for k, v in tree.root.find("ports").entries]
+    assert pairs == [(443, "http")]
 
 
 def test_dispatch_rename_key_rejects_null_key_without_mutating() -> None:

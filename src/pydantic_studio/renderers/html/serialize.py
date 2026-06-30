@@ -105,11 +105,9 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
     """Translate the wire-format string for a typed FormNode into the Python
     typed value its ``validate_value`` expects.
 
-    Most primitive nodes accept the wire format directly: ``string``,
-    ``int``, ``bool``, ``path``, ``url``, ``email``, ``ip_address``,
-    ``ip_network``, ``pattern``, ``literal`` (Pydantic's Literal accepts
-    primitives), and ``secret`` (when ``secret_kind == "str"``) pass
-    through untouched.
+    Most primitive nodes accept the SPA's wire format directly. String
+    representations for scalar keys and caller-supplied JSON API payloads
+    are coerced where the target node expects a concrete Python type.
 
     The kinds that need coercion are those whose ``validate_value`` does
     an exact-type check that the JSON wire format can't satisfy
@@ -117,6 +115,8 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
 
     - ``enum`` — wire value is the member's ``.name`` (str); look up the
       matching Enum member by name.
+    - ``bool`` / ``int`` / ``float`` — mapping key inputs arrive as strings
+      in the browser; parse them before node validation.
     - ``datetime`` / ``date`` / ``time`` — wire value is an ISO 8601
       string; parse via ``fromisoformat`` (handles ``+00:00`` and ``Z``
       on 3.11+).
@@ -136,24 +136,6 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
     whatever this returns, so a malformed wire string surfaces as the
     canonical "invalid X" error.
     """
-    from datetime import date, datetime, time, timedelta
-    from decimal import Decimal, InvalidOperation
-    from uuid import UUID
-
-    from pydantic import TypeAdapter
-
-    from pydantic_studio.tree.nodes import (
-        BytesNode,
-        DateNode,
-        DatetimeNode,
-        DecimalNode,
-        EnumNode,
-        SecretNode,
-        TimedeltaNode,
-        TimeNode,
-        UuidNode,
-    )
-
     if not isinstance(value, str):
         return value
     try:
@@ -161,6 +143,51 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
     except Exception:
         return value  # let set_value's own path-resolution fail clearly
 
+    return _maybe_coerce_wire_value_for_node(node, value)
+
+
+def _maybe_coerce_wire_value_for_node(node: Any, value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+
+    from datetime import date, datetime, time, timedelta
+    from decimal import Decimal, InvalidOperation
+    from uuid import UUID
+
+    from pydantic import TypeAdapter
+
+    from pydantic_studio.tree.nodes import (
+        BoolNode,
+        BytesNode,
+        DateNode,
+        DatetimeNode,
+        DecimalNode,
+        EnumNode,
+        FloatNode,
+        IntNode,
+        SecretNode,
+        TimedeltaNode,
+        TimeNode,
+        UuidNode,
+    )
+
+    if isinstance(node, BoolNode):
+        lowered = value.strip().lower()
+        if lowered in {"y", "yes", "true", "1", "on"}:
+            return True
+        if lowered in {"n", "no", "false", "0", "off"}:
+            return False
+        return value
+    if isinstance(node, IntNode):
+        try:
+            return int(value)
+        except ValueError:
+            return value
+    if isinstance(node, FloatNode):
+        try:
+            return float(value)
+        except ValueError:
+            return value
     # Enum: look up the member by name (existing Phase 1 logic).
     if isinstance(node, EnumNode):
         for name, member in node.choices:
@@ -215,6 +242,32 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
         return value.encode()
 
     return value
+
+
+def _mapping_key_template(tree: FormTree, path: str) -> Any:
+    from pydantic.fields import FieldInfo
+
+    from pydantic_studio.tree.builder import default_registry
+    from pydantic_studio.tree.nodes import MappingNode, _resolve_type_name
+
+    node = _resolve(tree, path)
+    if not isinstance(node, MappingNode):
+        msg = f"{path!r} is not a MappingNode"
+        raise TypeError(msg)
+    key_type = _resolve_type_name(node.key_type_name)
+    return default_registry().find(key_type).build(
+        key_type, FieldInfo(annotation=key_type), None
+    )
+
+
+def _mapping_key_arg(tree: FormTree, mutation: dict[str, Any], key: str) -> Any:
+    path = _path_arg(mutation)
+    value = _required_arg(mutation, key)
+    key_node = _mapping_key_template(tree, path)
+    if key_node.kind == "string" and not isinstance(value, str):
+        msg = f"{key} must be a string"
+        raise TypeError(msg)
+    return _maybe_coerce_wire_value_for_node(key_node, value)
 
 
 def _required_arg(mutation: dict[str, Any], key: str) -> Any:
@@ -284,18 +337,18 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
                 _required_int_arg(mutation, "to"),
             )
         if op == "add_entry":
-            return tree.add_entry(
-                _path_arg(mutation), key=_required_string_arg(mutation, "key")
-            )
+            path = _path_arg(mutation)
+            return tree.add_entry(path, key=_mapping_key_arg(tree, mutation, "key"))
         if op == "remove_entry":
             return tree.remove_entry(
                 _path_arg(mutation), _required_int_arg(mutation, "index")
             )
         if op == "rename_key":
+            path = _path_arg(mutation)
             return tree.rename_key(
-                _path_arg(mutation),
+                path,
                 _required_int_arg(mutation, "index"),
-                _required_string_arg(mutation, "new_key"),
+                _mapping_key_arg(tree, mutation, "new_key"),
             )
         if op == "select_variant":
             return tree.select_variant(

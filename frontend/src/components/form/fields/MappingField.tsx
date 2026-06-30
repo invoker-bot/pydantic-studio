@@ -25,6 +25,29 @@ function entryKey(k: FormNodeData): string {
   return "";
 }
 
+function typeTail(typeName: string): string {
+  const parts = typeName.split(".");
+  return parts[parts.length - 1] ?? typeName;
+}
+
+function nextDefaultKey(node: MappingNodeData): string {
+  const existing = new Set(node.entries.map(([k]) => entryKey(k)));
+  const keyType = typeTail(node.key_type_name);
+  if (keyType === "int" || keyType === "float") {
+    let i = 0;
+    while (existing.has(String(i))) i += 1;
+    return String(i);
+  }
+  if (keyType === "bool") {
+    for (const candidate of ["false", "true"]) {
+      if (!existing.has(candidate)) return candidate;
+    }
+  }
+  let i = 0;
+  while (existing.has(`key${i}`)) i += 1;
+  return `key${i}`;
+}
+
 export function MappingField({
   node,
   path,
@@ -32,11 +55,7 @@ export function MappingField({
   const mutation = useApplyMutation();
 
   const onAdd = () => {
-    // Compute a fresh key like "key0", "key1", ... that doesn't collide.
-    const existing = new Set(node.entries.map(([k]) => entryKey(k)));
-    let i = 0;
-    while (existing.has(`key${i}`)) i += 1;
-    mutation.mutate({ op: "add_entry", path, key: `key${i}` });
+    mutation.mutate({ op: "add_entry", path, key: nextDefaultKey(node) });
   };
   const onRemove = (index: number) =>
     mutation.mutate({ op: "remove_entry", path, index });
