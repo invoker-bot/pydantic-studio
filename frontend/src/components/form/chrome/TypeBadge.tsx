@@ -29,7 +29,7 @@ function formatString(node: FormNodeData): string {
 }
 
 export function TypeBadge({ node }: { node: FormNodeData }) {
-  let summary = node.kind;
+  let summary: string = node.kind;
   if (node.kind === "int" || node.kind === "float" || node.kind === "decimal") {
     const constraints = formatNumeric(node);
     if (constraints) summary = `${node.kind} · ${constraints}`;

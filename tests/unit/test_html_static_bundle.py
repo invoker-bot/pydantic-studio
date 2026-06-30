@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -111,3 +112,19 @@ def test_frontend_variant_schema_matches_supported_persistence_modes() -> None:
     assert 'z.enum(["metadata", "inline_discriminator"])' in schema
     assert '"model_field"' not in schema
     assert "model_field" not in bundled_js
+
+
+def test_frontend_node_schema_strictly_covers_backend_node_kinds() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+    backend_nodes = (ROOT / "src" / "pydantic_studio" / "tree" / "nodes.py").read_text(
+        encoding="utf-8"
+    )
+
+    backend_kinds = set(re.findall(r'kind: Literal\["([^"]+)"\]', backend_nodes))
+    frontend_kinds = set(re.findall(r'kind: z\.literal\("([^"]+)"\)', schema))
+
+    assert frontend_kinds == backend_kinds
+    assert "UnknownNodeSchema" not in schema
+    assert "[extra: string]" not in schema

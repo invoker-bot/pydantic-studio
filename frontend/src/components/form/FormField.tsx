@@ -124,13 +124,9 @@ function dispatch(node: FormNodeData, path: string) {
       return <UnionField node={node as NodeOfKind<"union">} path={path} />;
     case "any":
       return <AnyField node={node as NodeOfKind<"any">} path={path} />;
-    default:
-      return (
-        <div className="rounded border border-dashed border-zinc-300 p-2 text-xs text-zinc-500">
-          <strong className="font-mono">{node.name}</strong>: kind{" "}
-          <code className="font-mono">{node.kind}</code> not yet wired
-          (Phase 5+).
-        </div>
-      );
+    default: {
+      const exhaustive: never = node;
+      return exhaustive;
+    }
   }
 }

@@ -1,9 +1,8 @@
-// zod schemas mirroring the Phase 1 JSON API contract (see spec §5.1).
+// zod schemas mirroring the JSON API contract.
 // Each schema corresponds to one FormNode subclass in
-// src/pydantic_studio/tree/nodes.py. Phase 3 covers the 5 primitive
-// kinds the dispatcher handles (string/int/bool/enum/literal) plus
-// group (the root + nested groups). Phase 4 adds the dynamic kinds
-// (sequence/mapping/union/any).
+// src/pydantic_studio/tree/nodes.py. Keep this union strict: if the
+// backend emits a new node kind, update this file and the renderer
+// together instead of silently accepting a partially-rendered node.
 
 import { z } from "zod";
 
@@ -302,27 +301,6 @@ export const AnyValueNodeSchema = NodeBase.extend({
   value: z.unknown(),
 });
 
-// Phase 3 dispatcher covers these 6 kinds. Phase 4 adds sequence,
-// mapping, union, any (and the rest of the spec's 20+ node kinds).
-// For now, unknown kinds parse loosely as a passthrough so the
-// fetch doesn't reject the whole tree on a node Phase 3 doesn't
-// understand yet (e.g., a sequence in the test schema).
-//
-// We use ``z.union`` (not ``z.discriminatedUnion``) for two reasons:
-//   1. GroupNodeSchema is recursive via z.lazy, so its TS type is the
-//      wide ``ZodType<GroupNodeData>`` — not the narrower
-//      ``ZodDiscriminatedUnionOption<"kind">`` that discriminatedUnion
-//      requires for inference.
-//   2. We need an UnknownNodeSchema fallback whose ``kind`` is
-//      ``z.string()`` (not a literal), which discriminatedUnion also
-//      rejects. Plain ``z.union`` accepts both.
-// Runtime validation is identical; the only loss is a marginal speedup
-// from discriminator-based dispatch, which doesn't matter at our scale.
-const UnknownNodeSchema = z.object({
-  kind: z.string(),
-  name: z.string(),
-}).passthrough();
-
 export const FormNodeSchema: z.ZodType<FormNodeData> = z.union([
   StringNodeSchema,
   IntNodeSchema,
@@ -349,7 +327,6 @@ export const FormNodeSchema: z.ZodType<FormNodeData> = z.union([
   MappingNodeSchema,
   UnionNodeSchema,
   AnyValueNodeSchema,
-  UnknownNodeSchema,
 ]);
 
 export type FormNodeData =
@@ -377,8 +354,7 @@ export type FormNodeData =
   | SequenceNodeData
   | MappingNodeData
   | UnionNodeData
-  | z.infer<typeof AnyValueNodeSchema>
-  | { kind: string; name: string; [extra: string]: unknown };
+  | z.infer<typeof AnyValueNodeSchema>;
 
 export const FormTreeSchema = z.object({
   schema_name: z.string(),
