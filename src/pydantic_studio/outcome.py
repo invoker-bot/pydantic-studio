@@ -10,7 +10,7 @@ guessing intent from exceptions or post-quit tree state:
     if outcome.submitted:
         instance = tree.to_instance()
         ...persist...
-    else:
+    elif outcome.cancelled:
         ...abort without writing...
 """
 
@@ -37,3 +37,7 @@ class EditOutcome:
     @property
     def submitted(self) -> bool:
         return self.status == "submitted"
+
+    @property
+    def cancelled(self) -> bool:
+        return self.status == "cancelled"

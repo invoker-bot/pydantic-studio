@@ -42,8 +42,11 @@ class _RequiredLast(BaseModel):
 
 def test_edit_outcome_shape() -> None:
     ok = EditOutcome(status="submitted")
+    cancelled = EditOutcome(status="cancelled")
     assert ok.submitted is True
-    assert EditOutcome(status="cancelled").submitted is False
+    assert ok.cancelled is False
+    assert cancelled.submitted is False
+    assert cancelled.cancelled is True
 
 
 @pytest.mark.asyncio
