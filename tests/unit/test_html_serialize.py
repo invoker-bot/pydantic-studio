@@ -458,6 +458,15 @@ def test_dispatch_missing_op_fails_without_mutating() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha"})
     result = dispatch_mutation(tree, {"path": "name", "value": "x"})
     assert result.ok is False
+    assert any("op is required" in e for e in result.errors)
+    assert tree.root.find("name").value == "alpha"
+
+
+def test_dispatch_non_string_op_fails_without_mutating() -> None:
+    tree = build_form_tree(_Primitive, existing={"name": "alpha"})
+    result = dispatch_mutation(tree, {"op": 123, "path": "name", "value": "x"})
+    assert result.ok is False
+    assert any("op must be a string" in e for e in result.errors)
     assert tree.root.find("name").value == "alpha"
 
 

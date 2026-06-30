@@ -249,6 +249,10 @@ def _path_arg(mutation: dict[str, Any]) -> str:
     return value
 
 
+def _op_arg(mutation: dict[str, Any]) -> str:
+    return _required_string_arg(mutation, "op")
+
+
 def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
     """Apply one mutation from the JSON API onto the FormTree.
 
@@ -264,8 +268,8 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     valid mutation validation failures in the standard 200 response with
     ``validation.ok = false``.
     """
-    op = mutation.get("op")
     try:
+        op = _op_arg(mutation)
         path = _path_arg(mutation)
         if op == "set_value":
             value = _required_arg(mutation, "value")

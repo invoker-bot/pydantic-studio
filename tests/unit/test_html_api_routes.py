@@ -90,6 +90,24 @@ def test_api_mutations_unknown_op_returns_400() -> None:
     assert "nuke" in body["detail"]
 
 
+def test_api_mutations_missing_op_returns_400() -> None:
+    client = _client({"name": "alpha"})
+    response = client.post(
+        "/api/mutations", json={"path": "name", "value": "beta"}
+    )
+    assert response.status_code == 400
+    assert "op is required" in response.json()["detail"]
+
+
+def test_api_mutations_non_string_op_returns_400() -> None:
+    client = _client({"name": "alpha"})
+    response = client.post(
+        "/api/mutations", json={"op": 123, "path": "name", "value": "beta"}
+    )
+    assert response.status_code == 400
+    assert "op must be a string" in response.json()["detail"]
+
+
 def test_api_mutations_non_object_request_returns_400() -> None:
     tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
     server = StudioServer(tree=tree, save_path=None)
