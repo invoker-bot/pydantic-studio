@@ -1378,6 +1378,11 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
         from pydantic_studio.types.aliases import input_value_for_field
 
         if isinstance(seed, BaseModel):
+            if not isinstance(seed, node.schema_class):
+                return [
+                    f"expected {node.schema_class.__name__} BaseModel "
+                    f"for group seed, got {type(seed).__name__}"
+                ]
             data = seed.model_dump(mode="python")
         elif isinstance(seed, dict):
             data = seed
