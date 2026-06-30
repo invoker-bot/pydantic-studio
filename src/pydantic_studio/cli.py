@@ -8,11 +8,14 @@ The command surface covers schema introspection (``show``), version reporting
 from __future__ import annotations
 
 import importlib
+import io
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
 import typer
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from rich.console import Console
 from rich.tree import Tree
 
@@ -23,6 +26,9 @@ from pydantic_studio.tree.nodes import (
     SequenceNode,
     UnionNode,
 )
+
+_JSON_VALUE_ADAPTER = TypeAdapter(object)
+_YAML_SUFFIXES = {".yaml", ".yml"}
 
 app = typer.Typer(
     name="pydantic-studio",
@@ -104,6 +110,61 @@ def _walk(node: Any, parent: Tree) -> None:
     # Leaf nodes have no children — _node_label already shows the value.
 
 
+def _json_ready(value: Any) -> Any:
+    """Convert node values to the JSON-friendly shape used by config writers."""
+    return _JSON_VALUE_ADAPTER.dump_python(value, mode="json", warnings=False)
+
+
+def _stub_value(node: Any) -> Any:
+    """Return a YAML-stub value, preserving defaults and marking missing required leaves."""
+    if isinstance(node, GroupNode):
+        if node.omitted and not node.required:
+            return None
+        return {child.name: _stub_value(child) for child in node.fields}
+    if isinstance(node, SequenceNode):
+        return [_stub_value(item) for item in node.items]
+    if isinstance(node, MappingNode):
+        return {_stub_value(key): _stub_value(value) for key, value in node.entries}
+    if isinstance(node, UnionNode):
+        if node.selected is not None:
+            return _stub_value(node.selected)
+        return "?" if node.required else None
+    if getattr(node, "required", False) and hasattr(node, "value") and node.value is None:
+        return "?"
+    return _json_ready(node.to_python())
+
+
+def _fill_yaml_payload(tree: Any) -> str:
+    """Render a YAML config stub without requiring a complete valid instance."""
+    from pydantic_studio.io.yaml import _build_commented_map, _yaml
+
+    schema_class = tree.schema_class
+    if schema_class is None:
+        msg = "FormTree.schema_class is None; cannot render YAML"
+        raise ValueError(msg)
+    data = _stub_value(tree.root)
+    if not isinstance(data, dict):
+        msg = f"expected root stub to be a dict, got {type(data).__name__}"
+        raise ValueError(msg)
+    cm = _build_commented_map(data, schema_class, None)
+    buf = io.StringIO()
+    _yaml().dump(cm, buf)
+    return buf.getvalue()
+
+
+def _write_text_atomic(path: Path, payload: str) -> None:
+    """Write text through a same-directory temp file, then atomically replace."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".tmp-fill-", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+        os.replace(tmp, path)
+    except Exception:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 @app.command()
 def show(target: str) -> None:
     """Introspect a Pydantic schema and print its form-tree shape.
@@ -142,34 +203,18 @@ def fill(
     ),
 ) -> None:
     """Emit a config stub populated with the schema's defaults."""
-    import io as _io
-
-    from pydantic_studio import build_form_tree
     from pydantic_studio.io.dispatch import save_config
 
     schema = _load_schema(target)
     tree = build_form_tree(schema)
     if out is not None:
-        save_config(tree, out)
+        if out.suffix.lower() in _YAML_SUFFIXES:
+            _write_text_atomic(out, _fill_yaml_payload(tree))
+        else:
+            save_config(tree, out)
         typer.echo(f"Wrote {out}")
         return
-    # Stdout path: YAML default.
-    from pydantic_studio.io.yaml import _build_commented_map, _yaml
-
-    schema_class = tree.schema_class
-    if schema_class is None:
-        typer.secho(
-            "FormTree.schema_class is None — cannot render YAML",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1)
-    instance = tree.to_instance()
-    data = instance.model_dump(mode="python")
-    cm = _build_commented_map(data, schema_class, None)
-    buf = _io.StringIO()
-    _yaml().dump(cm, buf)
-    typer.echo(buf.getvalue(), nl=False)
+    typer.echo(_fill_yaml_payload(tree), nl=False)
 
 
 @app.command()

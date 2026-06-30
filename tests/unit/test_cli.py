@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from ruamel.yaml import YAML
 from typer.testing import CliRunner
 
 import pydantic_studio.cli as cli_module
 from pydantic_studio.cli import app
 
 runner = CliRunner()
+yaml = YAML(typ="safe")
 
 
 def test_cli_module_docstring_describes_current_command_surface() -> None:
@@ -77,6 +79,13 @@ class TestFill:
         # Description comments appear.
         assert "Service identifier" in result.output
 
+    def test_fill_emits_required_placeholders_to_stdout(self) -> None:
+        result = runner.invoke(app, ["fill", "tests.fixtures.schemas:Simple"])
+        assert result.exit_code == 0
+        assert "name: '?'" in result.output
+        assert "# The thing's name" in result.output
+        assert yaml.load(result.output)["name"] == "?"
+
     def test_fill_writes_to_out_file(self, tmp_path) -> None:
         out = tmp_path / "config.yaml"
         result = runner.invoke(
@@ -88,6 +97,18 @@ class TestFill:
         content = out.read_text(encoding="utf-8")
         assert "name:" in content
         assert "Listening port" in content
+
+    def test_fill_writes_required_placeholders_to_yaml_file(self, tmp_path) -> None:
+        out = tmp_path / "config.yaml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.fixtures.schemas:Simple", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        content = out.read_text(encoding="utf-8")
+        assert "name: '?'" in content
+        assert yaml.load(content)["name"] == "?"
 
     def test_fill_unknown_schema_errors(self) -> None:
         result = runner.invoke(app, ["fill", "nosuch:Foo"])

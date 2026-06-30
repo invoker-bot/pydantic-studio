@@ -50,19 +50,19 @@ $ pydantic-studio fill mypkg.server:ServerConfig --out server.yaml
 
 ```yaml
 # Service identifier
-name: ?
+name: '?'
 # Upstream API endpoint
-api_url: ?
+api_url: '?'
 database:
   primary:
     # Replica hostname or IP
-    host: ?
+    host: '?'
     # Replica port
     port: 5432
   # Read-only replicas for query offload
   read_replicas: []
   # Connection password
-  password: ?
+  password: '?'
 logging:
   # Log verbosity
   level: info
@@ -70,7 +70,8 @@ logging:
   format: text
 ```
 
-(Required fields without defaults appear as `?`; you fill them in.)
+(Required fields without defaults appear as the string `?`; YAML quotes it so
+the generated stub remains parseable while you fill it in.)
 
 ## Edit interactively
 
