@@ -1,8 +1,8 @@
-"""Minimal CLI for pydantic-studio.
+"""Typer CLI for pydantic-studio.
 
-v0.0.3 ships only the ``show`` subcommand — schema introspection without
-any I/O dependencies. ``edit`` / ``check`` / ``render`` join in Plan 4
-once YAML round-trip support lands.
+The command surface covers schema introspection (``show``), version reporting
+(``version``), config stub generation (``fill``), validation (``check`` and
+``run``), and interactive editing (``edit``).
 """
 
 from __future__ import annotations

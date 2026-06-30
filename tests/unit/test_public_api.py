@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pydantic_studio as ps
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_version_string_present():
@@ -46,3 +50,16 @@ def test_register_builder_is_callable_and_affects_default_registry():
     before = len(default_registry())
     ps.register_builder(_Dummy())
     assert len(default_registry()) == before + 1
+
+
+def test_source_docs_do_not_reference_retired_phase_markers():
+    retired_markers = ("v0.0.3", "Plan 4", "only the ``show`` subcommand")
+
+    offenders = {
+        str(path.relative_to(ROOT)): marker
+        for path in ROOT.joinpath("src", "pydantic_studio").rglob("*.py")
+        for marker in retired_markers
+        if marker in path.read_text(encoding="utf-8")
+    }
+
+    assert offenders == {}

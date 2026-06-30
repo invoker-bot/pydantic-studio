@@ -579,9 +579,9 @@ class SecretNode(FormNode):
     pick the correct widget. ``to_python`` wraps the stored value in the
     appropriate Pydantic Secret type so model validation passes.
 
-    Security caveat: in v0.0.3, secret values are stored in plaintext in
-    snapshots (in-memory) and in ``draft_save`` JSON (on disk). Don't use
-    drafts on shared storage for sensitive deployments. v0.x will offer
+    Security caveat: secret values are stored in plaintext in snapshots
+    (in-memory) and in ``draft_save`` JSON (on disk). Don't use drafts on
+    shared storage for sensitive deployments. A future release may add
     encrypted drafts or a "skip secrets in drafts" mode.
     """
 

@@ -1,12 +1,23 @@
-"""Tests for the minimal `pydantic-studio show` CLI."""
+"""Tests for the `pydantic-studio` CLI."""
 
 from __future__ import annotations
 
 from typer.testing import CliRunner
 
+import pydantic_studio.cli as cli_module
 from pydantic_studio.cli import app
 
 runner = CliRunner()
+
+
+def test_cli_module_docstring_describes_current_command_surface() -> None:
+    docstring = cli_module.__doc__ or ""
+
+    for command in ("fill", "run", "check", "edit", "show", "version"):
+        assert command in docstring
+    assert "v0.0.3" not in docstring
+    assert "Plan 4" not in docstring
+    assert "only the ``show`` subcommand" not in docstring
 
 
 class TestShow:
