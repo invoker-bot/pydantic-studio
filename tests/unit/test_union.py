@@ -153,6 +153,21 @@ def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_select_variant_rejects_explicit_none_seed_without_mutating() -> None:
+    tree = build_form_tree(WithUnion, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 0, seed=None)
+
+    assert result.ok is False
+    assert result.errors == ("value is required",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 1
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
 def test_select_variant_rejects_group_seed_shape_without_mutating() -> None:
     tree = build_form_tree(_SeededListUnionHolder, existing={"value": "keep-me"})
 

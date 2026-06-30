@@ -1524,7 +1524,7 @@ def _build_seeded_node(
     builder: Any,
     type_: Any,
     field_info: Any,
-    seed: Any,
+    seed: Any = _UNSET_VALUE,
 ) -> tuple[Any | None, list[str]]:
     from pydantic import ValidationError
 
@@ -1532,7 +1532,9 @@ def _build_seeded_node(
         node = builder.build(type_, field_info, None)
     except ValidationError as exc:
         return None, _validation_error_messages(exc)
-    errors = _validate_seed_against_node(node, seed)
+    if seed is _UNSET_VALUE:
+        return node, []
+    errors = _validate_seed_against_node(node, seed, none_is_absent=False)
     if errors:
         return None, errors
     try:
@@ -2212,7 +2214,7 @@ class FormTree(BaseModel):
         return node
 
     def select_variant(
-        self, path: str, variant_index: int, seed: Any = None
+        self, path: str, variant_index: int, seed: Any = _UNSET_VALUE
     ) -> ValidationResult:
         """Switch the UnionNode at ``path`` to its ``variant_index``-th variant.
 
