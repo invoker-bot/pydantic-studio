@@ -36,6 +36,7 @@ def _write_wheel(
     license_files: tuple[str, ...] = ("LICENSE",),
     package_init: str | None = "pydantic_studio/__init__.py",
     cli_module: str | None = "pydantic_studio/cli.py",
+    cli_module_content: str = "app = object()\n",
     typed_marker: str | None = "pydantic_studio/py.typed",
     static_bundle: tuple[str, ...] = (
         "pydantic_studio/renderers/html/static/dist/index.html",
@@ -66,7 +67,7 @@ def _write_wheel(
         if package_init is not None:
             zf.writestr(package_init, "__version__ = '0.4.0'\n")
         if cli_module is not None:
-            zf.writestr(cli_module, "app = object()\n")
+            zf.writestr(cli_module, cli_module_content)
         if typed_marker is not None:
             zf.writestr(typed_marker, "")
         for filename in static_bundle:
@@ -91,6 +92,7 @@ def _write_sdist(
     license_files: tuple[str, ...] = ("LICENSE",),
     package_init: str | None = "src/pydantic_studio/__init__.py",
     cli_module: str | None = "src/pydantic_studio/cli.py",
+    cli_module_content: str = "app = object()\n",
     typed_marker: str | None = "src/pydantic_studio/py.typed",
     static_bundle: tuple[str, ...] = (
         "src/pydantic_studio/renderers/html/static/dist/index.html",
@@ -137,7 +139,7 @@ def _write_sdist(
         if cli_module is not None:
             source = dist / cli_module
             source.parent.mkdir(parents=True, exist_ok=True)
-            source.write_text("app = object()\n", encoding="utf-8")
+            source.write_text(cli_module_content, encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{cli_module}")
         if typed_marker is not None:
             source = dist / typed_marker
@@ -611,6 +613,25 @@ def test_verify_distribution_metadata_rejects_missing_wheel_console_script_modul
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_wheel_console_script_missing_target_object(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, cli_module_content="other = object()\n")
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"app"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_typed_marker_record_entry(
     tmp_path: Path,
 ) -> None:
@@ -886,6 +907,26 @@ def test_verify_distribution_metadata_rejects_missing_sdist_console_script_modul
     )
 
     with pytest.raises(RuntimeError, match=r"cli\.py"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_sdist_console_script_missing_target_object(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        cli_module_content="other = object()\n",
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"app"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 

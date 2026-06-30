@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import configparser
 import csv
 import io
@@ -245,6 +246,11 @@ def _wheel_entry_points(
         return parser["console_scripts"]
 
 
+def _wheel_text(wheel: Path, filename: str) -> str:
+    with zipfile.ZipFile(wheel) as zf:
+        return zf.read(filename).decode("utf-8")
+
+
 def _sdist_names(sdist: Path) -> list[str]:
     with tarfile.open(sdist) as tf:
         return tf.getnames()
@@ -402,14 +408,80 @@ def _project_console_scripts(pyproject: dict[str, object]) -> dict[str, str]:
     return {name: target for name, target in scripts.items() if isinstance(name, str)}
 
 
+def _console_script_module_and_object(target: str) -> tuple[str, str]:
+    module, separator, attribute = target.partition(":")
+    if not separator or not module or not attribute:
+        raise RuntimeError(f"pyproject.toml console script target is invalid: {target!r}")
+    return f"{module.replace('.', '/')}.py", attribute.split(".", 1)[0]
+
+
+def _project_console_script_targets(
+    pyproject: dict[str, object],
+) -> tuple[tuple[str, str, str], ...]:
+    targets: list[tuple[str, str, str]] = []
+    for script_name, target in _project_console_scripts(pyproject).items():
+        module_file, target_object = _console_script_module_and_object(target)
+        targets.append((script_name, module_file, target_object))
+    return tuple(targets)
+
+
 def _project_console_script_module_files(pyproject: dict[str, object]) -> tuple[str, ...]:
-    module_files: list[str] = []
-    for target in _project_console_scripts(pyproject).values():
-        module, separator, _attribute = target.partition(":")
-        if not separator or not module:
-            raise RuntimeError(f"pyproject.toml console script target is invalid: {target!r}")
-        module_files.append(f"{module.replace('.', '/')}.py")
-    return tuple(dict.fromkeys(module_files))
+    return tuple(
+        dict.fromkeys(
+            module_file
+            for _script_name, module_file, _target_object in _project_console_script_targets(
+                pyproject
+            )
+        )
+    )
+
+
+def _target_names(target: ast.expr) -> tuple[str, ...]:
+    if isinstance(target, ast.Name):
+        return (target.id,)
+    if isinstance(target, ast.Starred):
+        return _target_names(target.value)
+    if isinstance(target, ast.Tuple | ast.List):
+        return tuple(name for item in target.elts for name in _target_names(item))
+    return ()
+
+
+def _module_top_level_names(source: str, *, filename: str) -> frozenset[str]:
+    try:
+        module = ast.parse(source, filename=filename)
+    except SyntaxError as exc:
+        raise RuntimeError(f"{filename} is not valid Python: {exc.msg}") from exc
+
+    names: set[str] = set()
+    for node in module.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                names.update(_target_names(target))
+        elif isinstance(node, ast.AnnAssign | ast.AugAssign):
+            names.update(_target_names(node.target))
+        elif isinstance(node, ast.Import):
+            names.update(alias.asname or alias.name.split(".", 1)[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.update(alias.asname or alias.name for alias in node.names if alias.name != "*")
+    return frozenset(names)
+
+
+def _verify_console_script_target_objects(
+    pyproject: dict[str, object],
+    *,
+    read_source,
+    source_prefix: str = "",
+) -> None:
+    missing_targets = []
+    for script_name, module_file, target_object in _project_console_script_targets(pyproject):
+        filename = f"{source_prefix}{module_file}"
+        source = read_source(filename)
+        if target_object not in _module_top_level_names(source, filename=filename):
+            missing_targets.append(f"{script_name} -> {filename}:{target_object}")
+    if missing_targets:
+        raise RuntimeError(f"missing console script target objects: {missing_targets!r}")
 
 
 def _project_package_files(pyproject: dict[str, object]) -> tuple[str, ...]:
@@ -606,6 +678,10 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
                 f"{wheel} missing console script entry points in {wheel_dist_info_dir}: "
                 f"{missing_entry_points!r}"
             )
+        _verify_console_script_target_objects(
+            pyproject,
+            read_source=lambda filename: _wheel_text(wheel, filename),
+        )
 
     sdist_metadata_headers = _metadata_headers(_sdist_metadata(sdist))
     missing_sdist_identity = [
@@ -648,6 +724,11 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     ]
     if missing_files:
         raise RuntimeError(f"{sdist} missing source files: {missing_files!r}")
+    _verify_console_script_target_objects(
+        pyproject,
+        read_source=lambda filename: _sdist_text(sdist, filename),
+        source_prefix=f"{sdist_root}/src/",
+    )
     static_dist_prefix = (
         f"{sdist_root}/src/{_project_package_root(pyproject)}/renderers/html/static/dist"
     )
