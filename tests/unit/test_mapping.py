@@ -145,6 +145,19 @@ def test_add_entry_rejects_mapping_max_length_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_add_entry_rejects_duplicate_key_without_mutating() -> None:
+    tree = build_form_tree(WithDict, existing={"settings": {"a": 1}})
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+
+    result = tree.add_entry("settings", "a", 2)
+
+    assert result.ok is False
+    assert result.errors == ("duplicate key 'a'",)
+    assert settings.to_python() == {"a": 1}
+    assert tree.snapshots == []
+
+
 def test_remove_entry_rejects_mapping_min_length_without_mutating() -> None:
     tree = build_form_tree(ConstrainedDict, existing={"settings": {"a": 1}})
     settings = tree.root.find("settings")
@@ -155,4 +168,17 @@ def test_remove_entry_rejects_mapping_min_length_without_mutating() -> None:
     assert result.ok is False
     assert result.errors == ("length must be >= 1",)
     assert settings.to_python() == {"a": 1}
+    assert tree.snapshots == []
+
+
+def test_rename_key_rejects_duplicate_key_without_mutating() -> None:
+    tree = build_form_tree(WithDict, existing={"settings": {"a": 1, "b": 2}})
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+
+    result = tree.rename_key("settings", 1, "a")
+
+    assert result.ok is False
+    assert result.errors == ("duplicate key 'a'",)
+    assert settings.to_python() == {"a": 1, "b": 2}
     assert tree.snapshots == []

@@ -1940,6 +1940,17 @@ class FormTree(BaseModel):
             return ValidationResult.fail(errors)
         return ValidationResult.ok()
 
+    @staticmethod
+    def _validate_mapping_unique_key(
+        mp: MappingNode, key: Any, exclude_index: int | None = None
+    ) -> ValidationResult:
+        for index, (key_node, _value_node) in enumerate(mp.entries):
+            if exclude_index is not None and index == exclude_index:
+                continue
+            if key_node.to_python() == key:
+                return ValidationResult.fail([f"duplicate key {key!r}"])
+        return ValidationResult.ok()
+
     def add_entry(
         self, path: str, key: Any, value: Any = None
     ) -> ValidationResult:
@@ -1964,6 +1975,9 @@ class FormTree(BaseModel):
         if key_errors:
             return ValidationResult.fail(list(key_errors))
         k_node = k_builder.build(key_type, key_field, key)
+        unique_result = self._validate_mapping_unique_key(mp, k_node.to_python())
+        if not unique_result.ok:
+            return unique_result
         value_field = FieldInfo(annotation=value_type)
         v_node = v_builder.build(value_type, value_field, None)
         if value is not None:
@@ -2008,6 +2022,9 @@ class FormTree(BaseModel):
         errors = k_node.validate_value(new_key)
         if errors:
             return ValidationResult.fail(list(errors))
+        unique_result = self._validate_mapping_unique_key(mp, new_key, exclude_index=index)
+        if not unique_result.ok:
+            return unique_result
         # Validation passed — push snapshot and mutate.
         self._push_snapshot(_snap.take(self.root))
         cast("Any", k_node).value = new_key
