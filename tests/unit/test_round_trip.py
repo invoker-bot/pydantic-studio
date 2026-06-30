@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import BaseModel, Field
@@ -8,6 +9,9 @@ from pydantic import BaseModel, Field
 from pydantic_studio.exceptions import ValidationFailedError
 from pydantic_studio.tree.builder import build_form_tree
 from tests.fixtures.schemas import Person, Simple
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_to_instance_simple_full_population():
@@ -76,3 +80,25 @@ def test_to_instance_preserves_alias_field_edits():
 
     assert result.ok is True
     assert tree.to_instance().api_key == "rotated"
+
+
+def test_saved_serialization_aliases_reload_across_formats(tmp_path: Path) -> None:
+    from pydantic_studio import load_config, save_config
+
+    class AliasConfig(BaseModel):
+        api_key: str = Field(
+            default="secret",
+            alias="api-key",
+            serialization_alias="apiKey",
+        )
+
+    tree = build_form_tree(AliasConfig)
+    result = tree.set_value("api_key", "rotated")
+    assert result.ok is True
+
+    for suffix in ("yaml", "toml", "json"):
+        path = tmp_path / f"config.{suffix}"
+        save_config(tree, path)
+
+        assert "apiKey" in path.read_text(encoding="utf-8")
+        assert load_config(path, AliasConfig).to_instance().api_key == "rotated"

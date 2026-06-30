@@ -41,6 +41,10 @@ def field_input_paths(field_name: str, field_info: FieldInfo) -> tuple[InputPath
             elif isinstance(choice, AliasPath):
                 paths.append(tuple(choice.path))
 
+    serialization_alias = getattr(field_info, "serialization_alias", None)
+    if isinstance(serialization_alias, str):
+        paths.append((serialization_alias,))
+
     return tuple(dict.fromkeys(paths))
 
 
