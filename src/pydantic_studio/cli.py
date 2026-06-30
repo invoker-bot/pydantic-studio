@@ -10,8 +10,10 @@ from __future__ import annotations
 import importlib
 import io
 import json
+import math
 import os
 import tempfile
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -115,7 +117,20 @@ def _walk(node: Any, parent: Tree) -> None:
 
 def _json_ready(value: Any) -> Any:
     """Convert node values to the JSON-friendly shape used by config writers."""
+    _reject_non_finite_json_values(value)
     return _JSON_VALUE_ADAPTER.dump_python(value, mode="json", warnings=False)
+
+
+def _reject_non_finite_json_values(value: Any) -> None:
+    if isinstance(value, float) and not math.isfinite(value):
+        msg = f"non-finite value {value!r} is not JSON compliant"
+        raise ValueError(msg)
+    if isinstance(value, Mapping):
+        for item in value.values():
+            _reject_non_finite_json_values(item)
+    elif isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
+        for item in value:
+            _reject_non_finite_json_values(item)
 
 
 def _stub_value(node: Any) -> Any:
@@ -175,7 +190,7 @@ def _fill_toml_payload(tree: Any) -> str:
 
 def _fill_json_payload(tree: Any) -> str:
     """Render a JSON config stub without requiring a complete valid instance."""
-    return json.dumps(_fill_stub_data(tree), indent=2)
+    return json.dumps(_fill_stub_data(tree), indent=2, allow_nan=False)
 
 
 def _fill_payload_for_path(tree: Any, path: Path) -> str | None:
