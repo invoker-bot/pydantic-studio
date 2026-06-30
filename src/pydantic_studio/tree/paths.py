@@ -92,6 +92,14 @@ class Path:
                 assert m is not None  # raw[i].isdigit() guarantees a match
                 segments.append(int(m.group(0)))
                 i = m.end()
+                # After a dotted/root integer segment, the next character (if
+                # any) must be a separator or another bracket index.
+                if i < n and raw[i] not in (".", "["):
+                    msg = (
+                        f"unexpected character {raw[i]!r} after index "
+                        f"at position {i} in path {raw!r}"
+                    )
+                    raise ValueError(msg)
             else:
                 m = _FIELD_RE.match(raw, i)
                 if not m:
