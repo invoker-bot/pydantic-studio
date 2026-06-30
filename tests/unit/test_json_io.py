@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
@@ -48,6 +49,19 @@ class TestLoadJson:
         tree = load_json(src, Server)
         assert {f.name for f in tree.root.fields} == {"name", "port", "debug"}
 
+    def test_load_rejects_non_finite_numbers(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.json_ import load_json
+
+        class FloatConfig(BaseModel):
+            value: float = 0.0
+
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            src = tmp_path / f"{constant}.json"
+            src.write_text(f'{{"value": {constant}}}', encoding="utf-8")
+
+            with pytest.raises(ValueError, match="non-finite JSON constant"):
+                load_json(src, FloatConfig)
+
 
 class TestSaveJson:
     def test_save_creates_file_with_values(self, tmp_path: Path) -> None:
@@ -80,6 +94,15 @@ class TestSaveJson:
         save_json(tree, out)
         content = out.read_text(encoding="utf-8")
         assert "\n  " in content
+
+    def test_save_rejects_non_finite_numbers(self, tmp_path: Path) -> None:
+        from pydantic_studio.io.json_ import save_json
+
+        class FloatConfig(BaseModel):
+            value: float = float("nan")
+
+        with pytest.raises(ValueError, match="JSON compliant"):
+            save_json(build_form_tree(FloatConfig), tmp_path / "out.json")
 
     def test_save_uses_field_aliases(self, tmp_path: Path) -> None:
         from pydantic_studio.io.json_ import save_json

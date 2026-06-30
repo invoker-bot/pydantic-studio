@@ -20,6 +20,11 @@ if TYPE_CHECKING:
     from pydantic_studio.tree.nodes import FormTree
 
 
+def _reject_non_finite_json_constant(value: str) -> None:
+    msg = f"non-finite JSON constant {value!r} is not supported"
+    raise ValueError(msg)
+
+
 def load_json(path: str | Path, schema: type[BaseModel]) -> FormTree:
     """Load a JSON file into a FormTree bound to ``schema``.
 
@@ -30,7 +35,7 @@ def load_json(path: str | Path, schema: type[BaseModel]) -> FormTree:
     """
     path = Path(path)
     with path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
+        data = json.load(f, parse_constant=_reject_non_finite_json_constant)
     if not isinstance(data, dict):
         msg = f"expected JSON object at top level, got {type(data).__name__}"
         raise ValueError(msg)
@@ -46,7 +51,11 @@ def save_json(tree: FormTree, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    payload = json.dumps(tree.to_output_python(by_alias=True), indent=2)
+    payload = json.dumps(
+        tree.to_output_python(by_alias=True),
+        indent=2,
+        allow_nan=False,
+    )
 
     fd, tmp = tempfile.mkstemp(prefix=".tmp-json-", dir=str(path.parent))
     try:
