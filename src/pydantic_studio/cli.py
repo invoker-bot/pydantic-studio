@@ -202,6 +202,19 @@ def _write_text_atomic(path: Path, payload: str) -> None:
         raise
 
 
+def _load_config_for_cli(file: Path, schema: type[BaseModel]) -> Any:
+    """Load a config file for CLI commands, reporting parse/I/O errors cleanly."""
+    from ruamel.yaml import YAMLError
+
+    from pydantic_studio.io.dispatch import load_config
+
+    try:
+        return load_config(file, schema)
+    except (OSError, ValueError, YAMLError) as e:
+        typer.secho(f"{file}: could not load: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+
 @app.command()
 def show(target: str) -> None:
     """Introspect a Pydantic schema and print its form-tree shape.
@@ -264,11 +277,10 @@ def run(
     from pydantic import ValidationError
 
     from pydantic_studio.exceptions import ValidationFailedError
-    from pydantic_studio.io.dispatch import load_config
 
     schema = _load_schema(target)
+    tree = _load_config_for_cli(file, schema)
     try:
-        tree = load_config(file, schema)
         instance = tree.to_instance()
     except (ValidationError, ValidationFailedError) as e:
         typer.secho(f"Validation failed: {e}", fg=typer.colors.RED, err=True)
@@ -285,11 +297,10 @@ def check(
     from pydantic import ValidationError
 
     from pydantic_studio.exceptions import ValidationFailedError
-    from pydantic_studio.io.dispatch import load_config
 
     schema = _load_schema(target)
+    tree = _load_config_for_cli(file, schema)
     try:
-        tree = load_config(file, schema)
         tree.to_instance()
     except (ValidationError, ValidationFailedError) as e:
         typer.secho(f"{file}: validation failed", fg=typer.colors.RED, err=True)
@@ -321,9 +332,7 @@ def edit(
 
     schema = _load_schema(target)
     if file is not None and file.exists():
-        from pydantic_studio.io.dispatch import load_config
-
-        tree = load_config(file, schema)
+        tree = _load_config_for_cli(file, schema)
     else:
         tree = build_form_tree(schema)
 

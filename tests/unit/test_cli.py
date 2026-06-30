@@ -153,6 +153,19 @@ class TestRun:
         # Useful: surface the field that failed.
         assert "port" in result.output.lower()
 
+    def test_run_load_failure_reports_file_path(self, tmp_path) -> None:
+        cfg = tmp_path / "bad.yaml"
+        cfg.write_text("name: [unterminated\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            ["run", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+
+        assert result.exit_code == 1
+        assert "could not load" in result.output.lower()
+        assert "bad.yaml" in result.output
+
 
 class TestCheck:
     def test_check_silent_on_valid(self, tmp_path) -> None:
@@ -183,6 +196,18 @@ class TestCheck:
             ["check", "tests.fixtures.schemas:Server", str(cfg)],
         )
         assert result.exit_code != 0
+
+    def test_check_missing_file_reports_file_path(self, tmp_path) -> None:
+        cfg = tmp_path / "missing.yaml"
+
+        result = runner.invoke(
+            app,
+            ["check", "tests.fixtures.schemas:Server", str(cfg)],
+        )
+
+        assert result.exit_code == 1
+        assert "could not load" in result.output.lower()
+        assert "missing.yaml" in result.output
 
 
 class TestFillFormats:
