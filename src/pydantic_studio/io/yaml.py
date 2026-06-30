@@ -245,6 +245,17 @@ def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
     return None
 
 
+def _field_info_for_key(schema: type[BaseModel], key: str) -> FieldInfo | None:
+    """Return field metadata addressed by a model field name or alias."""
+    field_info = schema.model_fields.get(key)
+    if field_info is not None:
+        return field_info
+    return next(
+        (candidate for candidate in schema.model_fields.values() if candidate.alias == key),
+        None,
+    )
+
+
 def _unknown_key_paths(
     data: Mapping[Any, Any],
     schema: type[BaseModel],
@@ -255,7 +266,7 @@ def _unknown_key_paths(
     for key, value in data.items():
         key_str = str(key)
         path = f"{prefix}{key_str}"
-        field_info = schema.model_fields.get(key_str)
+        field_info = _field_info_for_key(schema, key_str)
         if field_info is None:
             paths.append(path)
             continue
@@ -279,7 +290,7 @@ def _dropped_source_key_paths(
     for key, value in source.items():
         key_str = str(key)
         path = f"{prefix}{key_str}"
-        field_info = schema.model_fields.get(key_str)
+        field_info = _field_info_for_key(schema, key_str)
         if field_info is None:
             if key_str not in data:
                 paths.append(path)

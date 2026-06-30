@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pydantic_studio import load_yaml
 from pydantic_studio.tree.builder import build_form_tree
@@ -81,6 +81,39 @@ class TestLoadYaml:
 
         assert tree.to_instance().address.city == "London"
         assert "address.obsolete_zip" in captured.err
+
+    def test_load_alias_field_does_not_warn_as_unknown(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        src = tmp_path / "alias.yaml"
+        src.write_text("api-key: rotated\n", encoding="utf-8")
+
+        tree = load_yaml(src, AliasConfig)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().api_key == "rotated"
+        assert captured.err == ""
+
+    def test_load_nested_alias_field_does_not_warn_as_unknown(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class Inner(BaseModel):
+            api_key: str = Field(default="secret", alias="api-key")
+
+        class Outer(BaseModel):
+            inner: Inner = Inner()
+
+        src = tmp_path / "nested-alias.yaml"
+        src.write_text("inner:\n  api-key: rotated\n", encoding="utf-8")
+
+        tree = load_yaml(src, Outer)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().inner.api_key == "rotated"
+        assert captured.err == ""
 
     def test_load_missing_file_raises(self, tmp_path: Path) -> None:
         src = tmp_path / "nonexistent.yaml"
