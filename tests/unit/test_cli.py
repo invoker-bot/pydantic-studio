@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tomllib
+from typing import Any
 
 from pydantic import BaseModel
 from ruamel.yaml import YAML
@@ -18,6 +19,10 @@ yaml = YAML(typ="safe")
 
 class NonFiniteFloatSchema(BaseModel):
     value: float = float("nan")
+
+
+class NonFiniteAnySchema(BaseModel):
+    value: Any = float("nan")
 
 
 def test_cli_module_docstring_describes_current_command_surface() -> None:
@@ -308,6 +313,36 @@ class TestFillFormats:
         assert "could not write" in result.output.lower()
         assert "JSON compliant" in result.output
         assert not out.exists()
+
+    def test_fill_json_serializes_non_finite_any_default_as_text(self, tmp_path) -> None:
+        out = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.unit.test_cli:NonFiniteAnySchema", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(out.read_text(encoding="utf-8")) == {"value": "nan"}
+
+    def test_fill_yaml_serializes_non_finite_any_default_as_text(self, tmp_path) -> None:
+        out = tmp_path / "out.yaml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.unit.test_cli:NonFiniteAnySchema", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        assert yaml.load(out.read_text(encoding="utf-8")) == {"value": "nan"}
+
+    def test_fill_toml_serializes_non_finite_any_default_as_text(self, tmp_path) -> None:
+        out = tmp_path / "out.toml"
+        result = runner.invoke(
+            app,
+            ["fill", "tests.unit.test_cli:NonFiniteAnySchema", "--out", str(out)],
+        )
+
+        assert result.exit_code == 0
+        assert tomllib.loads(out.read_text(encoding="utf-8")) == {"value": "nan"}
 
 
 class TestRunFormats:

@@ -24,10 +24,12 @@ from rich.tree import Tree
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import (
+    AnyValueNode,
     GroupNode,
     MappingNode,
     SequenceNode,
     UnionNode,
+    _json_safe_any_value,
 )
 
 _JSON_VALUE_ADAPTER = TypeAdapter(object)
@@ -147,6 +149,8 @@ def _stub_value(node: Any) -> Any:
         if node.selected is not None:
             return _stub_value(node.selected)
         return "?" if node.required else None
+    if isinstance(node, AnyValueNode):
+        return _json_safe_any_value(node.to_python())
     if getattr(node, "required", False) and hasattr(node, "value") and node.value is None:
         return "?"
     return _json_ready(node.to_python())
