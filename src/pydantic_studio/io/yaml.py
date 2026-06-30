@@ -24,7 +24,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from pydantic_studio.tree.builder import build_form_tree
-from pydantic_studio.types.aliases import flat_field_input_keys
+from pydantic_studio.types.aliases import top_level_input_keys
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -252,7 +252,7 @@ def _field_info_for_key(schema: type[BaseModel], key: str) -> FieldInfo | None:
         (
             field_info
             for field_name, field_info in schema.model_fields.items()
-            if key in flat_field_input_keys(field_name, field_info)
+            if key in top_level_input_keys(field_name, field_info)
         ),
         None,
     )

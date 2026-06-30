@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Literal
 
 import pytest
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, Field
 from pydantic.fields import FieldInfo
 
 from pydantic_studio.exceptions import NoBuilderError
@@ -201,6 +201,23 @@ def test_group_builder_populates_flat_validation_alias_values():
     tree = build_form_tree(
         AliasConfig,
         existing={"api-key": "rotated", "auth-token": "bearer"},
+    )
+
+    assert tree.root.find("api_key").value == "rotated"
+    assert tree.root.find("token").value == "bearer"
+
+
+def test_group_builder_populates_alias_path_values():
+    class AliasConfig(BaseModel):
+        api_key: str = Field(default="secret", validation_alias=AliasPath("auth", "api-key"))
+        token: str = Field(
+            default="token",
+            validation_alias=AliasChoices("token", AliasPath("auth", "token")),
+        )
+
+    tree = build_form_tree(
+        AliasConfig,
+        existing={"auth": {"api-key": "rotated", "token": "bearer"}},
     )
 
     assert tree.root.find("api_key").value == "rotated"

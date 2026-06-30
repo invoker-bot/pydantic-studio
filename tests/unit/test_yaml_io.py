@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, Field
 
 from pydantic_studio import load_yaml
 from pydantic_studio.tree.builder import build_form_tree
@@ -127,6 +127,27 @@ class TestLoadYaml:
 
         src = tmp_path / "validation-alias.yaml"
         src.write_text("api-key: rotated\nauth-token: bearer\n", encoding="utf-8")
+
+        tree = load_yaml(src, AliasConfig)
+        captured = capsys.readouterr()
+
+        instance = tree.to_instance()
+        assert instance.api_key == "rotated"
+        assert instance.token == "bearer"
+        assert captured.err == ""
+
+    def test_load_alias_path_fields_do_not_warn_as_unknown(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", validation_alias=AliasPath("auth", "api-key"))
+            token: str = Field(
+                default="token",
+                validation_alias=AliasChoices("token", AliasPath("auth", "token")),
+            )
+
+        src = tmp_path / "alias-path.yaml"
+        src.write_text("auth:\n  api-key: rotated\n  token: bearer\n", encoding="utf-8")
 
         tree = load_yaml(src, AliasConfig)
         captured = capsys.readouterr()
