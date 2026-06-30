@@ -1783,7 +1783,13 @@ class FormTree(BaseModel):
         if key_errors:
             return ValidationResult.fail(list(key_errors))
         k_node = k_builder.build(key_type, key_field, key)
-        v_node = v_builder.build(value_type, FieldInfo(annotation=value_type), value)
+        value_field = FieldInfo(annotation=value_type)
+        v_node = v_builder.build(value_type, value_field, None)
+        if value is not None:
+            value_errors = v_node.validate_value(value)
+            if value_errors:
+                return ValidationResult.fail(list(value_errors))
+            v_node = v_builder.build(value_type, value_field, value)
         k_node.name = "key"
         v_node.name = "value"
         self._push_snapshot(_snap.take(self.root))

@@ -79,6 +79,19 @@ def test_add_entry_rejects_invalid_typed_key_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_add_entry_rejects_invalid_typed_value_without_mutating() -> None:
+    tree = build_form_tree(WithDict)
+
+    result = tree.add_entry("settings", "timeout", "not-an-int")
+
+    assert result.ok is False
+    assert any("expected int" in error for error in result.errors)
+    settings = tree.root.find("settings")
+    assert isinstance(settings, MappingNode)
+    assert settings.entries == []
+    assert tree.snapshots == []
+
+
 def test_remove_entry() -> None:
     tree = build_form_tree(
         WithDict, existing={"settings": {"a": 1, "b": 2, "c": 3}}
