@@ -35,10 +35,18 @@ def _write_wheel(
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
     license_files: tuple[str, ...] = ("LICENSE",),
     typed_marker: str | None = "pydantic_studio/py.typed",
+    static_bundle: tuple[str, ...] = (
+        "pydantic_studio/renderers/html/static/dist/index.html",
+        "pydantic_studio/renderers/html/static/dist/assets/index-test.css",
+        "pydantic_studio/renderers/html/static/dist/assets/index-test.js",
+    ),
     wheel_metadata: str | None = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     record: str | None = (
         "pydantic_studio/__init__.py,,\n"
         "pydantic_studio/py.typed,,\n"
+        "pydantic_studio/renderers/html/static/dist/index.html,,\n"
+        "pydantic_studio/renderers/html/static/dist/assets/index-test.css,,\n"
+        "pydantic_studio/renderers/html/static/dist/assets/index-test.js,,\n"
         "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
         "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
         "pydantic_studio-0.4.0.dist-info/entry_points.txt,,\n"
@@ -50,6 +58,8 @@ def _write_wheel(
         zf.writestr(metadata_name, metadata)
         if typed_marker is not None:
             zf.writestr(typed_marker, "")
+        for filename in static_bundle:
+            zf.writestr(filename, filename)
         if entry_points:
             zf.writestr(entry_points_name, entry_points)
         for filename in license_files:
@@ -68,6 +78,11 @@ def _write_sdist(
     readme: str | None = "README.md",
     license_files: tuple[str, ...] = ("LICENSE",),
     typed_marker: str | None = "src/pydantic_studio/py.typed",
+    static_bundle: tuple[str, ...] = (
+        "src/pydantic_studio/renderers/html/static/dist/index.html",
+        "src/pydantic_studio/renderers/html/static/dist/assets/index-test.css",
+        "src/pydantic_studio/renderers/html/static/dist/assets/index-test.js",
+    ),
     metadata: str | None = None,
     metadata_name: str = "pydantic_studio-0.4.0/PKG-INFO",
 ) -> None:
@@ -101,6 +116,11 @@ def _write_sdist(
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text("", encoding="utf-8")
             tf.add(source, arcname=f"pydantic_studio-0.4.0/{typed_marker}")
+        for filename in static_bundle:
+            source = dist / filename
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(filename, encoding="utf-8")
+            tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
 
 
 def _write_pyproject(
@@ -487,6 +507,89 @@ def test_verify_distribution_metadata_rejects_missing_wheel_typed_marker_record_
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
+def test_verify_distribution_metadata_rejects_missing_wheel_static_bundle_index(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        static_bundle=(
+            "pydantic_studio/renderers/html/static/dist/assets/index-test.css",
+            "pydantic_studio/renderers/html/static/dist/assets/index-test.js",
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"static.*index\.html"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_wheel_static_bundle_script(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        static_bundle=(
+            "pydantic_studio/renderers/html/static/dist/index.html",
+            "pydantic_studio/renderers/html/static/dist/assets/index-test.css",
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"static.*\.js"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_wheel_static_bundle_record_entry(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(
+        dist,
+        metadata,
+        record=(
+            "pydantic_studio/__init__.py,,\n"
+            "pydantic_studio/py.typed,,\n"
+            "pydantic_studio-0.4.0.dist-info/METADATA,,\n"
+            "pydantic_studio-0.4.0.dist-info/WHEEL,,\n"
+            "pydantic_studio-0.4.0.dist-info/entry_points.txt,,\n"
+            "pydantic_studio-0.4.0.dist-info/licenses/LICENSE,,\n"
+            "pydantic_studio-0.4.0.dist-info/RECORD,,\n"
+        ),
+    )
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"RECORD.*static"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
 def test_verify_distribution_metadata_rejects_missing_wheel_license_file(
     tmp_path: Path,
 ) -> None:
@@ -583,6 +686,29 @@ def test_verify_distribution_metadata_rejects_missing_sdist_typed_marker(
     )
 
     with pytest.raises(RuntimeError, match=r"py\.typed"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_missing_sdist_static_bundle_stylesheet(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        static_bundle=(
+            "src/pydantic_studio/renderers/html/static/dist/index.html",
+            "src/pydantic_studio/renderers/html/static/dist/assets/index-test.js",
+        ),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"static.*\.css"):
         verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 

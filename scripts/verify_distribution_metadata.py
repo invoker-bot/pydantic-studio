@@ -50,6 +50,29 @@ def _wheel_record_entries(record: str) -> frozenset[str]:
     return frozenset(row[0] for row in csv.reader(io.StringIO(record)) if row)
 
 
+def _static_bundle_files(names: set[str], *, dist_prefix: str) -> tuple[str, ...]:
+    index = f"{dist_prefix}/index.html"
+    asset_prefix = f"{dist_prefix}/assets/"
+    stylesheets = sorted(
+        name for name in names if name.startswith(asset_prefix) and name.endswith(".css")
+    )
+    scripts = sorted(
+        name for name in names if name.startswith(asset_prefix) and name.endswith(".js")
+    )
+    missing = [
+        path
+        for path, exists in (
+            (index, index in names),
+            (f"{asset_prefix}*.css", bool(stylesheets)),
+            (f"{asset_prefix}*.js", bool(scripts)),
+        )
+        if not exists
+    ]
+    if missing:
+        raise RuntimeError(f"missing web static bundle files: {missing!r}")
+    return (index, *stylesheets, *scripts)
+
+
 def _verify_wheel_structure(
     wheel: Path,
     *,
@@ -78,7 +101,11 @@ def _verify_wheel_structure(
                 f"{wheel} missing wheel license files in {dist_info_dir}: "
                 f"{missing_license_files!r}"
             )
-        package_files = (f"{package_root}/py.typed",)
+        static_bundle_files = _static_bundle_files(
+            names,
+            dist_prefix=f"{package_root}/renderers/html/static/dist",
+        )
+        package_files = (f"{package_root}/py.typed", *static_bundle_files)
         missing_package_files = [filename for filename in package_files if filename not in names]
         if missing_package_files:
             raise RuntimeError(f"{wheel} missing wheel package files: {missing_package_files!r}")
@@ -97,7 +124,7 @@ def _verify_wheel_structure(
         raise RuntimeError(f"{wheel} missing wheel metadata: {missing_metadata!r}")
 
     record_entries = _wheel_record_entries(record)
-    record_paths = [f"{package_root}/py.typed"]
+    record_paths = list(package_files)
     record_paths.extend(
         f"{dist_info_dir}/{filename}"
         for filename in ("METADATA", "WHEEL", "RECORD", "entry_points.txt")
@@ -523,6 +550,12 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     ]
     if missing_files:
         raise RuntimeError(f"{sdist} missing source files: {missing_files!r}")
+    _static_bundle_files(
+        name_set,
+        dist_prefix=(
+            f"{sdist_root}/src/{_project_package_root(pyproject)}/renderers/html/static/dist"
+        ),
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
