@@ -4,11 +4,13 @@ guidance (the `n` jump key, the HelpBar counter, save-failure cursor jump).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
+from pydantic_studio.tree.nodes import UnionNode
 
 
 class _Inner(BaseModel):
@@ -79,23 +81,23 @@ def test_partially_filled_optional_model_surfaces_remaining_required() -> None:
     assert tree.missing_required_paths() == ["payload.address"]
 
 
+def test_union_required_regressions_are_not_conditional_skips() -> None:
+    source = Path(__file__).read_text(encoding="utf-8")
+
+    assert "pytest.skip(\"payload did not build as a UnionNode\")" not in source
+
+
 def test_required_unselected_union_is_missing() -> None:
     tree = build_form_tree(_WithUnion)
     node = tree._resolve_path("payload")
-    if node.kind != "union":  # builder may collapse; guard the premise
-        import pytest
-
-        pytest.skip("payload did not build as a UnionNode")
+    assert isinstance(node, UnionNode)
     assert tree.missing_required_paths() == ["payload"]
 
 
 def test_selected_union_variant_is_walked() -> None:
     tree = build_form_tree(_WithUnion)
     node = tree._resolve_path("payload")
-    if node.kind != "union":
-        import pytest
-
-        pytest.skip("payload did not build as a UnionNode")
+    assert isinstance(node, UnionNode)
     names = node.variant_type_names
     idx = next(i for i, n in enumerate(names) if n.endswith("_Inner"))
     tree.select_variant("payload", idx)
