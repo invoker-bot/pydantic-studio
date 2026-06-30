@@ -20,6 +20,7 @@ from pydantic_studio.renderers.textual_.widgets.breadcrumb import Breadcrumb
 from pydantic_studio.renderers.textual_.widgets.field_list import (
     CursorMoved,
     FieldListView,
+    is_readonly_path,
 )
 from pydantic_studio.renderers.textual_.widgets.footer_hints import FooterHints
 from pydantic_studio.renderers.textual_.widgets.help_bar import HelpBar
@@ -163,7 +164,9 @@ class ConfigScreen(Screen):
             bar = self.query_one(HelpBar)
         except Exception:
             return
-        readonly = path in getattr(self.app, "readonly_paths", frozenset())
+        readonly = is_readonly_path(
+            path, getattr(self.app, "readonly_paths", frozenset())
+        )
         missing = len(self._form_tree.missing_required_paths())
         bar.show_node(node, missing_count=missing, readonly=readonly)
 

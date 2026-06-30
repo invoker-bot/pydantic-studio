@@ -10,7 +10,7 @@ read-only.
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.textual_ import StudioApp
@@ -24,6 +24,16 @@ class _Schema(BaseModel):
     path: str = "okx/okx"
     debug: bool = False
     name: str = "alpha"
+
+
+class _Profile(BaseModel):
+    name: str = "alpha"
+    enabled: bool = False
+
+
+class _NestedSchema(BaseModel):
+    profile: _Profile = Field(default_factory=_Profile)
+    name: str = "outer"
 
 
 @pytest.mark.asyncio
@@ -56,6 +66,27 @@ async def test_readonly_row_marker_and_disabled_input() -> None:
         await pilot.pause()
         assert tree._resolve_path("path").value == "okx/okx", (
             "typing must not reach a read-only field"
+        )
+
+
+@pytest.mark.asyncio
+async def test_readonly_parent_marks_descendant_rows_after_drilldown() -> None:
+    tree = build_form_tree(_NestedSchema)
+    app = StudioApp(tree=tree, save_path=None, readonly_paths={"profile"})
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        row = app.screen.query(FieldRow).first()
+        assert row.path == "profile.name"
+        assert "🔒" in row.label_text
+        assert row.query_one(Cell).disabled is True
+        for ch in "junk":
+            await pilot.press(ch)
+        await pilot.pause()
+        assert tree._resolve_path("profile.name").value == "alpha", (
+            "typing must not reach a descendant of a read-only parent"
         )
 
 

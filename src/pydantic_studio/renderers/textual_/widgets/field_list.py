@@ -79,6 +79,16 @@ class CursorMoved(Message):
     node: Any
 
 
+def is_readonly_path(path: str, readonly_paths: frozenset[str]) -> bool:
+    """Return True when ``path`` overlaps a renderer read-only path."""
+    return any(
+        path == readonly
+        or path.startswith(f"{readonly}.")
+        or readonly.startswith(f"{path}.")
+        for readonly in readonly_paths
+    )
+
+
 class FieldListView(VerticalScroll):
     """Scrollable vertical stack of FieldRows for the active container."""
 
@@ -175,7 +185,7 @@ class FieldListView(VerticalScroll):
                 form_tree=self._form_tree,
                 focused=(idx == self._cursor),
                 label_override=spec.label,
-                readonly=spec.path in readonly_paths,
+                readonly=is_readonly_path(spec.path, readonly_paths),
                 label_width=width,
                 deletable=deletable,
             )
@@ -197,7 +207,7 @@ class FieldListView(VerticalScroll):
         for spec in specs:
             label = spec.label if spec.label is not None else spec.node.name
             extra = 0  # required state lives in its own badge column now
-            if spec.path in readonly_paths:
+            if is_readonly_path(spec.path, readonly_paths):
                 extra += len(self._READONLY_SUFFIX) + 1  # 🔒 is double-width
             longest = max(longest, len(label) + extra)
         return max(self._LABEL_WIDTH_MIN, min(longest, self._LABEL_WIDTH_MAX))
@@ -477,7 +487,7 @@ class FieldListView(VerticalScroll):
 
     def _reject_readonly(self, row: FieldRow | None) -> bool:
         """Show the read-only helper and report True when ``row`` is locked."""
-        if row is None or row.path not in self._readonly_paths():
+        if row is None or not is_readonly_path(row.path, self._readonly_paths()):
             return False
         row.set_error("read-only — value is managed by the caller")
         return True
