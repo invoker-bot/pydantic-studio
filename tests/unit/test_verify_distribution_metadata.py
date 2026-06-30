@@ -30,6 +30,7 @@ def _write_wheel(
     dist: Path,
     metadata: str,
     *,
+    wheel_name: str = "pydantic_studio-0.4.0-py3-none-any.whl",
     metadata_name: str = "pydantic_studio-0.4.0.dist-info/METADATA",
     entry_points_name: str = "pydantic_studio-0.4.0.dist-info/entry_points.txt",
     entry_points: str = "[console_scripts]\npydantic-studio = pydantic_studio.cli:app\n",
@@ -63,7 +64,7 @@ def _write_wheel(
         "pydantic_studio-0.4.0.dist-info/RECORD,,\n"
     ),
 ) -> None:
-    with zipfile.ZipFile(dist / "pydantic_studio-0.4.0-py3-none-any.whl", "w") as zf:
+    with zipfile.ZipFile(dist / wheel_name, "w") as zf:
         zf.writestr(metadata_name, metadata)
         if package_init is not None:
             zf.writestr(package_init, package_init_content)
@@ -88,6 +89,8 @@ def _write_sdist(
     dist: Path,
     filenames: tuple[str, ...],
     *,
+    sdist_name: str = "pydantic_studio-0.4.0.tar.gz",
+    sdist_root: str = "pydantic_studio-0.4.0",
     pyproject: str | None = "pyproject.toml",
     readme: str | None = "README.md",
     license_files: tuple[str, ...] = ("LICENSE",),
@@ -106,54 +109,55 @@ def _write_sdist(
         '<link rel="stylesheet" href="/static/dist/assets/index-test.css">\n'
     ),
     metadata: str | None = None,
-    metadata_name: str = "pydantic_studio-0.4.0/PKG-INFO",
+    metadata_name: str | None = None,
 ) -> None:
-    with tarfile.open(dist / "pydantic_studio-0.4.0.tar.gz", "w:gz") as tf:
+    root_pkg_info = metadata_name if metadata_name is not None else f"{sdist_root}/PKG-INFO"
+    with tarfile.open(dist / sdist_name, "w:gz") as tf:
         if metadata is not None:
             pkg_info = dist / "PKG-INFO"
             pkg_info.write_text(metadata, encoding="utf-8")
-            tf.add(pkg_info, arcname=metadata_name)
+            tf.add(pkg_info, arcname=root_pkg_info)
         for filename in filenames:
             source = dist / filename
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(filename, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
+            tf.add(source, arcname=f"{sdist_root}/{filename}")
         if pyproject is not None:
             source = dist / pyproject
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(pyproject, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{pyproject}")
+            tf.add(source, arcname=f"{sdist_root}/{pyproject}")
         if readme is not None:
             source = dist / readme
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(readme, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{readme}")
+            tf.add(source, arcname=f"{sdist_root}/{readme}")
         for filename in license_files:
             source = dist / filename
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(filename, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
+            tf.add(source, arcname=f"{sdist_root}/{filename}")
         if package_init is not None:
             source = dist / package_init
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(package_init_content, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{package_init}")
+            tf.add(source, arcname=f"{sdist_root}/{package_init}")
         if cli_module is not None:
             source = dist / cli_module
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text(cli_module_content, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{cli_module}")
+            tf.add(source, arcname=f"{sdist_root}/{cli_module}")
         if typed_marker is not None:
             source = dist / typed_marker
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text("", encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{typed_marker}")
+            tf.add(source, arcname=f"{sdist_root}/{typed_marker}")
         for filename in static_bundle:
             source = dist / filename
             source.parent.mkdir(parents=True, exist_ok=True)
             content = static_index_html if filename.endswith("/index.html") else filename
             source.write_text(content, encoding="utf-8")
-            tf.add(source, arcname=f"pydantic_studio-0.4.0/{filename}")
+            tf.add(source, arcname=f"{sdist_root}/{filename}")
 
 
 def _write_pyproject(
@@ -269,6 +273,65 @@ def test_verify_distribution_metadata_accepts_expected_release_files(tmp_path: P
     )
 
     verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_wrong_wheel_filename_identity(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata, wheel_name="wrong_name-0.4.0-py3-none-any.whl")
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"wheel filename.*pydantic_studio-0\.4\.0"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_wrong_sdist_filename_identity(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        sdist_name="wrong_name-0.4.0.tar.gz",
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"sdist filename.*pydantic_studio-0\.4\.0"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
+
+
+def test_verify_distribution_metadata_rejects_wrong_sdist_archive_root_identity(
+    tmp_path: Path,
+) -> None:
+    verifier = _load_verifier()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    _write_pyproject(tmp_path)
+    metadata = _metadata()
+    _write_wheel(dist, metadata)
+    _write_sdist(
+        dist,
+        ("CHANGELOG.md", "SECURITY.md", "CONTRIBUTING.md"),
+        sdist_root="wrong_name-0.4.0",
+        metadata=metadata,
+    )
+
+    with pytest.raises(RuntimeError, match=r"sdist archive root.*pydantic_studio-0\.4\.0"):
+        verifier.verify_distribution_metadata(dist, project_root=tmp_path)
 
 
 def test_verify_distribution_metadata_rejects_wheel_metadata_decoy_path(

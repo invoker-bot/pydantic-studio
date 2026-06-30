@@ -48,6 +48,23 @@ def _wheel_filename_tag(wheel: Path) -> str:
     return "-".join(parts[-3:])
 
 
+def _verify_wheel_filename_identity(wheel: Path, pyproject: dict[str, object]) -> None:
+    expected_prefix = f"{_project_distribution_stem(pyproject)}-"
+    if not wheel.name.endswith(".whl") or not wheel.name.startswith(expected_prefix):
+        raise RuntimeError(
+            f"wheel filename {wheel.name!r} does not match expected "
+            f"{expected_prefix}*.whl"
+        )
+
+
+def _verify_sdist_filename_identity(sdist: Path, pyproject: dict[str, object]) -> None:
+    expected_name = f"{_project_distribution_stem(pyproject)}.tar.gz"
+    if sdist.name != expected_name:
+        raise RuntimeError(
+            f"sdist filename {sdist.name!r} does not match expected {expected_name!r}"
+        )
+
+
 def _wheel_record_entries(record: str) -> frozenset[str]:
     return frozenset(row[0] for row in csv.reader(io.StringIO(record)) if row)
 
@@ -386,6 +403,10 @@ def _wheel_dist_info_dir(pyproject: dict[str, object]) -> str:
     return f"{_project_package_root(pyproject)}-{_project_version(pyproject)}.dist-info"
 
 
+def _project_distribution_stem(pyproject: dict[str, object]) -> str:
+    return f"{_project_package_root(pyproject)}-{_project_version(pyproject)}"
+
+
 def _project_package_root(pyproject: dict[str, object]) -> str:
     project = _table(pyproject, "project", "project")
     name = project.get("name")
@@ -667,12 +688,23 @@ def _sdist_root(names: Sequence[str], sdist: Path) -> str:
     return roots.pop()
 
 
+def _verify_sdist_root_identity(sdist_root: str, pyproject: dict[str, object]) -> None:
+    expected_root = _project_distribution_stem(pyproject)
+    if sdist_root != expected_root:
+        raise RuntimeError(
+            f"sdist archive root {sdist_root!r} does not match expected {expected_root!r}"
+        )
+
+
 def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = None) -> None:
     project_root = project_root or Path.cwd()
     pyproject = _load_pyproject(project_root)
     wheel = _single_file(dist_dir, "*.whl")
     sdist = _single_file(dist_dir, "*.tar.gz")
     wheel_dist_info_dir = _wheel_dist_info_dir(pyproject)
+
+    _verify_wheel_filename_identity(wheel, pyproject)
+    _verify_sdist_filename_identity(sdist, pyproject)
 
     _verify_wheel_structure(
         wheel,
@@ -765,6 +797,7 @@ def verify_distribution_metadata(dist_dir: Path, *, project_root: Path | None = 
     names = _sdist_names(sdist)
     name_set = set(names)
     sdist_root = _sdist_root(names, sdist)
+    _verify_sdist_root_identity(sdist_root, pyproject)
     missing_files = [
         filename
         for filename in _expected_sdist_files(pyproject)
