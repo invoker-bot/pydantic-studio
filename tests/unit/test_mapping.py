@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
@@ -11,6 +13,10 @@ from tests.fixtures.schemas import WithDict
 
 class WithIntDict(BaseModel):
     ports: dict[int, str] = Field(default_factory=dict)
+
+
+class WithPathDict(BaseModel):
+    paths: dict[Path, int] = Field(default_factory=dict)
 
 
 class ConstrainedDict(BaseModel):
@@ -181,4 +187,23 @@ def test_rename_key_rejects_duplicate_key_without_mutating() -> None:
     assert result.ok is False
     assert result.errors == ("duplicate key 'a'",)
     assert settings.to_python() == {"a": 1, "b": 2}
+    assert tree.snapshots == []
+
+
+def test_rename_key_rejects_normalized_duplicate_key_without_mutating() -> None:
+    tree = build_form_tree(
+        WithPathDict,
+        existing={"paths": {Path("existing.yaml"): 1, Path("other.yaml"): 2}},
+    )
+    paths = tree.root.find("paths")
+    assert isinstance(paths, MappingNode)
+
+    result = tree.rename_key("paths", 1, "existing.yaml")
+
+    assert result.ok is False
+    assert result.errors == ("duplicate key PosixPath('existing.yaml')",)
+    assert paths.to_python() == {
+        Path("existing.yaml"): 1,
+        Path("other.yaml"): 2,
+    }
     assert tree.snapshots == []

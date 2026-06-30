@@ -2131,21 +2131,36 @@ class FormTree(BaseModel):
         self, path: str, index: int, new_key: Any
     ) -> ValidationResult:
         """Rename the key at ``index`` in the MappingNode at ``path``."""
+        from pydantic.fields import FieldInfo
+
         from pydantic_studio.tree import snapshots as _snap
+        from pydantic_studio.tree.builder import default_registry
 
         mp = self._walk_to_mapping(path)
         if not (0 <= index < len(mp.entries)):
             return ValidationResult.fail([f"index {index} out of range"])
-        k_node, _v_node = mp.entries[index]
-        errors = k_node.validate_value(new_key)
+        _old_key_node, value_node = mp.entries[index]
+        key_type = _resolve_type_name(mp.key_type_name)
+        key_field = FieldInfo(annotation=key_type)
+        key_builder = default_registry().find(key_type)
+        candidate_key = key_builder.build(key_type, key_field, None)
+        errors = candidate_key.validate_value(new_key)
         if errors:
             return ValidationResult.fail(list(errors))
-        unique_result = self._validate_mapping_unique_key(mp, new_key, exclude_index=index)
+        candidate_key = key_builder.build(key_type, key_field, new_key)
+        candidate_key.name = "key"
+        unique_result = self._validate_mapping_unique_key(
+            mp,
+            candidate_key.to_python(),
+            exclude_index=index,
+        )
         if not unique_result.ok:
             return unique_result
         # Validation passed — push snapshot and mutate.
         self._push_snapshot(_snap.take(self.root))
-        cast("Any", k_node).value = new_key
+        entries = list(mp.entries)
+        entries[index] = (candidate_key, value_node)
+        mp.entries = entries
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
