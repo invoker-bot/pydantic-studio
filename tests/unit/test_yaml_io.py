@@ -157,6 +157,22 @@ class TestLoadYaml:
         assert instance.token == "bearer"
         assert captured.err == ""
 
+    def test_load_alias_path_warns_for_unknown_nested_sibling(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class AliasConfig(BaseModel):
+            api_key: str = Field(default="secret", validation_alias=AliasPath("auth", "api-key"))
+
+        src = tmp_path / "alias-path-unknown.yaml"
+        src.write_text("auth:\n  api-key: rotated\n  stale: ignored\n", encoding="utf-8")
+
+        tree = load_yaml(src, AliasConfig)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().api_key == "rotated"
+        assert "auth.stale" in captured.err
+        assert "auth.api-key" not in captured.err
+
     def test_load_missing_file_raises(self, tmp_path: Path) -> None:
         src = tmp_path / "nonexistent.yaml"
         with pytest.raises(FileNotFoundError):

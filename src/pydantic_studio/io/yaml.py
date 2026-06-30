@@ -24,7 +24,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from pydantic_studio.tree.builder import build_form_tree
-from pydantic_studio.types.aliases import top_level_input_keys
+from pydantic_studio.types.aliases import InputPath, field_input_paths, top_level_input_keys
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -275,7 +275,55 @@ def _unknown_key_paths(
         nested_schema = _nested_schema_class(field_info)
         if nested_schema is not None and isinstance(value, Mapping):
             paths.extend(_unknown_key_paths(value, nested_schema, f"{path}."))
+        alias_path_tails = _alias_path_tails_for_key(schema, key_str)
+        if alias_path_tails and isinstance(value, Mapping):
+            paths.extend(_unknown_key_paths_for_input_paths(value, alias_path_tails, f"{path}."))
     return paths
+
+
+def _alias_path_tails_for_key(schema: type[BaseModel], key: str) -> tuple[InputPath, ...]:
+    """Return remaining input path segments after a top-level YAML key."""
+    tails: list[InputPath] = []
+    for field_name, field_info in schema.model_fields.items():
+        for input_path in field_input_paths(field_name, field_info):
+            if (
+                len(input_path) > 1
+                and isinstance(input_path[0], str)
+                and input_path[0] == key
+            ):
+                tails.append(input_path[1:])
+    return tuple(dict.fromkeys(tails))
+
+
+def _unknown_key_paths_for_input_paths(
+    data: Mapping[Any, Any],
+    input_paths: tuple[InputPath, ...],
+    prefix: str = "",
+) -> list[str]:
+    """Return mapping keys not covered by any remaining field input path."""
+    paths: list[str] = []
+    for key, value in data.items():
+        key_str = str(key)
+        path = f"{prefix}{key_str}"
+        matched_tails = tuple(
+            input_path[1:]
+            for input_path in input_paths
+            if input_path and _input_path_segment_matches_key(input_path[0], key)
+        )
+        if not matched_tails:
+            paths.append(path)
+            continue
+        if any(not tail for tail in matched_tails):
+            continue
+        if isinstance(value, Mapping):
+            paths.extend(_unknown_key_paths_for_input_paths(value, matched_tails, f"{path}."))
+    return paths
+
+
+def _input_path_segment_matches_key(segment: str | int, key: Any) -> bool:
+    if isinstance(segment, str):
+        return str(key) == segment
+    return key == segment
 
 
 def _dropped_source_key_paths(
