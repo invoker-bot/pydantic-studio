@@ -49,6 +49,9 @@ def _resolve_type_name(name: str) -> Any:
     parametrized forms instead of builder-less bare typing objects. Raises
     ValueError on miss with a diagnostic message.
     """
+    if not isinstance(name, str):
+        msg = f"malformed type name {name!r} (expected string type name)"
+        raise ValueError(msg)
     container_specs = {
         "typing.List": (1, lambda args: list[args[0]]),
         "typing.Dict": (2, lambda args: dict[args[0], args[1]]),

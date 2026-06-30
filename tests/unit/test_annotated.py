@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Literal
 
+import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio.types.annotated import (
@@ -133,3 +134,21 @@ def test_fq_round_trips_parameterized_container_type_names() -> None:
     assert _resolve_type_name(_fq(set[int])) == set[int]
     assert _resolve_type_name(_fq(tuple[int, str])) == tuple[int, str]
     assert _resolve_type_name(_fq(tuple[int, ...])) == tuple[int, ...]
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        "typing.List[123]",
+        "typing.Dict[\"builtins.str\", 123]",
+        "typing.Tuple[123]",
+        "typing.Union[123]",
+    ],
+)
+def test_resolve_type_name_rejects_non_string_structural_type_names(
+    encoded: str,
+) -> None:
+    from pydantic_studio.tree.nodes import _resolve_type_name
+
+    with pytest.raises(ValueError, match="type name"):
+        _resolve_type_name(encoded)

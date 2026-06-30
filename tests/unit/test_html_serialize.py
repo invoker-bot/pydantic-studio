@@ -78,6 +78,10 @@ class _WithIntValueDict(BaseModel):
     weights: dict[str, int] = Field(default_factory=dict)
 
 
+class _WithTupleKeyDict(BaseModel):
+    routes: dict[tuple[int, int], str] = Field(default_factory=dict)
+
+
 class _WithIntListValueDict(BaseModel):
     buckets: dict[str, list[int]] = Field(default_factory=dict)
 
@@ -909,6 +913,21 @@ def test_dispatch_add_entry_coerces_typed_mapping_key() -> None:
     assert pairs == [(8080, None)]
 
 
+def test_dispatch_add_entry_coerces_structured_mapping_key() -> None:
+    tree = build_form_tree(_WithTupleKeyDict)
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "add_entry", "path": "routes", "key": ["1", "2"], "value": "edge"},
+    )
+
+    assert result.ok is True
+    key, value = tree.root.find("routes").entries[0]
+    assert key.to_python() == (1, 2)
+    assert [item.value for item in key.items] == [1, 2]
+    assert value.value == "edge"
+
+
 def test_dispatch_remove_entry_drops_indexed_pair() -> None:
     tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC", "LOG": "info"}})
     result = dispatch_mutation(
@@ -941,6 +960,21 @@ def test_dispatch_rename_key_coerces_typed_mapping_key() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("ports").entries]
     assert pairs == [(443, "http")]
+
+
+def test_dispatch_rename_key_coerces_structured_mapping_key() -> None:
+    tree = build_form_tree(_WithTupleKeyDict, existing={"routes": {(1, 2): "edge"}})
+
+    result = dispatch_mutation(
+        tree,
+        {"op": "rename_key", "path": "routes", "index": 0, "new_key": ["3", "4"]},
+    )
+
+    assert result.ok is True
+    key, value = tree.root.find("routes").entries[0]
+    assert key.to_python() == (3, 4)
+    assert [item.value for item in key.items] == [3, 4]
+    assert value.value == "edge"
 
 
 def test_dispatch_rename_key_rejects_null_key_without_mutating() -> None:
