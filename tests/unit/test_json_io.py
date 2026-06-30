@@ -14,6 +14,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+def test_strict_json_dump_rejects_keys_that_collapse_to_duplicate_json_keys() -> None:
+    from pydantic_studio.io._json_strict import dumps_strict_json
+
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        dumps_strict_json({1: "integer key", "1": "string key"})
+
+
 class TestLoadJson:
     def test_load_basic_file(self, tmp_path: Path) -> None:
         from pydantic_studio.io.json_ import load_json
