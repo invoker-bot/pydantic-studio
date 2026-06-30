@@ -1371,11 +1371,19 @@ def _validation_error_messages(exc: Exception) -> list[str]:
     return [str(exc)]
 
 
-def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
-    if seed is None:
+def _validate_seed_against_node(
+    node: Any,
+    seed: Any,
+    *,
+    none_is_absent: bool = True,
+) -> list[str]:
+    if seed is None and none_is_absent:
         return []
     if isinstance(node, GroupNode):
-        from pydantic_studio.types.aliases import input_value_for_field
+        from pydantic_studio.types.aliases import (
+            input_value_or_missing_for_field,
+            is_missing_input_value,
+        )
 
         if isinstance(seed, BaseModel):
             if not isinstance(seed, node.schema_class):
@@ -1396,10 +1404,14 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
             field_info = node.schema_class.model_fields.get(child.name)
             if field_info is None:
                 continue
-            value = input_value_for_field(data, child.name, field_info)
-            if value is None:
+            value = input_value_or_missing_for_field(data, child.name, field_info)
+            if is_missing_input_value(value):
                 continue
-            for message in _validate_seed_against_node(child, value):
+            for message in _validate_seed_against_node(
+                child,
+                value,
+                none_is_absent=False,
+            ):
                 errors.append(f"{child.name}: {message}")
         return errors
     if isinstance(node, SequenceNode):
@@ -1442,7 +1454,11 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
                 for message in _validation_error_messages(exc):
                     errors.append(f"[{index}]: {message}")
                 continue
-            for message in _validate_seed_against_node(child, value):
+            for message in _validate_seed_against_node(
+                child,
+                value,
+                none_is_absent=False,
+            ):
                 errors.append(f"[{index}]: {message}")
         return errors
     if isinstance(node, MappingNode):
@@ -1472,7 +1488,11 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
                 for message in _validation_error_messages(exc):
                     errors.append(f"key {raw_key!r}: {message}")
                 continue
-            for message in _validate_seed_against_node(key_node, raw_key):
+            for message in _validate_seed_against_node(
+                key_node,
+                raw_key,
+                none_is_absent=False,
+            ):
                 errors.append(f"key {raw_key!r}: {message}")
             try:
                 value_node = value_builder.build(value_type, value_field, raw_value)
@@ -1480,11 +1500,19 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
                 for message in _validation_error_messages(exc):
                     errors.append(f"[{raw_key!r}]: {message}")
                 continue
-            for message in _validate_seed_against_node(value_node, raw_value):
+            for message in _validate_seed_against_node(
+                value_node,
+                raw_value,
+                none_is_absent=False,
+            ):
                 errors.append(f"[{raw_key!r}]: {message}")
         return errors
     if isinstance(node, UnionNode) and node.selected is not None:
-        return _validate_seed_against_node(node.selected, seed)
+        return _validate_seed_against_node(
+            node.selected,
+            seed,
+            none_is_absent=none_is_absent,
+        )
     validate_value = getattr(node, "validate_value", None)
     if callable(validate_value):
         return list(cast("tuple[str, ...]", validate_value(seed)))

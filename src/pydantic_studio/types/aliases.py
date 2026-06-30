@@ -61,6 +61,24 @@ def input_value_for_field(
     return None
 
 
+def input_value_or_missing_for_field(
+    data: Mapping[Any, Any],
+    field_name: str,
+    field_info: FieldInfo,
+) -> Any:
+    """Return the first matching field input value, preserving explicit None."""
+    for path in field_input_paths(field_name, field_info):
+        value = value_at_input_path(data, path)
+        if value is not _MISSING:
+            return value
+    return _MISSING
+
+
+def is_missing_input_value(value: object) -> bool:
+    """True when ``value`` is the sentinel returned for absent input paths."""
+    return value is _MISSING
+
+
 def top_level_input_keys(field_name: str, field_info: FieldInfo) -> tuple[str, ...]:
     """Return first path segments that can address a field in input data."""
     keys = [

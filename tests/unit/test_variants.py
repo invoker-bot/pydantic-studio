@@ -23,6 +23,10 @@ class PortSettings(BaseModel):
     port: int = 443
 
 
+class RequiredPortSettings(BaseModel):
+    port: int
+
+
 class CollidingDiscriminatorSettings(BaseModel):
     class_name: str = "model-field"
 
@@ -183,6 +187,27 @@ def test_select_root_variant_rejects_wrong_model_seed_without_mutating() -> None
     assert tree.variant.selected_id == "email"
     assert tree.root.find("address") is not None
     assert tree.root.find("channel") is None
+    assert tree.snapshots == []
+
+
+def test_select_root_variant_rejects_explicit_none_seed_without_mutating() -> None:
+    registry = VariantRegistry(
+        [
+            VariantSpec(id="email", model=EmailSettings, label="Email"),
+            VariantSpec(id="port", model=RequiredPortSettings, label="Port"),
+        ]
+    )
+    tree = build_variant_form_tree(registry, selected_id="email")
+
+    result = tree.select_root_variant("port", seed={"port": None})
+
+    assert result.ok is False
+    assert result.errors == ("port: value is required",)
+    assert tree.schema_class is EmailSettings
+    assert tree.variant is not None
+    assert tree.variant.selected_id == "email"
+    assert tree.root.find("address") is not None
+    assert tree.root.find("port") is None
     assert tree.snapshots == []
 
 
