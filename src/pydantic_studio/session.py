@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from pydantic_studio.exceptions import ValidationFailedError
 from pydantic_studio.outcome import EditOutcome
+from pydantic_studio.tree.paths import Path as TreePath
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -43,7 +44,7 @@ class EditSession:
     ) -> None:
         self.tree = tree
         self.save_path = Path(save_path) if save_path is not None else None
-        self.readonly_paths = frozenset(readonly_paths)
+        self.readonly_paths = _validate_readonly_paths(readonly_paths)
         self.outcome: EditOutcome | None = None
         self._initial_state = copy.deepcopy(tree.to_python())
 
@@ -99,3 +100,18 @@ class EditSession:
         if self.outcome is None:
             self.outcome = EditOutcome("cancelled")
         return self.outcome
+
+
+def _validate_readonly_paths(readonly_paths: Iterable[str]) -> frozenset[str]:
+    validated: set[str] = set()
+    for readonly_path in readonly_paths:
+        if not isinstance(readonly_path, str):
+            msg = f"read-only path must be a string, got {type(readonly_path).__name__}"
+            raise ValueError(msg)
+        try:
+            TreePath.parse(readonly_path)
+        except ValueError as exc:
+            msg = f"invalid read-only path {readonly_path!r}: {exc}"
+            raise ValueError(msg) from exc
+        validated.add(readonly_path)
+    return frozenset(validated)

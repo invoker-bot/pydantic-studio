@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree, load_yaml
@@ -98,3 +99,10 @@ def test_dirty_tracks_tree_changes() -> None:
     assert session.dirty is False
     tree.set_value("name", "changed")
     assert session.dirty is True
+
+
+@pytest.mark.parametrize("readonly_path", ["name.", "tags[+0]", "tags.0foo"])
+def test_session_rejects_invalid_readonly_path(readonly_path: str) -> None:
+    tree = build_form_tree(_ValidSchema)
+    with pytest.raises(ValueError, match="invalid read-only path"):
+        EditSession(tree=tree, readonly_paths={readonly_path})
