@@ -103,6 +103,9 @@ class EditSession:
 
 
 def _validate_readonly_paths(readonly_paths: Iterable[str]) -> frozenset[str]:
+    if isinstance(readonly_paths, str):
+        msg = "read-only paths must be an iterable of path strings, not a string"
+        raise ValueError(msg)
     validated: set[str] = set()
     for readonly_path in readonly_paths:
         if not isinstance(readonly_path, str):

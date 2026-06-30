@@ -106,3 +106,9 @@ def test_session_rejects_invalid_readonly_path(readonly_path: str) -> None:
     tree = build_form_tree(_ValidSchema)
     with pytest.raises(ValueError, match="invalid read-only path"):
         EditSession(tree=tree, readonly_paths={readonly_path})
+
+
+def test_session_rejects_readonly_paths_string_container() -> None:
+    tree = build_form_tree(_ValidSchema)
+    with pytest.raises(ValueError, match="read-only paths must be an iterable"):
+        EditSession(tree=tree, readonly_paths="name")  # type: ignore[arg-type]
