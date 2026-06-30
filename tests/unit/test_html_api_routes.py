@@ -17,6 +17,16 @@ class _Demo(BaseModel):
     workers: int = 4
 
 
+class _Profile(BaseModel):
+    name: str = "alpha"
+    role: str = "user"
+
+
+class _WithProfile(BaseModel):
+    profile: _Profile = Field(default_factory=_Profile)
+    workers: int = 4
+
+
 def _client(existing: dict | None = None) -> TestClient:
     tree = build_form_tree(_Demo, existing=existing)
     server = StudioServer(tree=tree, save_path=None)
@@ -311,6 +321,50 @@ def test_api_mutations_tree_includes_readonly_paths() -> None:
 
     assert response.status_code == 200
     assert response.json()["tree"]["readonly_paths"] == ["name"]
+
+
+def test_api_mutations_reject_readonly_path_without_mutating() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"name"})
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "name", "value": "beta"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {
+        "ok": False,
+        "errors": ["name is read-only — value is managed by the caller"],
+    }
+    assert body["validation"]["errors"][0] == {
+        "path": "name",
+        "message": "name is read-only — value is managed by the caller",
+    }
+    assert server.tree.root.find("name").value == "alpha"
+    name_field = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "name")
+    assert name_field["value"] == "alpha"
+
+
+def test_api_mutations_reject_readonly_descendant_without_mutating() -> None:
+    tree = build_form_tree(_WithProfile)
+    server = StudioServer(tree=tree, save_path=None, readonly_paths={"profile"})
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "profile.name", "value": "beta"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {
+        "ok": False,
+        "errors": ["profile.name is read-only — value is managed by the caller"],
+    }
+    assert server.tree.root.find("profile").find("name").value == "alpha"
 
 
 def test_run_html_app_signature_matches_run_app_contract() -> None:

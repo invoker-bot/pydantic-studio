@@ -12,6 +12,19 @@ if TYPE_CHECKING:
 
     from pydantic_studio.renderers.html.server import StudioServer
 
+_PATH_MUTATION_OPS = {
+    "set_value",
+    "add_item",
+    "insert_item",
+    "remove_item",
+    "move_item",
+    "add_entry",
+    "remove_entry",
+    "rename_key",
+    "select_variant",
+}
+_READONLY_MESSAGE = "read-only — value is managed by the caller"
+
 
 def _tree_payload(server: StudioServer) -> dict[str, object]:
     from pydantic_studio.renderers.html.serialize import tree_to_json
@@ -19,6 +32,24 @@ def _tree_payload(server: StudioServer) -> dict[str, object]:
     payload = tree_to_json(server.tree)
     payload["readonly_paths"] = sorted(server.readonly_paths)
     return payload
+
+
+def _paths_overlap(left: str, right: str) -> bool:
+    return left == right or left.startswith(f"{right}.") or right.startswith(f"{left}.")
+
+
+def _readonly_mutation_error(
+    server: StudioServer, mutation: dict[str, Any]
+) -> str | None:
+    op = mutation.get("op")
+    if op not in _PATH_MUTATION_OPS:
+        return None
+    path = mutation.get("path")
+    if not isinstance(path, str):
+        return None
+    if any(_paths_overlap(path, readonly) for readonly in server.readonly_paths):
+        return f"{path} is {_READONLY_MESSAGE}"
+    return None
 
 
 def register(app: FastAPI, server: StudioServer) -> None:
@@ -52,7 +83,13 @@ def register(app: FastAPI, server: StudioServer) -> None:
                 content={"detail": "mutation request must be a JSON object"},
             )
         mutation = cast("dict[str, Any]", raw_mutation)
-        result = dispatch_mutation(server.tree, mutation)
+        readonly_error = _readonly_mutation_error(server, mutation)
+        if readonly_error is None:
+            result = dispatch_mutation(server.tree, mutation)
+        else:
+            from pydantic_studio.tree.validation import ValidationResult
+
+            result = ValidationResult.fail([readonly_error])
         # Unknown / malformed op -> 400 so the client knows it's a request
         # bug, not a state issue. Validation failures of valid ops keep
         # 200 (the tree is untouched, ``validation`` reports what failed).
