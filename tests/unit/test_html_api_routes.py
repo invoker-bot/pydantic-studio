@@ -90,6 +90,32 @@ def test_api_mutations_unknown_op_returns_400() -> None:
     assert "nuke" in body["detail"]
 
 
+def test_api_mutations_non_object_request_returns_400() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app, raise_server_exceptions=False)
+
+    response = client.post("/api/mutations", json=["set_value", "name"])
+
+    assert response.status_code == 400
+    assert "JSON object" in response.json()["detail"]
+
+
+def test_api_mutations_invalid_json_returns_400() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app, raise_server_exceptions=False)
+
+    response = client.post(
+        "/api/mutations",
+        content=b"{not-json",
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert "invalid JSON" in response.json()["detail"]
+
+
 def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
     server, client = _server_and_client({"name": "alpha", "workers": 4})
     response = client.post("/api/submit")

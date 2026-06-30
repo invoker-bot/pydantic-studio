@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Request  # noqa: TC002 (FastAPI introspects this at runtime)
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -39,7 +39,19 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.post("/api/mutations", response_class=JSONResponse)
     async def api_mutations(request: Request) -> JSONResponse:
-        mutation = await request.json()
+        try:
+            raw_mutation = await request.json()
+        except ValueError as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": f"invalid JSON mutation request: {exc}"},
+            )
+        if not isinstance(raw_mutation, dict):
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "mutation request must be a JSON object"},
+            )
+        mutation = cast("dict[str, Any]", raw_mutation)
         result = dispatch_mutation(server.tree, mutation)
         # Unknown / malformed op -> 400 so the client knows it's a request
         # bug, not a state issue. Validation failures of valid ops keep
