@@ -154,6 +154,20 @@ def test_api_mutations_non_string_path_returns_400() -> None:
     assert "path must be a string" in response.json()["detail"]
 
 
+def test_api_mutations_missing_set_value_payload_returns_400() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app, raise_server_exceptions=False)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "name"},
+    )
+
+    assert response.status_code == 400
+    assert "mutation failed" in response.json()["detail"]
+
+
 def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
     server, client = _server_and_client({"name": "alpha", "workers": 4})
     response = client.post("/api/submit")

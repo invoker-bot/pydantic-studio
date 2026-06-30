@@ -260,7 +260,7 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
     try:
         path = _path_arg(mutation)
         if op == "set_value":
-            value = mutation.get("value")
+            value = mutation["value"]
             value = _maybe_coerce_typed_value(tree, path, value)
             return tree.set_value(path, value)
         if op == "add_item":
