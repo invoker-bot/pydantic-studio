@@ -215,6 +215,21 @@ def _load_config_for_cli(file: Path, schema: type[BaseModel]) -> Any:
         raise typer.Exit(code=1) from e
 
 
+def _write_fill_output_for_cli(tree: Any, out: Path) -> None:
+    """Write ``fill --out`` output, reporting format/I/O errors cleanly."""
+    from pydantic_studio.io.dispatch import save_config
+
+    try:
+        payload = _fill_payload_for_path(tree, out)
+        if payload is not None:
+            _write_text_atomic(out, payload)
+        else:
+            save_config(tree, out)
+    except (OSError, ValueError) as e:
+        typer.secho(f"{out}: could not write: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+
 @app.command()
 def show(target: str) -> None:
     """Introspect a Pydantic schema and print its form-tree shape.
@@ -253,16 +268,10 @@ def fill(
     ),
 ) -> None:
     """Emit a config stub populated with the schema's defaults."""
-    from pydantic_studio.io.dispatch import save_config
-
     schema = _load_schema(target)
     tree = build_form_tree(schema)
     if out is not None:
-        payload = _fill_payload_for_path(tree, out)
-        if payload is not None:
-            _write_text_atomic(out, payload)
-        else:
-            save_config(tree, out)
+        _write_fill_output_for_cli(tree, out)
         typer.echo(f"Wrote {out}")
         return
     typer.echo(_fill_yaml_payload(tree), nl=False)

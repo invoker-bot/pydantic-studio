@@ -81,5 +81,5 @@ pydantic-studio 0.1.2
 ## Exit codes
 
 - `0` — success
-- `1` — validation failure or config load failure (`run` / `check` / `edit`)
+- `1` — validation failure, config load failure, or output write failure
 - `2` — argument or schema-resolution error
