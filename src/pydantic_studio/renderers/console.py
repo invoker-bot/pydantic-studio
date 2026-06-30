@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic_studio.exceptions import CancelledByUser
+from pydantic_studio.io._json_strict import loads_strict_json
 from pydantic_studio.renderers.textual_.widgets.cells.parse import parse_for_kind
 
 InputFunc = Callable[[str], str]
@@ -291,8 +292,8 @@ def _parse_node_value(node: Any, raw: str) -> tuple[bool, Any]:
     if kind == "any":
         stripped = raw.strip()
         try:
-            return True, json.loads(stripped)
-        except json.JSONDecodeError:
+            return True, loads_strict_json(stripped)
+        except (json.JSONDecodeError, ValueError):
             return True, raw
     if kind == "secret":
         if getattr(node, "secret_kind", "str") == "bytes":

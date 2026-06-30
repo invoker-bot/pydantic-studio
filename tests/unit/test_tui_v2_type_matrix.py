@@ -17,7 +17,7 @@ from textual.widgets import Input
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.textual_ import StudioApp
 from pydantic_studio.renderers.textual_.screens import ConfigScreen, RenameKeyScreen
-from pydantic_studio.renderers.textual_.widgets.cells import SecretCell, TextCell
+from pydantic_studio.renderers.textual_.widgets.cells import AnyCell, SecretCell, TextCell
 from pydantic_studio.renderers.textual_.widgets.field_list import FieldListView
 from pydantic_studio.renderers.textual_.widgets.field_row import FieldRow
 
@@ -174,6 +174,18 @@ async def test_any_field_accepts_json_and_plain_text_input() -> None:
         await input_widget.action_submit()
         await pilot.pause()
         assert tree.root.find("payload").value == "plain text"
+
+
+def test_any_cell_preserves_non_standard_json_as_plain_text() -> None:
+    tree = build_form_tree(_AnySchema)
+    node = tree.root.find("payload")
+    assert node is not None
+    cell = AnyCell(node=node, path="payload", form_tree=tree)
+
+    for raw in ("NaN", "Infinity", "-Infinity", '{"a": 1, "a": 2}'):
+        ok, parsed = cell.parse(raw)
+        assert ok is True
+        assert parsed == raw
 
 
 @pytest.mark.asyncio

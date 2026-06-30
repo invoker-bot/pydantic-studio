@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -14,6 +14,10 @@ class PromptSchema(BaseModel):
     port: int = 8080
     debug: bool = False
     level: Literal["debug", "info"] = "info"
+
+
+class PromptAnySchema(BaseModel):
+    payload: Any = None
 
 
 class ConsoleEmail(BaseModel):
@@ -79,6 +83,19 @@ def test_console_reprompts_after_parse_error(tmp_path) -> None:
 
     assert load_yaml(out, PromptSchema).to_instance().port == 9091
     assert "cannot parse 'abc' as int" in lines
+
+
+def test_console_any_preserves_non_standard_json_as_plain_text() -> None:
+    from pydantic_studio.renderers.console import _parse_node_value
+
+    tree = build_form_tree(PromptAnySchema)
+    node = tree.root.find("payload")
+    assert node is not None
+
+    for raw in ("NaN", "Infinity", "-Infinity", '{"a": 1, "a": 2}'):
+        ok, parsed = _parse_node_value(node, raw)
+        assert ok is True
+        assert parsed == raw
 
 
 def test_console_prompts_for_root_variant_before_fields(tmp_path) -> None:

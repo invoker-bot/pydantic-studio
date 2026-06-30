@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from pydantic_studio.io._json_strict import loads_strict_json
 from pydantic_studio.renderers.textual_.widgets.cells.input_cell import InputCell
 
 
@@ -30,6 +31,6 @@ class AnyCell(InputCell):
         if stripped == "":
             return True, None
         try:
-            return True, json.loads(stripped)
-        except json.JSONDecodeError:
+            return True, loads_strict_json(stripped)
+        except (json.JSONDecodeError, ValueError):
             return True, raw
