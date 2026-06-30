@@ -10,13 +10,8 @@ from pydantic import BaseModel
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.html import StudioServer
 
-HTML_RENDERER_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "pydantic_studio"
-    / "renderers"
-    / "html"
-)
+ROOT = Path(__file__).resolve().parents[2]
+HTML_RENDERER_DIR = ROOT / "src" / "pydantic_studio" / "renderers" / "html"
 
 
 class _Demo(BaseModel):
@@ -102,3 +97,17 @@ def test_legacy_htmx_assets_and_templates_are_not_packaged() -> None:
         HTML_RENDERER_DIR / "templates",
     ]
     assert [path for path in legacy_paths if path.exists()] == []
+
+
+def test_frontend_variant_schema_matches_supported_persistence_modes() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+    bundled_js = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((HTML_RENDERER_DIR / "static" / "dist" / "assets").glob("*.js"))
+    )
+
+    assert 'z.enum(["metadata", "inline_discriminator"])' in schema
+    assert '"model_field"' not in schema
+    assert "model_field" not in bundled_js

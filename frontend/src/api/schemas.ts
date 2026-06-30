@@ -18,7 +18,7 @@ export const VariantStateSchema = z.object({
   options: z.array(VariantOptionSchema),
   selected_id: z.string(),
   discriminator: z.string().nullable(),
-  persistence: z.enum(["metadata", "inline_discriminator", "model_field"]),
+  persistence: z.enum(["metadata", "inline_discriminator"]),
 });
 
 export type VariantStateData = z.infer<typeof VariantStateSchema>;
