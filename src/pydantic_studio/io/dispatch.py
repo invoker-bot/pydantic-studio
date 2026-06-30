@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -18,6 +18,7 @@ _EXT_MAP: dict[str, _Format] = {
     ".toml": "toml",
     ".json": "json",
 }
+_SUPPORTED_FORMATS = ("json", "toml", "yaml")
 
 
 def _format_for_path(path: Path) -> _Format:
@@ -30,6 +31,14 @@ def _format_for_path(path: Path) -> _Format:
         )
         raise ValueError(msg)
     return fmt
+
+
+def _validate_format(format: str) -> _Format:
+    if format not in _SUPPORTED_FORMATS:
+        expected = ", ".join(_SUPPORTED_FORMATS)
+        msg = f"unsupported format {format!r}; expected one of {expected}"
+        raise ValueError(msg)
+    return cast("_Format", format)
 
 
 def load_config(
@@ -46,7 +55,7 @@ def load_config(
         format: optional explicit format override ("yaml"/"toml"/"json")
     """
     path = Path(path)
-    fmt = format or _format_for_path(path)
+    fmt = _format_for_path(path) if format is None else _validate_format(format)
     if fmt == "yaml":
         from pydantic_studio.io.yaml import load_yaml
 
@@ -68,7 +77,7 @@ def save_config(
 ) -> None:
     """Save a FormTree to a config file, picking writer by extension."""
     path = Path(path)
-    fmt = format or _format_for_path(path)
+    fmt = _format_for_path(path) if format is None else _validate_format(format)
     if fmt == "yaml":
         from pydantic_studio.io.yaml import save_yaml
 

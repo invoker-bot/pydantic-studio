@@ -66,3 +66,16 @@ class TestDispatcher:
         save_config(tree, out, format="yaml")
         reloaded = load_config(out, Server, format="yaml")
         assert reloaded.to_instance().name == "prod"
+
+    def test_save_rejects_unknown_explicit_format(self, tmp_path: Path) -> None:
+        tree = build_form_tree(Server)
+
+        with pytest.raises(ValueError, match="unsupported format"):
+            save_config(tree, tmp_path / "config", format="xml")
+
+    def test_load_rejects_unknown_explicit_format(self, tmp_path: Path) -> None:
+        src = tmp_path / "config.json"
+        src.write_text("{}", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="unsupported format"):
+            load_config(src, Server, format="xml")
