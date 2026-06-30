@@ -288,6 +288,16 @@ def test_dispatch_add_entry_appends_new_key() -> None:
     assert pairs == [("TZ", "UTC"), ("LOG", None)]
 
 
+def test_dispatch_add_entry_rejects_null_key_without_mutating() -> None:
+    tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC"}})
+    result = dispatch_mutation(tree, {"op": "add_entry", "path": "env", "key": None})
+
+    assert result.ok is False
+    assert any("key must be a string" in err for err in result.errors)
+    pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
+    assert pairs == [("TZ", "UTC")]
+
+
 def test_dispatch_remove_entry_drops_indexed_pair() -> None:
     tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC", "LOG": "info"}})
     result = dispatch_mutation(
@@ -307,6 +317,19 @@ def test_dispatch_rename_key_changes_key_at_index() -> None:
     assert result.ok is True
     pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
     assert pairs == [("TIMEZONE", "UTC")]
+
+
+def test_dispatch_rename_key_rejects_null_key_without_mutating() -> None:
+    tree = build_form_tree(_WithDict, existing={"env": {"TZ": "UTC"}})
+    result = dispatch_mutation(
+        tree,
+        {"op": "rename_key", "path": "env", "index": 0, "new_key": None},
+    )
+
+    assert result.ok is False
+    assert any("new_key must be a string" in err for err in result.errors)
+    pairs = [(k.value, v.value) for k, v in tree.root.find("env").entries]
+    assert pairs == [("TZ", "UTC")]
 
 
 def test_dispatch_select_variant_switches_to_indexed_branch() -> None:
@@ -337,6 +360,25 @@ def test_dispatch_select_root_variant_switches_root_model() -> None:
     assert result.ok is True
     assert tree.schema_class is _VariantSlack
     assert tree.root.find("channel") is not None
+
+
+def test_dispatch_select_root_variant_rejects_null_id_without_mutating() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail),
+                VariantSpec(id="slack", model=_VariantSlack),
+            ]
+        ),
+        selected_id="email",
+    )
+
+    result = dispatch_mutation(tree, {"op": "select_root_variant", "variant_id": None})
+
+    assert result.ok is False
+    assert any("variant_id must be a string" in err for err in result.errors)
+    assert tree.schema_class is _VariantEmail
+    assert tree.root.find("address") is not None
 
 
 def test_dispatch_unknown_op_fails_without_mutating() -> None:

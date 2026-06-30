@@ -217,6 +217,14 @@ def _maybe_coerce_typed_value(tree: FormTree, path: str, value: Any) -> Any:
     return value
 
 
+def _required_string_arg(mutation: dict[str, Any], key: str) -> str:
+    value = mutation[key]
+    if not isinstance(value, str):
+        msg = f"{key} must be a string"
+        raise TypeError(msg)
+    return value
+
+
 def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationResult:
     """Apply one mutation from the JSON API onto the FormTree.
 
@@ -245,17 +253,19 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
         if op == "move_item":
             return tree.move_item(path, int(mutation["from"]), int(mutation["to"]))
         if op == "add_entry":
-            return tree.add_entry(path, key=str(mutation["key"]))
+            return tree.add_entry(path, key=_required_string_arg(mutation, "key"))
         if op == "remove_entry":
             return tree.remove_entry(path, int(mutation["index"]))
         if op == "rename_key":
             return tree.rename_key(
-                path, int(mutation["index"]), str(mutation["new_key"])
+                path, int(mutation["index"]), _required_string_arg(mutation, "new_key")
             )
         if op == "select_variant":
             return tree.select_variant(path, int(mutation["variant_index"]))
         if op == "select_root_variant":
-            return tree.select_root_variant(str(mutation["variant_id"]))
+            return tree.select_root_variant(
+                _required_string_arg(mutation, "variant_id")
+            )
     except (KeyError, ValueError, TypeError) as exc:
         return ValidationResult.fail([f"mutation failed: {exc}"])
     return ValidationResult.fail([f"unknown op: {op!r}"])
