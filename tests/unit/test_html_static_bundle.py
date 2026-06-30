@@ -191,3 +191,35 @@ def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
         mutations,
         re.DOTALL,
     )
+
+
+def test_frontend_submit_and_cancel_schemas_validate_http_responses() -> None:
+    submit = (ROOT / "frontend" / "src" / "api" / "submit.ts").read_text(
+        encoding="utf-8"
+    )
+
+    assert "SubmitFailureResponseSchema.parse(await response.json())" in submit
+    assert "SubmitSuccessResponseSchema.parse(await response.json())" in submit
+    assert "CancelResponseSchema.parse(await response.json())" in submit
+    assert "as { ok?: boolean; errors?: SubmitError[] }" not in submit
+    assert "body.errors ?? []" not in submit
+    assert re.search(
+        r"const SubmitErrorSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        submit,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"const SubmitFailureResponseSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        submit,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"const SubmitSuccessResponseSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        submit,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"const CancelResponseSchema = z\.object\(\{(?P<body>.*?)\}\)\.strict\(\);",
+        submit,
+        re.DOTALL,
+    )

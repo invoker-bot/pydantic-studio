@@ -12,27 +12,48 @@
 // the server may already be gone.
 
 import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
 import { studioUrl } from "@/api/base";
 
-export interface SubmitError {
-  path: string;
-  message: string;
-}
+const SubmitErrorSchema = z.object({
+  path: z.string(),
+  message: z.string(),
+}).strict();
 
-export interface SubmitResponse {
-  ok: boolean;
-  errors: SubmitError[];
-}
+const SubmitFailureResponseSchema = z.object({
+  ok: z.literal(false),
+  errors: z.array(SubmitErrorSchema),
+}).strict();
+
+const SubmitSuccessResponseSchema = z.object({
+  ok: z.literal(true),
+}).strict();
+
+const CancelResponseSchema = z.object({
+  ok: z.literal(true),
+}).strict();
+
+export type SubmitError = z.infer<typeof SubmitErrorSchema>;
+
+export type SubmitResponse =
+  | {
+      ok: true;
+      errors: [];
+    }
+  | {
+      ok: false;
+      errors: SubmitError[];
+    };
 
 export async function submitTree(): Promise<SubmitResponse> {
   const response = await fetch(studioUrl("/api/submit"), { method: "POST" });
   if (response.status === 400) {
-    const body = (await response.json()) as { ok?: boolean; errors?: SubmitError[] };
-    return { ok: false, errors: body.errors ?? [] };
+    return SubmitFailureResponseSchema.parse(await response.json());
   }
   if (!response.ok) {
     throw new Error(`POST /api/submit failed: HTTP ${response.status}`);
   }
+  SubmitSuccessResponseSchema.parse(await response.json());
   return { ok: true, errors: [] };
 }
 
@@ -41,6 +62,7 @@ export async function cancelEdit(): Promise<void> {
   if (!response.ok) {
     throw new Error(`POST /api/cancel failed: HTTP ${response.status}`);
   }
+  CancelResponseSchema.parse(await response.json());
 }
 
 export function useSubmitTree() {
