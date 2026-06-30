@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pydantic_studio.tree.nodes import FormTree
 
 
-VariantPersistence = Literal["metadata", "inline_discriminator", "model_field"]
+VariantPersistence = Literal["metadata", "inline_discriminator"]
 
 
 def _model_type_name(model: type[BaseModel]) -> str:
@@ -94,7 +94,7 @@ def build_variant_form_tree(
 ) -> FormTree:
     """Build a FormTree for a selectable set of root model variants."""
 
-    allowed = {"metadata", "inline_discriminator", "model_field"}
+    allowed = {"metadata", "inline_discriminator"}
     if persistence not in allowed:
         msg = f"unknown variant persistence {persistence!r}; use one of {sorted(allowed)}"
         raise ValueError(msg)

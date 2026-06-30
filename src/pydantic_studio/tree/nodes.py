@@ -1352,7 +1352,7 @@ class VariantState(BaseModel):
     options: list[VariantOption]
     selected_id: str
     discriminator: str | None = None
-    persistence: Literal["metadata", "inline_discriminator", "model_field"] = "metadata"
+    persistence: Literal["metadata", "inline_discriminator"] = "metadata"
 
 
 class FormTree(BaseModel):
@@ -1455,9 +1455,7 @@ class FormTree(BaseModel):
         *,
         selected_id: str,
         discriminator: str | None = None,
-        persistence: Literal[
-            "metadata", "inline_discriminator", "model_field"
-        ] = "metadata",
+        persistence: Literal["metadata", "inline_discriminator"] = "metadata",
     ) -> None:
         """Attach caller-supplied root variant choices to this tree."""
         options = [

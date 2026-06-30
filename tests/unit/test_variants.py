@@ -100,6 +100,11 @@ def test_build_variant_form_tree_rejects_selected_id_conflicting_with_existing()
         )
 
 
+def test_build_variant_form_tree_rejects_model_field_persistence_until_supported() -> None:
+    with pytest.raises(ValueError, match="unknown variant persistence"):
+        build_variant_form_tree(_registry(), persistence="model_field")
+
+
 def test_select_root_variant_rebuilds_schema_and_root() -> None:
     tree = build_variant_form_tree(_registry(), selected_id="email")
 
