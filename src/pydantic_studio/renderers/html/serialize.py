@@ -351,13 +351,19 @@ def dispatch_mutation(tree: FormTree, mutation: dict[str, Any]) -> ValidationRes
                 _mapping_key_arg(tree, mutation, "new_key"),
             )
         if op == "select_variant":
+            path = _path_arg(mutation)
+            variant_index = _required_int_arg(mutation, "variant_index")
+            if "seed" in mutation:
+                return tree.select_variant(path, variant_index, mutation["seed"])
             return tree.select_variant(
-                _path_arg(mutation), _required_int_arg(mutation, "variant_index")
+                path,
+                variant_index,
             )
         if op == "select_root_variant":
-            return tree.select_root_variant(
-                _required_string_arg(mutation, "variant_id")
-            )
+            variant_id = _required_string_arg(mutation, "variant_id")
+            if "seed" in mutation:
+                return tree.select_root_variant(variant_id, mutation["seed"])
+            return tree.select_root_variant(variant_id)
     except (KeyError, ValueError, TypeError) as exc:
         return ValidationResult.fail([f"mutation failed: {exc}"])
     return ValidationResult.fail([f"unknown op: {op!r}"])
