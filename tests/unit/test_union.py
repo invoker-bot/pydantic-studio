@@ -153,6 +153,21 @@ def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_select_variant_rejects_group_seed_shape_without_mutating() -> None:
+    tree = build_form_tree(_SeededListUnionHolder, existing={"value": "keep-me"})
+
+    result = tree.select_variant("value", 1, seed="not-a-model")
+
+    assert result.ok is False
+    assert result.errors == ("expected dict/BaseModel for group seed, got str",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
 def test_select_variant_rejects_sequence_seed_constraint_without_mutating() -> None:
     tree = build_form_tree(_SeededListUnionHolder, existing={"value": "keep-me"})
 

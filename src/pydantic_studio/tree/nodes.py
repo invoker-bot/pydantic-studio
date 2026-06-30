@@ -1382,7 +1382,10 @@ def _validate_seed_against_node(node: Any, seed: Any) -> list[str]:
         elif isinstance(seed, dict):
             data = seed
         else:
-            return []
+            return [
+                "expected dict/BaseModel for group seed, got "
+                f"{type(seed).__name__}"
+            ]
         errors: list[str] = []
         for child in node.fields:
             field_info = node.schema_class.model_fields.get(child.name)
