@@ -238,3 +238,13 @@ def test_frontend_submit_and_cancel_schemas_validate_http_responses() -> None:
         submit,
         re.DOTALL,
     )
+
+
+def test_frontend_sends_heartbeat_while_web_session_is_open() -> None:
+    app = (ROOT / "frontend" / "src" / "App.tsx").read_text(encoding="utf-8")
+
+    assert "HEARTBEAT_INTERVAL_MS = 10_000" in app
+    assert 'studioUrl("/api/heartbeat")' in app
+    assert "void sendHeartbeat();" in app
+    assert "window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS)" in app
+    assert "window.clearInterval(intervalId)" in app

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Redo2, Undo2 } from "lucide-react";
 
+import { studioUrl } from "@/api/base";
 import { fetchTree } from "@/api/tree";
 import { useApplyMutation } from "@/api/mutations";
 import {
@@ -20,6 +21,8 @@ import { VariantSelector } from "@/components/form/VariantSelector";
 import { missingRequiredPaths } from "@/lib/required";
 
 type Status = "editing" | "saved" | "cancelled";
+
+const HEARTBEAT_INTERVAL_MS = 10_000;
 
 export default function App() {
   const { data, isLoading, error } = useQuery({
@@ -45,6 +48,21 @@ export default function App() {
     () => (data ? missingRequiredPaths(data.root) : []),
     [data],
   );
+
+  useEffect(() => {
+    const sendHeartbeat = () => {
+      void fetch(studioUrl("/api/heartbeat"), {
+        method: "GET",
+        cache: "no-store",
+      }).catch(() => {
+        // Submit/cancel can shut down the local server before React unmounts.
+      });
+    };
+
+    void sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   // A failed submit scrolls straight to the first offending field —
   // the banner is the summary, the field is the destination.
