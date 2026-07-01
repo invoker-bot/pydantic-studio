@@ -18,6 +18,10 @@ from pydantic_studio.types.annotated import (
     is_union_type,
     strip_annotated,
 )
+from pydantic_studio.types.transforms import (
+    field_info_from_annotation,
+    parse_existing_if_transforming,
+)
 from pydantic_studio.types.utils import _fq, field_default
 
 if TYPE_CHECKING:
@@ -47,6 +51,8 @@ class UnionBuilder:
         if is_optional_type(unwrapped) and len(non_none_args) == 1:
             inner_type = non_none_args[0]
             inner_builder = self._registry.find(inner_type)
+            inner_field_info = field_info_from_annotation(inner_type)
+            existing = parse_existing_if_transforming(inner_field_info, existing)
             inner = inner_builder.build(inner_type, field_info, existing)
             inner.required = False  # Optional implies not required
             inner.nullable = True

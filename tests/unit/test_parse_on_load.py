@@ -61,6 +61,11 @@ class _Vault(BaseModel):
     leverage: int = 1
 
 
+class _OptionalVault(BaseModel):
+    api_key: _EncryptedSecret | None = None
+    leverage: int = 1
+
+
 class _Outer(BaseModel):
     vault: _Vault
     note: str = ""
@@ -73,6 +78,21 @@ class _VaultList(BaseModel):
 
 class _VaultMap(BaseModel):
     api_keys: dict[str, _EncryptedSecret]
+    leverage: int = 1
+
+
+class _OptionalVaultList(BaseModel):
+    api_keys: list[_EncryptedSecret | None]
+    leverage: int = 1
+
+
+class _OptionalVaultMap(BaseModel):
+    api_keys: dict[str, _EncryptedSecret | None]
+    leverage: int = 1
+
+
+class _OptionalVaultTuple(BaseModel):
+    api_keys: tuple[_EncryptedSecret | None, ...]
     leverage: int = 1
 
 
@@ -111,6 +131,17 @@ def test_nested_group_fields_are_parsed_too() -> None:
     assert dumped["vault"]["api_key"] == "ENC[nested]"
 
 
+def test_optional_transforming_value_is_parsed_too() -> None:
+    tree = build_form_tree(
+        _OptionalVault, existing={"api_key": "ENC[maybe]", "leverage": 2}
+    )
+
+    assert tree._resolve_path("api_key").value == "maybe"
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["api_key"] == "ENC[maybe]"
+
+
 def test_sequence_items_with_transforming_validators_are_parsed_too() -> None:
     tree = build_form_tree(
         _VaultList, existing={"api_keys": ["ENC[first]"], "leverage": 2}
@@ -132,6 +163,46 @@ def test_mapping_values_with_transforming_validators_are_parsed_too() -> None:
     tree.set_value("leverage", 5)
     dumped = tree.to_instance().model_dump(mode="json")
     assert dumped["api_keys"] == {"primary": "ENC[first]"}
+
+
+def test_optional_sequence_items_with_transforming_validators_are_parsed_too() -> None:
+    tree = build_form_tree(
+        _OptionalVaultList,
+        existing={"api_keys": ["ENC[first]", None], "leverage": 2},
+    )
+
+    assert tree._resolve_path("api_keys[0]").value == "first"
+    assert tree._resolve_path("api_keys[1]").value is None
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["api_keys"] == ["ENC[first]", None]
+
+
+def test_optional_mapping_values_with_transforming_validators_are_parsed_too() -> None:
+    tree = build_form_tree(
+        _OptionalVaultMap,
+        existing={"api_keys": {"primary": "ENC[first]", "empty": None}, "leverage": 2},
+    )
+    api_keys = tree._resolve_path("api_keys")
+
+    assert api_keys.entries[0][1].value == "first"
+    assert api_keys.entries[1][1].value is None
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["api_keys"] == {"primary": "ENC[first]", "empty": None}
+
+
+def test_optional_tuple_items_with_transforming_validators_are_parsed_too() -> None:
+    tree = build_form_tree(
+        _OptionalVaultTuple,
+        existing={"api_keys": ("ENC[first]", None), "leverage": 2},
+    )
+
+    assert tree._resolve_path("api_keys[0]").value == "first"
+    assert tree._resolve_path("api_keys[1]").value is None
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["api_keys"] == ["ENC[first]", None]
 
 
 def test_plain_validator_transform_applies_to_non_secret_types() -> None:
