@@ -57,12 +57,12 @@ assert result.ok
 tree.set_value("port", 9090)
 ```
 
-## 4. Save as YAML
+## 4. Save by extension
 
 ```python
-from pydantic_studio import save_yaml
+from pydantic_studio import save_config
 
-save_yaml(tree, "config.yaml")
+save_config(tree, "config.yaml")
 ```
 
 ```yaml
@@ -83,11 +83,11 @@ started_at: '2026-05-06T12:00:00'
 ## 5. Reload + edit + save
 
 ```python
-from pydantic_studio import load_yaml
+from pydantic_studio import load_config
 
-tree = load_yaml("config.yaml", AppSettings)
+tree = load_config("config.yaml", AppSettings)
 tree.set_value("port", 9091)
-save_yaml(tree, "config.yaml")
+save_config(tree, "config.yaml")
 # User comments preserved on round-trip; only changed values are updated.
 ```
 

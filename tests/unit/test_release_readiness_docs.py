@@ -124,6 +124,18 @@ def test_agent_guide_uses_format_dispatch_save_guidance() -> None:
     assert "| save_yaml raises ValidationFailedError |" not in text
 
 
+def test_quick_start_uses_format_dispatch_helpers() -> None:
+    for doc in ("README.md", "docs/site/index.md"):
+        text = (ROOT / doc).read_text(encoding="utf-8")
+        assert "from pydantic_studio import build_form_tree, save_config" in text
+        assert 'save_config(tree, "config.yaml")' in text
+
+    tutorial = (ROOT / "docs" / "site" / "tutorial.md").read_text(encoding="utf-8")
+    assert "from pydantic_studio import save_config, load_config" in tutorial
+    assert "from pydantic_studio import save_yaml" not in tutorial
+    assert "save_yaml(tree" not in tutorial
+
+
 def test_release_guide_names_console_script_entry_point_verification() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
 

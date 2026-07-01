@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-1303%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-1304%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,7 +77,7 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 1303 tests: 1251 default unit/integration/TUI/web smoke tests plus 52
+by 1304 tests: 1252 default unit/integration/TUI/web smoke tests plus 52
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
@@ -113,7 +113,7 @@ pip install 'pydantic-studio[email]'
 
 ```python
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
-from pydantic_studio import build_form_tree, save_yaml
+from pydantic_studio import build_form_tree, save_config
 
 
 class AppSettings(BaseModel):
@@ -125,7 +125,7 @@ class AppSettings(BaseModel):
 
 tree = build_form_tree(AppSettings)
 tree.set_value("port", 9090)
-save_yaml(tree, "config.yaml")
+save_config(tree, "config.yaml")
 ```
 
 ```yaml
@@ -411,7 +411,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 1251 default tests; skips tests/e2e/
+uv run pytest -q                          # 1252 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint

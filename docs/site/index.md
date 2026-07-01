@@ -31,7 +31,7 @@ uv add pydantic-studio
 
 ```python
 from pydantic import BaseModel, Field
-from pydantic_studio import build_form_tree, save_yaml
+from pydantic_studio import build_form_tree, save_config
 
 
 class AppSettings(BaseModel):
@@ -41,7 +41,7 @@ class AppSettings(BaseModel):
 
 tree = build_form_tree(AppSettings)
 tree.set_value("port", 9090)
-save_yaml(tree, "config.yaml")
+save_config(tree, "config.yaml")
 ```
 
 ```yaml
