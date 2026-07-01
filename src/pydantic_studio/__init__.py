@@ -132,6 +132,7 @@ __all__ = [
     "__version__",
     "build_form_tree",
     "build_variant_form_tree",
+    "default_registry",
     "delete_draft",
     "draft_newer_than",
     "find_draft",

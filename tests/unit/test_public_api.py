@@ -29,6 +29,17 @@ def test_top_level_io_format_helpers():
     assert ps.supported_extensions() == (".json", ".toml", ".yaml", ".yml")
 
 
+def test_documented_top_level_api_is_in_all():
+    api_doc = ROOT.joinpath("docs", "site", "api.md").read_text(encoding="utf-8")
+    documented_names = {
+        line.removeprefix("::: pydantic_studio.").strip()
+        for line in api_doc.splitlines()
+        if line.startswith("::: pydantic_studio.")
+    }
+
+    assert documented_names <= set(ps.__all__)
+
+
 def test_embeddable_session_exports():
     assert hasattr(ps, "EditSession")
     assert hasattr(ps, "SubmitResult")
