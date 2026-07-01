@@ -208,15 +208,23 @@ def register(app: FastAPI, server: StudioServer) -> None:
                 content={"detail": f"submit failed: {exc}"},
             )
         if not result.ok:
-            errors = [
-                {
-                    "path": result.paths[index] if index < len(result.paths) else "",
-                    "message": message,
-                }
-                for index, message in enumerate(result.errors)
-            ]
-            if not errors:
-                errors = validation_envelope(server.tree)["errors"]
+            try:
+                errors = [
+                    {
+                        "path": result.paths[index]
+                        if index < len(result.paths)
+                        else "",
+                        "message": message,
+                    }
+                    for index, message in enumerate(result.errors)
+                ]
+                if not errors:
+                    errors = validation_envelope(server.tree)["errors"]
+            except Exception as exc:
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": f"submit response failed: {exc}"},
+                )
             return JSONResponse(
                 status_code=400,
                 content={

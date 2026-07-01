@@ -346,6 +346,31 @@ def test_api_submit_preserves_errors_without_paths() -> None:
     }
 
 
+def test_api_submit_validation_fallback_exception_returns_json_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic_studio.renderers.html import serialize
+
+    def broken_validation_envelope(_tree) -> dict[str, object]:
+        raise RuntimeError("validation backend unavailable")
+
+    monkeypatch.setattr(serialize, "validation_envelope", broken_validation_envelope)
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+
+    def submit_without_errors() -> SubmitResult:
+        return SubmitResult(ok=False, errors=(), paths=())
+
+    server.session.submit = submit_without_errors
+    response = TestClient(server.app, raise_server_exceptions=False).post("/api/submit")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {
+        "detail": "submit response failed: validation backend unavailable"
+    }
+
+
 def test_api_submit_exception_returns_json_detail() -> None:
     tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
     server = StudioServer(tree=tree, save_path=None)
