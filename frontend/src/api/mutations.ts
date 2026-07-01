@@ -66,7 +66,7 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
     throw new Error(`Mutation rejected: ${body.detail}`);
   }
   if (!response.ok) {
-    throw new Error(`POST /api/mutations failed: HTTP ${response.status}`);
+    throw new Error(await responseErrorMessage(response));
   }
   const raw = await response.json();
   const parsed = MutationResponseSchema.parse(raw);
@@ -85,6 +85,16 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
     throw err;
   }
   return parsed;
+}
+
+async function responseErrorMessage(response: Response): Promise<string> {
+  const fallback = `POST /api/mutations failed: HTTP ${response.status}`;
+  try {
+    const body = MutationErrorResponseSchema.parse(await response.json());
+    return `${fallback}: ${body.detail}`;
+  } catch {
+    return fallback;
+  }
 }
 
 export function useApplyMutation() {

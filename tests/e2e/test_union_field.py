@@ -97,7 +97,11 @@ def test_union_variant_transport_failure_is_announced(
 ) -> None:
     page.route(
         "**/api/mutations",
-        lambda route: route.fulfill(status=500, body="mutation unavailable"),
+        lambda route: route.fulfill(
+            status=500,
+            content_type="application/json",
+            json={"detail": "mutation backend unavailable"},
+        ),
     )
     page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
@@ -117,6 +121,7 @@ def test_union_variant_transport_failure_is_announced(
     alert = page.get_by_role("alert")
     expect(alert).to_contain_text("Variant failed:", timeout=5000)
     expect(alert).to_contain_text("HTTP 500")
+    expect(alert).to_contain_text("mutation backend unavailable")
     describedby = slack_chip.get_attribute("aria-describedby")
     assert describedby is not None
     expect(page.locator(f'[id="{describedby}"]')).to_have_attribute("role", "alert")
