@@ -151,7 +151,8 @@ class TestFill:
         )
 
         assert result.exit_code == 1
-        assert "could not write" in result.output.lower()
+        assert "unsupported config file extension" in result.output
+        assert "could not write" not in result.output.lower()
         assert "config.ini" in result.output
 
     def test_fill_output_extension_is_rejected_before_schema_import(self, tmp_path) -> None:
@@ -160,7 +161,8 @@ class TestFill:
         result = runner.invoke(app, ["fill", "nosuch:Foo", "--out", str(out)])
 
         assert result.exit_code == 1
-        assert "could not write" in result.output.lower()
+        assert "unsupported config file extension" in result.output
+        assert "could not write" not in result.output.lower()
         assert "config.ini" in result.output
         assert "nosuch" not in result.output.lower()
 
