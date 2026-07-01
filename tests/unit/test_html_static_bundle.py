@@ -171,6 +171,19 @@ def test_frontend_tree_schema_requires_readonly_paths() -> None:
     assert "readonly_paths: z.array(z.string()).default([])" not in schema
 
 
+def test_frontend_float_schema_accepts_non_finite_wire_strings() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+    float_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "FloatField.tsx"
+    ).read_text(encoding="utf-8")
+
+    assert 'z.enum(["NaN", "Infinity", "-Infinity"])' in schema
+    assert "parseFloatWireValue" in float_field
+    assert 'value: trimmed' in float_field
+
+
 def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
     mutations = (ROOT / "frontend" / "src" / "api" / "mutations.ts").read_text(
         encoding="utf-8"

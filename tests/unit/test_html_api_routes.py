@@ -44,6 +44,10 @@ class _RootRequiredSlack(BaseModel):
     channel: str
 
 
+class _WithNonFiniteFloat(BaseModel):
+    value: float = float("nan")
+
+
 def _client(existing: dict | None = None) -> TestClient:
     tree = build_form_tree(_Demo, existing=existing)
     server = StudioServer(tree=tree, save_path=None)
@@ -72,6 +76,37 @@ def test_api_tree_returns_json_with_schema_and_root() -> None:
     assert body["root"]["kind"] == "group"
     names = {f["name"] for f in body["root"]["fields"]}
     assert {"name", "workers"} <= names
+
+
+def test_api_tree_returns_json_for_non_finite_float_defaults() -> None:
+    tree = build_form_tree(_WithNonFiniteFloat)
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app, raise_server_exceptions=False)
+
+    response = client.get("/api/tree")
+
+    assert response.status_code == 200
+    body = response.json()
+    value = next(f for f in body["root"]["fields"] if f["name"] == "value")
+    assert value["value"] == "NaN"
+    assert value["default"] == "NaN"
+
+
+def test_api_mutations_accept_non_finite_float_wire_strings() -> None:
+    tree = build_form_tree(_WithNonFiniteFloat)
+    server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(server.app, raise_server_exceptions=False)
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "value", "value": "Infinity"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mutation_result"] == {"ok": True, "errors": []}
+    value = next(f for f in body["tree"]["root"]["fields"] if f["name"] == "value")
+    assert value["value"] == "Infinity"
 
 
 def test_api_tree_includes_unsaved_count() -> None:

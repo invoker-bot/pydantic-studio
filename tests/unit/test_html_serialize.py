@@ -120,6 +120,11 @@ class _AnyHolder(BaseModel):
     payload: Any = None
 
 
+class _NonFiniteFloatHolder(BaseModel):
+    value: float = float("nan")
+    limit: float = float("inf")
+
+
 class _VariantEmail(BaseModel):
     address: str = "ops@example.com"
 
@@ -314,6 +319,19 @@ def test_tree_to_json_serializes_non_json_native_any_value() -> None:
 
     payload = next(f for f in data["root"]["fields"] if f["name"] == "payload")
     assert payload["value"] == "opaque-value"
+    json.dumps(data, allow_nan=False)
+
+
+def test_tree_to_json_serializes_non_finite_floats_as_json_strings() -> None:
+    tree = build_form_tree(_NonFiniteFloatHolder)
+
+    data = tree_to_json(tree)
+
+    fields = {field["name"]: field for field in data["root"]["fields"]}
+    assert fields["value"]["value"] == "NaN"
+    assert fields["value"]["default"] == "NaN"
+    assert fields["limit"]["value"] == "Infinity"
+    assert fields["limit"]["default"] == "Infinity"
     json.dumps(data, allow_nan=False)
 
 

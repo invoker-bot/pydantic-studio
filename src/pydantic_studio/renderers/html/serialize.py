@@ -8,6 +8,7 @@ from the route layer.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 from pydantic_studio.tree.validation import ValidationResult
@@ -56,7 +57,19 @@ def tree_to_json(tree: FormTree) -> dict[str, Any]:
     }
     data["unsaved_count"] = len(tree.snapshots)
     data["preview"] = render_yaml_preview(tree)
-    return data
+    return _json_safe_non_finite(data)
+
+
+def _json_safe_non_finite(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        if math.isnan(value):
+            return "NaN"
+        return "Infinity" if value > 0 else "-Infinity"
+    if isinstance(value, dict):
+        return {key: _json_safe_non_finite(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_json_safe_non_finite(child) for child in value]
+    return value
 
 
 def _strip_node_internal_fields(value: Any) -> None:

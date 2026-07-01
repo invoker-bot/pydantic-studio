@@ -73,15 +73,20 @@ export const LiteralNodeSchema = NodeBase.extend({
   choices: z.array(z.unknown()),
 });
 
+const FloatWireValueSchema = z.union([
+  z.number(),
+  z.enum(["NaN", "Infinity", "-Infinity"]),
+]).nullable();
+
 export const FloatNodeSchema = NodeBase.extend({
   kind: z.literal("float"),
-  value: z.number().nullable(),
-  default: z.number().nullable(),
-  ge: z.number().nullable(),
-  le: z.number().nullable(),
-  gt: z.number().nullable(),
-  lt: z.number().nullable(),
-  multiple_of: z.number().nullable(),
+  value: FloatWireValueSchema,
+  default: FloatWireValueSchema,
+  ge: FloatWireValueSchema,
+  le: FloatWireValueSchema,
+  gt: FloatWireValueSchema,
+  lt: FloatWireValueSchema,
+  multiple_of: FloatWireValueSchema,
   allow_inf_nan: z.boolean(),
 });
 
