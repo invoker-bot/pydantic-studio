@@ -90,12 +90,12 @@ def test_container_constraint_controls_disable_at_boundaries(page: Page) -> None
         expect(tag_add).to_be_enabled()
         expect(page.get_by_role("button", name="remove tags[0]")).to_be_disabled()
 
-        env_add = page.get_by_role("button", name="+ Add Entry")
+        env_add = page.get_by_role("button", name="add env entry")
         expect(env_add).to_be_enabled()
-        expect(page.get_by_role("button", name="remove entry").first).to_be_disabled()
+        expect(page.get_by_role("button", name="remove entry one")).to_be_disabled()
 
         env_add.click()
 
         expect(page.get_by_text("2 entries")).to_be_visible(timeout=5000)
         expect(env_add).to_be_disabled()
-        expect(page.get_by_role("button", name="remove entry").first).to_be_enabled()
+        expect(page.get_by_role("button", name="remove entry one")).to_be_enabled()

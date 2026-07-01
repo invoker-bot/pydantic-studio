@@ -12,14 +12,8 @@ def test_any_field_parses_json_value(
     page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
-    # metadata starts empty. Add an entry via the metadata's +Add button.
-    # There are TWO +Add Entry buttons (env and metadata); use .all()
-    # and pick the second.
-    add_buttons = page.get_by_role("button", name="+ Add Entry").all()
-    assert len(add_buttons) >= 2, (
-        f"expected >=2 +Add Entry buttons, found {len(add_buttons)}"
-    )
-    add_buttons[1].click()   # the metadata one
+    # metadata starts empty. Add an entry via the field-specific +Add button.
+    page.get_by_role("button", name="add metadata entry").click()
 
     # The new entry's value field is an AnyField - takes raw text or JSON.
     # Locate the "any value (JSON or raw string)" placeholder input.

@@ -105,6 +105,7 @@ export function MappingField({
           className="w-full border-dashed text-zinc-500"
           disabled={structureDisabled || atMaxLength}
           onClick={onAdd}
+          aria-label={`add ${node.name} entry`}
         >
           + Add Entry
         </Button>

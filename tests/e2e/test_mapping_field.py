@@ -67,7 +67,7 @@ def test_add_entry_rename_key(page: Page, fastapi_url: str) -> None:
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
     # env starts empty - click + Add Entry under the env field
-    add_button = page.get_by_role("button", name="+ Add Entry").first
+    add_button = page.get_by_role("button", name="add env entry")
     expect(add_button).to_be_visible()
     add_button.click()
 
@@ -110,7 +110,7 @@ def test_add_entry_uses_typed_default_key_for_int_mapping(page: Page) -> None:
             timeout=5000
         )
 
-        add_button = page.get_by_role("button", name="+ Add Entry").first
+        add_button = page.get_by_role("button", name="add ports entry")
         add_button.click()
 
         key_input = page.get_by_label("entry key").first
@@ -148,4 +148,4 @@ def test_readonly_mapping_descendant_disables_structural_controls(
     expect(key_input).to_be_disabled()
 
     expect(page.get_by_role("button", name="remove entry LOCKED")).to_be_disabled()
-    expect(page.get_by_role("button", name="+ Add Entry").first).to_be_disabled()
+    expect(page.get_by_role("button", name="add env entry")).to_be_disabled()
