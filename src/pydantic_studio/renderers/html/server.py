@@ -131,7 +131,27 @@ class StudioServer:
 
     def render_spa_index(self) -> HTMLResponse:
         """Serve the built SPA index with runtime mount-path config."""
-        index = _SPA_INDEX.read_text(encoding="utf-8")
+        try:
+            index = _SPA_INDEX.read_text(encoding="utf-8")
+        except OSError as exc:
+            asset_path = html.escape(str(_SPA_INDEX), quote=True)
+            error = html.escape(str(exc), quote=True)
+            return HTMLResponse(
+                "<!doctype html>"
+                "<html>"
+                "<head><title>pydantic-studio bundle unavailable</title></head>"
+                "<body>"
+                "<h1>pydantic-studio web bundle unavailable</h1>"
+                "<p>The React web bundle could not be read. Rebuild it with "
+                "<code>cd frontend &amp;&amp; pnpm build</code>, or reinstall a "
+                "package that includes "
+                "<code>pydantic_studio/renderers/html/static/dist/</code>.</p>"
+                f"<p><strong>Missing asset:</strong> <code>{asset_path}</code></p>"
+                f"<pre>{error}</pre>"
+                "</body>"
+                "</html>",
+                status_code=500,
+            )
         if self.base_path:
             escaped_base_path = html.escape(self.base_path, quote=True)
             index = index.replace(

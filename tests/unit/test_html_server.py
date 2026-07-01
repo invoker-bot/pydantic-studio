@@ -54,6 +54,29 @@ def test_spa_bundle_referenced_by_index_is_reachable() -> None:
     assert len(bundle_response.content) > 10000
 
 
+def test_index_route_missing_spa_bundle_returns_diagnostic_html(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from pydantic_studio.renderers.html import StudioServer
+    from pydantic_studio.renderers.html import server as html_server
+
+    missing_index = tmp_path / "missing" / "index.html"
+    monkeypatch.setattr(html_server, "_SPA_INDEX", missing_index)
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(tree=tree, save_path=None)
+    client = TestClient(studio_server.app, raise_server_exceptions=False)
+
+    response = client.get("/")
+
+    assert response.status_code == 500
+    assert "text/html" in response.headers["content-type"]
+    assert "pydantic-studio web bundle unavailable" in response.text
+    assert "frontend" in response.text
+    assert "pnpm build" in response.text
+    assert str(missing_index) in response.text
+
+
 def test_index_injects_runtime_base_path_for_mounted_app() -> None:
     from pydantic_studio.renderers.html import StudioServer
 
