@@ -318,7 +318,7 @@ def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
         encoding="utf-8"
     )
 
-    assert "MutationErrorResponseSchema.parse(await response.json())" in mutations
+    assert "Mutation rejected: ${await responseErrorMessage(response)}" in mutations
     assert "MutationResponseSchema.parse(raw)" in mutations
     assert "body.detail ??" not in mutations
     assert "validation: raw.validation" not in mutations
@@ -355,7 +355,7 @@ def test_frontend_submit_and_cancel_schemas_validate_http_responses() -> None:
         encoding="utf-8"
     )
 
-    assert "SubmitFailureResponseSchema.parse(await response.json())" in submit
+    assert "SubmitFailureResponseSchema.parse(await response.clone().json())" in submit
     assert "SubmitSuccessResponseSchema.parse(await response.json())" in submit
     assert "CancelResponseSchema.parse(await response.json())" in submit
     assert "as { ok?: boolean; errors?: SubmitError[] }" not in submit

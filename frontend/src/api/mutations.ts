@@ -62,8 +62,7 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
   });
   if (response.status === 400) {
     // Unknown op or malformed request (Phase 1 spec §5.2 contract).
-    const body = MutationErrorResponseSchema.parse(await response.json());
-    throw new Error(`Mutation rejected: ${body.detail}`);
+    throw new Error(`Mutation rejected: ${await responseErrorMessage(response)}`);
   }
   if (!response.ok) {
     throw new Error(await responseErrorMessage(response));

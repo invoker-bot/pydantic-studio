@@ -187,3 +187,27 @@ def test_field_validation_errors_are_announced_as_alerts(
     expect(page.get_by_role("alert")).to_have_count(0)
     expect(workers).not_to_have_attribute("aria-invalid", "true")
     assert workers.get_attribute("aria-describedby") is None
+
+
+def test_mutation_bad_request_transport_failure_is_announced(
+    page: Page, fastapi_url: str
+) -> None:
+    page.route(
+        "**/api/mutations",
+        lambda route: route.fulfill(
+            status=400,
+            content_type="text/plain",
+            body="proxy rejected mutation",
+        ),
+    )
+    page.goto(f"{fastapi_url}/")
+    workers = page.get_by_label("workers", exact=True)
+    expect(workers).to_be_visible(timeout=5000)
+
+    workers.fill("8")
+    workers.blur()
+
+    alert = page.get_by_role("alert")
+    expect(alert).to_contain_text("POST /api/mutations failed: HTTP 400", timeout=5000)
+    expect(alert).not_to_contain_text("ZodError")
+    expect(alert).not_to_contain_text("Unexpected token")

@@ -125,6 +125,30 @@ def test_save_transport_failure_is_announced(page: Page) -> None:
         expect(page.get_by_role("button", name="Save")).to_be_enabled()
 
 
+def test_save_bad_request_transport_failure_is_announced(
+    page: Page, fastapi_url: str
+) -> None:
+    page.route(
+        "**/api/submit",
+        lambda route: route.fulfill(
+            status=400,
+            content_type="text/plain",
+            body="proxy rejected submit",
+        ),
+    )
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    page.get_by_role("button", name="Save").click()
+
+    alert = page.get_by_role("alert")
+    expect(alert).to_contain_text("Save failed", timeout=5000)
+    expect(alert).to_contain_text("POST /api/submit failed: HTTP 400")
+    expect(alert).not_to_contain_text("ZodError")
+    expect(alert).not_to_contain_text("Unexpected token")
+    expect(page.get_by_role("button", name="Save")).to_be_enabled()
+
+
 def test_action_error_clears_after_successful_edit(page: Page) -> None:
     with _serve_broken_action_tree("submit") as base_url:
         page.goto(f"{base_url}/")

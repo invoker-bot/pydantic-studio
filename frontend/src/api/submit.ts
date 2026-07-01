@@ -52,7 +52,11 @@ export type SubmitResponse =
 export async function submitTree(): Promise<SubmitResponse> {
   const response = await fetch(studioUrl("/api/submit"), { method: "POST" });
   if (response.status === 400) {
-    return SubmitFailureResponseSchema.parse(await response.json());
+    try {
+      return SubmitFailureResponseSchema.parse(await response.clone().json());
+    } catch {
+      throw new Error(await responseErrorMessage(response, "POST /api/submit"));
+    }
   }
   if (!response.ok) {
     throw new Error(await responseErrorMessage(response, "POST /api/submit"));
