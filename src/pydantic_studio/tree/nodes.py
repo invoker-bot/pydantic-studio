@@ -1664,6 +1664,88 @@ def _union_variant_annotation(union: UnionNode, index: int) -> Any:
     return resolved_type
 
 
+UnionValidationContext = tuple[UnionNode, tuple[Any, ...]]
+
+
+def _replace_descendant_for_validation(
+    node: Any,
+    segments: tuple[Any, ...],
+    replacement: Any,
+) -> Any:
+    if not segments:
+        return replacement
+
+    seg = segments[0]
+    rest = segments[1:]
+    candidate = node.model_copy(deep=True)
+    if isinstance(candidate, GroupNode) and isinstance(seg, str):
+        fields = list(candidate.fields)
+        for index, child in enumerate(fields):
+            if child.name == seg:
+                fields[index] = _replace_descendant_for_validation(child, rest, replacement)
+                candidate.fields = fields
+                return candidate
+        msg = f"no field named {seg!r} at this level"
+        raise KeyError(msg)
+    if isinstance(candidate, SequenceNode) and isinstance(seg, int):
+        if not (0 <= seg < len(candidate.items)):
+            msg = f"index {seg} out of range for sequence of length {len(candidate.items)}"
+            raise KeyError(msg)
+        items = list(candidate.items)
+        items[seg] = _replace_descendant_for_validation(items[seg], rest, replacement)
+        candidate.items = items
+        return candidate
+    if isinstance(candidate, MappingNode) and isinstance(seg, int):
+        if not (0 <= seg < len(candidate.entries)):
+            msg = f"index {seg} out of range for mapping of length {len(candidate.entries)}"
+            raise KeyError(msg)
+        entries = list(candidate.entries)
+        key_node, value_node = entries[seg]
+        entries[seg] = (
+            key_node,
+            _replace_descendant_for_validation(value_node, rest, replacement),
+        )
+        candidate.entries = entries
+        return candidate
+    if isinstance(candidate, UnionNode):
+        if candidate.selected is None:
+            msg = "cannot navigate into a union with no selected variant"
+            raise KeyError(msg)
+        candidate.selected = _replace_descendant_for_validation(
+            candidate.selected,
+            segments,
+            replacement,
+        )
+        return candidate
+    msg = (
+        f"cannot navigate segment {seg!r} into {type(candidate).__name__} "
+        f"(no rule for ({type(candidate).__name__}, {type(seg).__name__}))"
+    )
+    raise KeyError(msg)
+
+
+def _validate_union_contexts_with_replacement(
+    contexts: list[UnionValidationContext],
+    replacement: Any,
+) -> list[str]:
+    for union, relative_segments in contexts:
+        if union.selected is None or union.selected_index is None:
+            continue
+        candidate_selected = _replace_descendant_for_validation(
+            union.selected,
+            relative_segments,
+            replacement,
+        )
+        errors = _validate_union_selected_against_node(
+            union,
+            union.selected_index,
+            candidate_selected,
+        )
+        if errors:
+            return errors
+    return []
+
+
 def _validate_seed_against_node(
     node: Any,
     seed: Any,
@@ -2167,15 +2249,20 @@ class FormTree(BaseModel):
         # activate any *omitted* optional group the edit passed through.
         node: Any = self.root
         walked_groups: list[GroupNode] = []
-        for seg in path_obj.segments[:-1]:
+        union_contexts: list[UnionValidationContext] = []
+        for index, seg in enumerate(path_obj.segments[:-1]):
             if isinstance(node, GroupNode):
                 walked_groups.append(node)
+            if isinstance(node, UnionNode):
+                union_contexts.append((node, tuple(path_obj.segments[index:])))
             node = self._descend(node, seg)
         if isinstance(node, GroupNode):
             walked_groups.append(node)
 
         # Resolve the terminal segment to a target node.
         last = path_obj.segments[-1]
+        if isinstance(node, UnionNode):
+            union_contexts.append((node, (last,)))
         target = self._descend(node, last)
         if isinstance(target, GroupNode):
             if value is None:
@@ -2188,6 +2275,17 @@ class FormTree(BaseModel):
                     return ValidationResult.fail(errors)
                 if target.omitted:
                     return ValidationResult.ok()
+                candidate_target = target.model_copy(deep=True)
+                _reset_group_to_schema_defaults(candidate_target)
+                candidate_target.omitted = True
+                candidate_target.emit_null = target.nullable
+                union_errors = _validate_union_contexts_with_replacement(
+                    union_contexts,
+                    candidate_target,
+                )
+                if union_errors:
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
                 self._push_snapshot(_snap.take(self.root))
                 _reset_group_to_schema_defaults(target)
@@ -2204,6 +2302,16 @@ class FormTree(BaseModel):
             if not result.ok:
                 target.error = result.errors[0] if result.errors else "invalid"
                 return result
+            candidate_target = target.model_copy(
+                update={"fields": fields, "omitted": False, "emit_null": False}
+            )
+            union_errors = _validate_union_contexts_with_replacement(
+                union_contexts,
+                candidate_target,
+            )
+            if union_errors:
+                target.error = union_errors[0]
+                return ValidationResult.fail(union_errors)
 
             self._push_snapshot(_snap.take(self.root))
             target.fields = fields
@@ -2291,6 +2399,18 @@ class FormTree(BaseModel):
                     return ValidationResult.fail(errors)
                 if write_target.omitted:
                     return ValidationResult.ok()
+                candidate_selected = write_target.model_copy(deep=True)
+                _reset_group_to_schema_defaults(candidate_selected)
+                candidate_selected.omitted = True
+                candidate_selected.emit_null = write_target.nullable
+                union_errors = _validate_union_contexts_with_replacement(
+                    union_contexts,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
                 self._push_snapshot(_snap.take(self.root))
                 _reset_group_to_schema_defaults(write_target)
@@ -2311,6 +2431,18 @@ class FormTree(BaseModel):
                     union_errors = _validate_union_selected_against_node(
                         target,
                         target.selected_index,
+                        candidate_selected,
+                    )
+                    if union_errors:
+                        write_target.error = union_errors[0]
+                        target.error = union_errors[0]
+                        return ValidationResult.fail(union_errors)
+                else:
+                    candidate_selected = write_target.model_copy(
+                        update={"fields": fields, "omitted": False, "emit_null": False}
+                    )
+                    union_errors = _validate_union_contexts_with_replacement(
+                        union_contexts,
                         candidate_selected,
                     )
                     if union_errors:
@@ -2345,6 +2477,17 @@ class FormTree(BaseModel):
                     return ValidationResult.fail(errors)
                 if write_target.omitted and write_target.emit_null:
                     return ValidationResult.ok()
+                candidate_selected = write_target.model_copy(
+                    update={"items": [], "omitted": True, "emit_null": True}
+                )
+                union_errors = _validate_union_contexts_with_replacement(
+                    union_contexts,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
                 self._push_snapshot(_snap.take(self.root))
                 write_target.items = []
@@ -2381,6 +2524,18 @@ class FormTree(BaseModel):
                     write_target.error = union_errors[0]
                     target.error = union_errors[0]
                     return ValidationResult.fail(union_errors)
+            else:
+                candidate_selected = write_target.model_copy(
+                    update={"items": items, "omitted": False, "emit_null": False}
+                )
+                union_errors = _validate_union_contexts_with_replacement(
+                    union_contexts,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
             self._push_snapshot(_snap.take(self.root))
             write_target.items = items
@@ -2409,6 +2564,17 @@ class FormTree(BaseModel):
                     return ValidationResult.fail(errors)
                 if write_target.omitted and write_target.emit_null:
                     return ValidationResult.ok()
+                candidate_selected = write_target.model_copy(
+                    update={"entries": [], "omitted": True, "emit_null": True}
+                )
+                union_errors = _validate_union_contexts_with_replacement(
+                    union_contexts,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
                 self._push_snapshot(_snap.take(self.root))
                 write_target.entries = []
@@ -2439,6 +2605,18 @@ class FormTree(BaseModel):
                 union_errors = _validate_union_selected_against_node(
                     target,
                     target.selected_index,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
+            else:
+                candidate_selected = write_target.model_copy(
+                    update={"entries": entries, "omitted": False, "emit_null": False}
+                )
+                union_errors = _validate_union_contexts_with_replacement(
+                    union_contexts,
                     candidate_selected,
                 )
                 if union_errors:
@@ -2509,6 +2687,21 @@ class FormTree(BaseModel):
                 write_target.error = union_errors[0]
                 target.error = union_errors[0]
                 return ValidationResult.fail(union_errors)
+        else:
+            candidate_selected = cast("Any", write_target).model_copy(
+                update={
+                    "value": value,
+                    "emit_null": value is None and write_target.nullable,
+                }
+            )
+            union_errors = _validate_union_contexts_with_replacement(
+                union_contexts,
+                candidate_selected,
+            )
+            if union_errors:
+                write_target.error = union_errors[0]
+                target.error = union_errors[0]
+                return ValidationResult.fail(union_errors)
 
         # Validation passed: snapshot before mutating so undo can revert.
         self._push_snapshot(_snap.take(self.root))
@@ -2570,15 +2763,25 @@ class FormTree(BaseModel):
 
     def _resolve_path(self, path: str) -> Any:
         """Resolve ``path`` to a node using the same descent rules as set_value."""
+        node, _contexts = self._resolve_path_with_union_contexts(path)
+        return node
+
+    def _resolve_path_with_union_contexts(
+        self,
+        path: str,
+    ) -> tuple[Any, list[UnionValidationContext]]:
         from pydantic_studio.tree.paths import Path as _Path
 
         path_obj = _Path.parse(path)
+        contexts: list[UnionValidationContext] = []
         if not path_obj.segments:
-            return self.root
+            return self.root, contexts
         node: Any = self.root
-        for seg in path_obj.segments:
+        for index, seg in enumerate(path_obj.segments):
+            if isinstance(node, UnionNode):
+                contexts.append((node, tuple(path_obj.segments[index:])))
             node = self._descend(node, seg)
-        return node
+        return node, contexts
 
     def _walk_to_sequence(self, path: str) -> SequenceNode:
         """Resolve ``path`` and return the SequenceNode at that location."""
@@ -2588,6 +2791,16 @@ class FormTree(BaseModel):
             msg = f"{path!r} is not a SequenceNode"
             raise TypeError(msg)
         return node
+
+    def _walk_to_sequence_with_union_contexts(
+        self,
+        path: str,
+    ) -> tuple[SequenceNode, list[UnionValidationContext]]:
+        node, contexts = self._resolve_path_with_union_contexts(path)
+        if not isinstance(node, SequenceNode):
+            msg = f"{path!r} is not a SequenceNode"
+            raise TypeError(msg)
+        return node, contexts
 
     @staticmethod
     def _validate_sequence_length(seq: SequenceNode, new_length: int) -> ValidationResult:
@@ -2742,7 +2955,7 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
         from pydantic_studio.types.transforms import field_info_from_annotation
 
-        seq = self._walk_to_sequence(path)
+        seq, union_contexts = self._walk_to_sequence_with_union_contexts(path)
         if seq.origin == "tuple_fixed":
             return ValidationResult.fail(["cannot add to a fixed-length tuple"])
         item_type = _sequence_item_annotation(seq, len(seq.items))
@@ -2764,6 +2977,16 @@ class FormTree(BaseModel):
         container_errors = _validate_sequence_items_against_node(seq, new_items)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_seq = seq.model_copy(
+            update={"items": new_items, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_seq,
+        )
+        if union_errors:
+            seq.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         child.name = str(len(seq.items))
         seq.items = new_items
@@ -2778,7 +3001,7 @@ class FormTree(BaseModel):
         """Remove the child at ``index`` from the SequenceNode at ``path``."""
         from pydantic_studio.tree import snapshots as _snap
 
-        seq = self._walk_to_sequence(path)
+        seq, union_contexts = self._walk_to_sequence_with_union_contexts(path)
         index_result = self._validate_index_argument("index", index)
         if not index_result.ok:
             return index_result
@@ -2791,6 +3014,16 @@ class FormTree(BaseModel):
         container_errors = _validate_sequence_items_against_node(seq, new_items)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_seq = seq.model_copy(
+            update={"items": new_items, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_seq,
+        )
+        if union_errors:
+            seq.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         for i, it in enumerate(new_items):
             it.name = str(i)
@@ -2810,7 +3043,7 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
         from pydantic_studio.types.transforms import field_info_from_annotation
 
-        seq = self._walk_to_sequence(path)
+        seq, union_contexts = self._walk_to_sequence_with_union_contexts(path)
         if seq.origin == "tuple_fixed":
             return ValidationResult.fail(
                 ["cannot insert into a fixed-length tuple"]
@@ -2837,6 +3070,16 @@ class FormTree(BaseModel):
         container_errors = _validate_sequence_items_against_node(seq, new_items)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_seq = seq.model_copy(
+            update={"items": new_items, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_seq,
+        )
+        if union_errors:
+            seq.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         for i, it in enumerate(new_items):
             it.name = str(i)
@@ -2854,7 +3097,7 @@ class FormTree(BaseModel):
         """Move the child at ``from_index`` to ``to_index`` in the SequenceNode at ``path``."""
         from pydantic_studio.tree import snapshots as _snap
 
-        seq = self._walk_to_sequence(path)
+        seq, union_contexts = self._walk_to_sequence_with_union_contexts(path)
         from_index_result = self._validate_index_argument("from_index", from_index)
         if not from_index_result.ok:
             return from_index_result
@@ -2877,6 +3120,16 @@ class FormTree(BaseModel):
         container_errors = _validate_sequence_items_against_node(seq, items)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_seq = seq.model_copy(
+            update={"items": items, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_seq,
+        )
+        if union_errors:
+            seq.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         for i, it in enumerate(items):
             it.name = str(i)
@@ -2896,6 +3149,16 @@ class FormTree(BaseModel):
             msg = f"{path!r} is not a MappingNode"
             raise TypeError(msg)
         return node
+
+    def _walk_to_mapping_with_union_contexts(
+        self,
+        path: str,
+    ) -> tuple[MappingNode, list[UnionValidationContext]]:
+        node, contexts = self._resolve_path_with_union_contexts(path)
+        if not isinstance(node, MappingNode):
+            msg = f"{path!r} is not a MappingNode"
+            raise TypeError(msg)
+        return node, contexts
 
     @staticmethod
     def _validate_mapping_length(mp: MappingNode, new_length: int) -> ValidationResult:
@@ -3009,7 +3272,7 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
         from pydantic_studio.types.transforms import field_info_from_annotation
 
-        mp = self._walk_to_mapping(path)
+        mp, union_contexts = self._walk_to_mapping_with_union_contexts(path)
         length_result = self._validate_mapping_length(mp, len(mp.entries) + 1)
         if not length_result.ok:
             return length_result
@@ -3039,6 +3302,16 @@ class FormTree(BaseModel):
         container_errors = _validate_mapping_entries_against_node(mp, new_entries)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_mp = mp.model_copy(
+            update={"entries": new_entries, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_mp,
+        )
+        if union_errors:
+            mp.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         k_node.name = "key"
         v_node.name = "value"
@@ -3054,7 +3327,7 @@ class FormTree(BaseModel):
         """Remove the entry at ``index`` from the MappingNode at ``path``."""
         from pydantic_studio.tree import snapshots as _snap
 
-        mp = self._walk_to_mapping(path)
+        mp, union_contexts = self._walk_to_mapping_with_union_contexts(path)
         index_result = self._validate_index_argument("index", index)
         if not index_result.ok:
             return index_result
@@ -3067,6 +3340,16 @@ class FormTree(BaseModel):
         container_errors = _validate_mapping_entries_against_node(mp, new_entries)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_mp = mp.model_copy(
+            update={"entries": new_entries, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_mp,
+        )
+        if union_errors:
+            mp.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         mp.entries = new_entries
         mp.omitted = False
@@ -3084,7 +3367,7 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
         from pydantic_studio.types.transforms import field_info_from_annotation
 
-        mp = self._walk_to_mapping(path)
+        mp, union_contexts = self._walk_to_mapping_with_union_contexts(path)
         index_result = self._validate_index_argument("index", index)
         if not index_result.ok:
             return index_result
@@ -3116,6 +3399,16 @@ class FormTree(BaseModel):
         container_errors = _validate_mapping_entries_against_node(mp, entries)
         if container_errors:
             return ValidationResult.fail(container_errors)
+        candidate_mp = mp.model_copy(
+            update={"entries": entries, "omitted": False, "emit_null": False}
+        )
+        union_errors = _validate_union_contexts_with_replacement(
+            union_contexts,
+            candidate_mp,
+        )
+        if union_errors:
+            mp.error = union_errors[0]
+            return ValidationResult.fail(union_errors)
         # Validation passed — push snapshot and mutate.
         self._push_snapshot(_snap.take(self.root))
         mp.entries = entries

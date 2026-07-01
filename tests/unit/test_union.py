@@ -108,7 +108,7 @@ def _reject_blocked_payload(value: Any) -> str | _SeededListPayload:
         if isinstance(value, dict)
         else value
     )
-    if isinstance(candidate, _SeededListPayload) and candidate.items == [9]:
+    if isinstance(candidate, _SeededListPayload) and 9 in candidate.items:
         raise ValueError("payload blocked")
     return candidate
 
@@ -457,6 +457,34 @@ def test_set_value_rejects_selected_group_union_plain_validator_without_mutating
     )
 
     result = tree.set_value("value", {"items": [9]})
+
+    assert result.ok is False
+    assert result.errors == ("Value error, payload blocked",)
+    assert tree.to_instance().value == _SeededListPayload(items=[1])
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_nested_group_union_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(
+        _PlainValidatorGroupUnionHolder,
+        existing={"value": {"items": [1]}},
+    )
+
+    result = tree.set_value("value.items", [9])
+
+    assert result.ok is False
+    assert result.errors == ("Value error, payload blocked",)
+    assert tree.to_instance().value == _SeededListPayload(items=[1])
+    assert tree.snapshots == []
+
+
+def test_add_item_rejects_nested_group_union_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(
+        _PlainValidatorGroupUnionHolder,
+        existing={"value": {"items": [1]}},
+    )
+
+    result = tree.add_item("value.items", 9)
 
     assert result.ok is False
     assert result.errors == ("Value error, payload blocked",)
