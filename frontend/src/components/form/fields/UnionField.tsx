@@ -48,6 +48,7 @@ export function UnionField({
               variant={active ? "default" : "outline"}
               size="sm"
               aria-pressed={active}
+              aria-label={`select ${node.name} variant ${shortTypeName(variantName)}`}
               disabled={readonlyVariant}
               onClick={() => onSelect(index)}
             >
