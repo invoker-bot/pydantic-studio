@@ -9,6 +9,8 @@ import { z } from "zod";
 import { studioUrl } from "@/api/base";
 import { FormTreeSchema, type FormTree } from "@/api/schemas";
 
+export const APPLY_MUTATION_KEY = ["applyMutation"] as const;
+
 const MutationErrorResponseSchema = z.object({
   detail: z.string(),
 }).strict();
@@ -88,6 +90,7 @@ export async function applyMutation(mutation: Mutation): Promise<MutationRespons
 export function useApplyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: APPLY_MUTATION_KEY,
     mutationFn: applyMutation,
     onSuccess: (response) => {
       // Server-authoritative: replace the cached tree with what the

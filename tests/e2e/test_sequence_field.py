@@ -171,3 +171,9 @@ def test_bracket_submit_error_expands_and_highlights_sequence_item(
         expect(network_input).to_be_visible(timeout=5000)
         field = page.locator('[data-field-path="items.0.network"]')
         expect(field).to_have_class(re.compile("ring-red-400"))
+
+        network_input.fill("mainnet")
+        network_input.blur()
+
+        expect(page.get_by_test_id("submit-errors")).to_have_count(0)
+        expect(field).not_to_have_class(re.compile("ring-red-400"))

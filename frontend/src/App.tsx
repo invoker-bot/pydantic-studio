@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutationState, useQuery } from "@tanstack/react-query";
 import { Redo2, Undo2 } from "lucide-react";
 
 import { studioUrl } from "@/api/base";
 import { fetchTree } from "@/api/tree";
-import { useApplyMutation } from "@/api/mutations";
+import { APPLY_MUTATION_KEY, useApplyMutation } from "@/api/mutations";
 import {
   useCancelEdit,
   useSubmitTree,
@@ -36,6 +36,15 @@ export default function App() {
   const [status, setStatus] = useState<Status>("editing");
   const [submitErrors, setSubmitErrors] = useState<SubmitError[]>([]);
   const [requiredCursor, setRequiredCursor] = useState(0);
+  const appliedMutationTimes = useMutationState({
+    filters: { mutationKey: APPLY_MUTATION_KEY },
+    select: (mutation) => mutation.state.submittedAt,
+  });
+  const latestAppliedMutationAt = appliedMutationTimes.reduce(
+    (latest, submittedAt) => Math.max(latest, submittedAt),
+    0,
+  );
+  const lastSeenAppliedMutationAt = useRef(latestAppliedMutationAt);
 
   const flags = useMemo<FormFlags>(
     () => ({
@@ -63,6 +72,12 @@ export default function App() {
     const intervalId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (latestAppliedMutationAt <= lastSeenAppliedMutationAt.current) return;
+    lastSeenAppliedMutationAt.current = latestAppliedMutationAt;
+    if (submitErrors.length > 0) setSubmitErrors([]);
+  }, [latestAppliedMutationAt, submitErrors.length]);
 
   // A failed submit scrolls straight to the first offending field —
   // the banner is the summary, the field is the destination.
