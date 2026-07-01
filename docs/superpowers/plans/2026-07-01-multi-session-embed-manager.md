@@ -18,13 +18,20 @@
 - **repeatable submit——绕开终态 409**:`routes.py` 的 `POST /api/mutations` 在 `session.outcome` 落定后返回 409(`_terminal_session_detail`)。`EditSession.submit()` 仅在**干净 `to_instance()`** 后置 `outcome="submitted"`(校验失败时**不置**,会话仍活)。embed 流程是"submit→宿主业务校验→可能失败→继续改",故宿主判失败后必须让会话回到非终态:manager 提供 **`reopen_session(id)`**(置 `session.outcome=None`),宿主 save 端点在业务校验失败时调它,mutations 随即恢复可用。宿主判成功则直接 `close_session(id)`。
 - **前端 base_path 已全通**(`studioUrl()` 前缀全部 5 处 fetch),多会话**无需改 fetch 层**;只加 `sessionId` 注入 + postMessage(下）。
 - **前端改动必须 `pnpm build` 并提交重生成的 `static/dist`**(CI 有 bundle drift gate,`git diff --exit-code`)。
-- **发布同步**:`pyproject.toml` version、`src/pydantic_studio/__init__.py:__version__`、`CHANGELOG.md` 三者一致(publish workflow 断言相等);本计划 `0.4.0 → 0.5.0`。
+- **发布同步**:`pyproject.toml` version 与 `src/pydantic_studio/__init__.py:__version__` 必须一致、且等于 `v*` tag(publish workflow 断言 `pyproject==__version__==tag`);`CHANGELOG.md` 的 `## <version>` 条目靠**约定**补(非机器强制)。本计划 `0.4.0 → 0.5.0`。
 
 ## 执行阶段
 
 ### 阶段 1 — `StudioEmbedManager`(后端)
 
-- 新增 `src/pydantic_studio/renderers/html/embed.py`:`StudioEmbedManager`(`__init__(host_external_path, *, idle_ttl_seconds=900)`,持 `self.app`(一个 `FastAPI`/`Starlette`)+ `dict[str, tuple[StudioServer, Route]]`)与方法 `create_session(*, tree, save_path=None, readonly_paths=()) -> str`(建 `EditSession`,构造 `StudioServer(session=…, base_path=f"{prefix}/s/{sid}")`,`self.app.mount(f"/s/{sid}", server.app)` 并记 route,返回 sid)、`get_outcome(sid)`、`reopen_session(sid)`(`server.session.outcome=None`)、`close_session(sid)`(从 `app.router.routes` 摘除该 route + 出 dict)、以及 idle-TTL 清扫(按需 sweep 或后台任务)。sid 用 `secrets.token_hex`(非 `Math.random`,确定性无关)。
+- 新增 `src/pydantic_studio/renderers/html/embed.py`:`StudioEmbedManager`(`__init__(host_external_path, *, idle_ttl_seconds=900)`,持 `self.app`(一个 `FastAPI`/`Starlette`)+ `dict[str, tuple[StudioServer, Route]]`)与方法:
+  - `create_session(*, tree, save_path=None, readonly_paths=()) -> str`:建 `EditSession`,构造 `StudioServer(session=…, base_path=f"{prefix}/s/{sid}")`,`self.app.mount(f"/s/{sid}", server.app)` 并记 route,返回 sid。sid 用 `secrets.token_hex`。
+  - **`get_session(sid) -> EditSession`(或等价的 `tree` / `to_instance()` 访问器)**:宿主在**任意时刻**(包括会话仍活、`outcome is None` 时)读取当前编辑树/实例。⚠ 不要只暴露 `get_outcome(sid) -> EditOutcome | None`——`EditOutcome` **不携带 tree**,且活跃 embed 会话的 `outcome` 恒为 `None`(embed 模式下 submit 走宿主 save,不必然把会话置终态)。宿主 save 端点需要的是当前 tree 的 `to_instance()`,故必须有一个独立于终态的树访问器。`get_outcome` 仍可保留作只读状态查询。
+  - `reopen_session(sid)`:`server.session.outcome=None`,让业务校验失败后 mutations 恢复可用。
+  - `close_session(sid)`:**按存储的 `Route`/`Mount` 引用身份**从 `self.app.router.routes` 摘除(非按路径字符串匹配)+ 出 dict。
+  - idle-TTL 清扫(按需 sweep 或后台任务,读 `server.last_heartbeat_ts`)。
+
+  > **刻意选择**:让 `EditSession.submit()` 照常在干净校验后置终态 `outcome`,再由宿主判业务失败后调 `reopen_session` 复位——而非"embed 模式 submit 永不置终态"(spec §embed API 列的另一备选)。前者复用现有 `submit()` 路径不改、`get_outcome` 语义诚实;勿回退成后者。
 - `mount_embed_app(host_app, path, *, idle_ttl_seconds=900) -> StudioEmbedManager`:`normalize_base_path(path)` 存为外部前缀,`host_app.mount(prefix, manager.app)`(镜像 `mount_html_app` 的 `getattr(host_app,"mount")` 守卫),返回 manager。
 - 用 `EditSession(session=…)` 传入(避免 `_reject_session_parameter_conflicts` 冲突)。
 - 导出:`src/pydantic_studio/renderers/html/__init__.py` + 顶层 `__init__.py` 加 `StudioEmbedManager` / `mount_embed_app`。
