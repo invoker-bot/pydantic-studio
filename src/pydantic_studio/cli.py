@@ -379,15 +379,19 @@ def edit(
     from pydantic_studio.exceptions import CancelledByUser, ValidationFailedError
 
     schema = _load_schema(target)
+    save_path = file if file is not None else Path(f"{schema.__name__}.yaml")
+    try:
+        _validate_edit_save_path_for_cli(save_path)
+    except ValueError as e:
+        typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
     if file is not None and file.exists():
         tree = _load_config_for_cli(file, schema)
     else:
         tree = build_form_tree(schema)
 
-    save_path = file if file is not None else Path(f"{schema.__name__}.yaml")
-
     try:
-        _validate_edit_save_path_for_cli(save_path)
         if frontend == "console":
             from pydantic_studio.renderers.console import run_console_app
 

@@ -91,6 +91,22 @@ def test_edit_new_file_with_unknown_extension_errors_before_renderer(
     assert called is False
 
 
+def test_edit_existing_file_with_unknown_extension_uses_edit_extension_error(
+    tmp_path: Path,
+) -> None:
+    cfg = tmp_path / "config.ini"
+    cfg.write_text("name = prod\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["edit", "tests.fixtures.schemas:Server", str(cfg)],
+    )
+
+    assert result.exit_code == 1
+    assert "unsupported config file extension" in result.output
+    assert "could not load" not in result.output
+
+
 def test_edit_console_failure_reports_clean_error(monkeypatch) -> None:
     def fake_run(tree, save_path=None) -> None:
         raise OSError("disk full")
