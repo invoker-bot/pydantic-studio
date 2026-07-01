@@ -69,8 +69,9 @@ def _field_allows_none(field_info: FieldInfo) -> bool:
 
 def _mark_explicit_null(child: Any) -> None:
     child.emit_null = True
-    if isinstance(child, GroupNode):
+    if hasattr(child, "omitted"):
         child.omitted = True
+    if isinstance(child, GroupNode):
         return
     if hasattr(child, "selected"):
         child.selected = None

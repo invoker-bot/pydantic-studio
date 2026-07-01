@@ -26,6 +26,11 @@ class ConstrainedDict(BaseModel):
     )
 
 
+class OptionalDictHost(BaseModel):
+    labels: dict[str, int] | None = None
+    seeded: dict[str, int] | None = Field(default_factory=lambda: {"default": 1})
+
+
 def test_dict_builder_constructs_mapping_node() -> None:
     tree = build_form_tree(WithDict)
     settings = tree.root.find("settings")
@@ -65,6 +70,30 @@ def test_dict_to_instance_round_trip() -> None:
     )
     instance = tree.to_instance()
     assert instance.settings == {"a": 1, "b": 2}
+
+
+def test_optional_dict_default_none_stays_omitted_and_materializes_none() -> None:
+    tree = build_form_tree(OptionalDictHost)
+
+    assert "labels" not in tree.to_python()
+    assert tree.to_instance().labels is None
+
+
+def test_optional_dict_existing_null_overrides_seeded_default() -> None:
+    tree = build_form_tree(OptionalDictHost, existing={"seeded": None})
+
+    assert tree.to_python()["seeded"] is None
+    assert tree.to_instance().seeded is None
+
+
+def test_set_value_can_clear_optional_dict_to_null() -> None:
+    tree = build_form_tree(OptionalDictHost, existing={"labels": {"a": 1}})
+
+    result = tree.set_value("labels", None)
+
+    assert result.ok is True
+    assert tree.to_python()["labels"] is None
+    assert tree.to_instance().labels is None
 
 
 def test_add_entry_appends() -> None:

@@ -16,6 +16,11 @@ class ConstrainedList(BaseModel):
     tags: list[str] = Field(default_factory=lambda: ["a"], min_length=1, max_length=2)
 
 
+class OptionalListHost(BaseModel):
+    tags: list[str] | None = None
+    seeded: list[str] | None = Field(default_factory=lambda: ["default"])
+
+
 def test_sequence_node_construct() -> None:
     node = SequenceNode(
         name="tags",
@@ -122,6 +127,30 @@ def test_list_to_instance_round_trip() -> None:
     tree = build_form_tree(WithList, existing={"tags": ["x", "y"]})
     instance = tree.to_instance()
     assert instance.tags == ["x", "y"]
+
+
+def test_optional_list_default_none_stays_omitted_and_materializes_none() -> None:
+    tree = build_form_tree(OptionalListHost)
+
+    assert "tags" not in tree.to_python()
+    assert tree.to_instance().tags is None
+
+
+def test_optional_list_existing_null_overrides_seeded_default() -> None:
+    tree = build_form_tree(OptionalListHost, existing={"seeded": None})
+
+    assert tree.to_python()["seeded"] is None
+    assert tree.to_instance().seeded is None
+
+
+def test_set_value_can_clear_optional_list_to_null() -> None:
+    tree = build_form_tree(OptionalListHost, existing={"tags": ["a"]})
+
+    result = tree.set_value("tags", None)
+
+    assert result.ok is True
+    assert tree.to_python()["tags"] is None
+    assert tree.to_instance().tags is None
 
 
 def test_set_to_instance_round_trip() -> None:

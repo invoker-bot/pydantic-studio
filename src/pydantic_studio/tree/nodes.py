@@ -1065,10 +1065,15 @@ class SequenceNode(FormNode):
     slot_type_names: list[str] | None = None
     min_length: int | None = None
     max_length: int | None = None
+    # Optional containers defaulting to None keep their display items
+    # separate from their submitted value until the user edits them.
+    omitted: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     def to_python(self) -> Any:
+        if self.emit_null or (self.omitted and not self.required):
+            return None
         values = [it.to_python() for it in self.items]
         if self.origin == "list":
             return values
@@ -1103,10 +1108,15 @@ class MappingNode(FormNode):
     value_type_name: str
     min_length: int | None = None
     max_length: int | None = None
+    # Optional containers defaulting to None keep their display entries
+    # separate from their submitted value until the user edits them.
+    omitted: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    def to_python(self) -> dict[Any, Any]:
+    def to_python(self) -> dict[Any, Any] | None:
+        if self.emit_null or (self.omitted and not self.required):
+            return None
         return {k.to_python(): v.to_python() for k, v in self.entries}
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
@@ -1370,10 +1380,14 @@ def _collect_missing_required(node: Any, base: str, out: list[str]) -> None:
             _collect_missing_required(child, join(child.name), out)
         return
     if kind == "sequence":
+        if not node.required and node.to_python() is None:
+            return
         for idx, item in enumerate(node.items):
             _collect_missing_required(item, join(idx), out)
         return
     if kind == "mapping":
+        if not node.required and node.to_python() is None:
+            return
         for idx, (_key, value) in enumerate(node.entries):
             _collect_missing_required(value, join(idx), out)
         return
@@ -2047,6 +2061,24 @@ class FormTree(BaseModel):
             return ValidationResult.ok()
 
         if isinstance(write_target, SequenceNode):
+            if value is None and write_target.nullable:
+                if write_target.omitted and write_target.emit_null:
+                    return ValidationResult.ok()
+
+                self._push_snapshot(_snap.take(self.root))
+                write_target.omitted = True
+                write_target.emit_null = True
+                write_target.error = None
+                for group in walked_groups:
+                    if group.omitted:
+                        group.omitted = False
+                if isinstance(target, UnionNode):
+                    target.emit_null = False
+                    target.error = None
+                if self.draft_path is not None:
+                    _snap.draft_save(self, self.draft_path)
+                return ValidationResult.ok()
+
             result, items = self._build_sequence_items(write_target, value)
             if not result.ok:
                 message = result.errors[0] if result.errors else "invalid"
@@ -2056,6 +2088,7 @@ class FormTree(BaseModel):
 
             self._push_snapshot(_snap.take(self.root))
             write_target.items = items
+            write_target.omitted = False
             write_target.emit_null = False
             write_target.error = None
             for group in walked_groups:
@@ -2069,6 +2102,24 @@ class FormTree(BaseModel):
             return ValidationResult.ok()
 
         if isinstance(write_target, MappingNode):
+            if value is None and write_target.nullable:
+                if write_target.omitted and write_target.emit_null:
+                    return ValidationResult.ok()
+
+                self._push_snapshot(_snap.take(self.root))
+                write_target.omitted = True
+                write_target.emit_null = True
+                write_target.error = None
+                for group in walked_groups:
+                    if group.omitted:
+                        group.omitted = False
+                if isinstance(target, UnionNode):
+                    target.emit_null = False
+                    target.error = None
+                if self.draft_path is not None:
+                    _snap.draft_save(self, self.draft_path)
+                return ValidationResult.ok()
+
             result, entries = self._build_mapping_entries(write_target, value)
             if not result.ok:
                 message = result.errors[0] if result.errors else "invalid"
@@ -2078,6 +2129,7 @@ class FormTree(BaseModel):
 
             self._push_snapshot(_snap.take(self.root))
             write_target.entries = entries
+            write_target.omitted = False
             write_target.emit_null = False
             write_target.error = None
             for group in walked_groups:
@@ -2367,6 +2419,9 @@ class FormTree(BaseModel):
         child.name = str(len(seq.items))
         self._push_snapshot(_snap.take(self.root))
         seq.items = [*seq.items, child]
+        seq.omitted = False
+        seq.emit_null = False
+        seq.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -2389,6 +2444,9 @@ class FormTree(BaseModel):
         for i, it in enumerate(new_items):
             it.name = str(i)
         seq.items = new_items
+        seq.omitted = False
+        seq.emit_null = False
+        seq.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -2430,6 +2488,9 @@ class FormTree(BaseModel):
         for i, it in enumerate(new_items):
             it.name = str(i)
         seq.items = new_items
+        seq.omitted = False
+        seq.emit_null = False
+        seq.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -2464,6 +2525,9 @@ class FormTree(BaseModel):
         for i, it in enumerate(items):
             it.name = str(i)
         seq.items = items
+        seq.omitted = False
+        seq.emit_null = False
+        seq.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -2614,6 +2678,9 @@ class FormTree(BaseModel):
         v_node.name = "value"
         self._push_snapshot(_snap.take(self.root))
         mp.entries = [*mp.entries, (k_node, v_node)]
+        mp.omitted = False
+        mp.emit_null = False
+        mp.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -2633,6 +2700,9 @@ class FormTree(BaseModel):
             return length_result
         self._push_snapshot(_snap.take(self.root))
         mp.entries = [e for i, e in enumerate(mp.entries) if i != index]
+        mp.omitted = False
+        mp.emit_null = False
+        mp.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()
@@ -2678,6 +2748,9 @@ class FormTree(BaseModel):
         entries = list(mp.entries)
         entries[index] = (candidate_key, value_node)
         mp.entries = entries
+        mp.omitted = False
+        mp.emit_null = False
+        mp.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)
         return ValidationResult.ok()

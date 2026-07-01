@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-from pydantic_studio.tree.nodes import GroupNode, UnionNode
+from pydantic_studio.tree.nodes import GroupNode, MappingNode, SequenceNode, UnionNode
 from pydantic_studio.types.annotated import (
     get_union_args,
     is_optional_type,
@@ -50,14 +50,14 @@ class UnionBuilder:
             inner = inner_builder.build(inner_type, field_info, existing)
             inner.required = False  # Optional implies not required
             inner.nullable = True
-            # Optional[Model] defaulting to None starts *omitted*: the
-            # demoted GroupNode pre-fills children with schema defaults
-            # for display, but the field's value is still None until the
-            # user activates the group. Without the flag, to_instance()
-            # would materialize a fully-defaulted instance instead of
+            # Optional containers and models defaulting to None start
+            # *omitted*: their child nodes may carry schema defaults for
+            # display, but the field value is still None until the user
+            # activates it. Without the flag, to_instance() would
+            # materialize empty/defaulted structures instead of
             # round-tripping None.
             if (
-                isinstance(inner, GroupNode)
+                isinstance(inner, (GroupNode, SequenceNode, MappingNode))
                 and existing is None
                 and field_default(field_info) is None
             ):
