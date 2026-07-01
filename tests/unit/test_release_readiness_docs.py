@@ -19,13 +19,22 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
-        "README.md": ("1245", "1212 default"),
-        "CLAUDE.md": ("1245", "1212 default"),
+        "README.md": (
+            "1246",
+            "1212 default",
+            "34 explicit Playwright browser e2e tests",
+        ),
+        "CLAUDE.md": (
+            "1246",
+            "1212 default",
+            "34 explicit Playwright browser e2e tests",
+        ),
     }
     for doc, snippets in expectations.items():
         text = (ROOT / doc).read_text(encoding="utf-8")
+        normalized_text = " ".join(text.split())
         for snippet in snippets:
-            assert snippet in text, f"{doc} should mention {snippet!r}"
+            assert snippet in normalized_text, f"{doc} should mention {snippet!r}"
 
 
 def test_release_guide_names_console_script_entry_point_verification() -> None:
