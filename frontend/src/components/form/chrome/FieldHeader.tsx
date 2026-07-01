@@ -3,5 +3,5 @@
 import type { ReactNode } from "react";
 
 export function FieldHeader({ children }: { children: ReactNode }) {
-  return <div className="flex items-baseline gap-2">{children}</div>;
+  return <div className="flex flex-wrap items-baseline gap-2">{children}</div>;
 }

@@ -220,6 +220,46 @@ def test_frontend_numeric_fields_surface_backend_constraints() -> None:
     assert "!node.allow_inf_nan" in decimal_field
 
 
+def test_frontend_string_field_surfaces_constraints_as_chips_not_type_badge() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+    string_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "StringField.tsx"
+    ).read_text(encoding="utf-8")
+    type_badge = (
+        ROOT / "frontend" / "src" / "components" / "form" / "chrome" / "TypeBadge.tsx"
+    ).read_text(encoding="utf-8")
+    field_header = (
+        ROOT / "frontend" / "src" / "components" / "form" / "chrome" / "FieldHeader.tsx"
+    ).read_text(encoding="utf-8")
+    chip = (
+        ROOT / "frontend" / "src" / "components" / "form" / "chrome" / "Chip.tsx"
+    ).read_text(encoding="utf-8")
+    string_schema = re.search(
+        r"export const StringNodeSchema = NodeBase\.extend\(\{(?P<body>.*?)\}\);",
+        schema,
+        re.S,
+    )
+
+    assert string_schema is not None
+    assert "min_length: z.number().nullable()" in string_schema.group("body")
+    assert "max_length: z.number().nullable()" in string_schema.group("body")
+    assert "pattern: z.string().nullable()" in string_schema.group("body")
+    assert "<StringConstraintChips constraints={node} />" in string_field
+    constraint_chips = (
+        ROOT / "frontend" / "src" / "components" / "form" / "chrome" / "StringConstraintChips.tsx"
+    )
+    assert constraint_chips.exists()
+    constraint_chip_source = constraint_chips.read_text(encoding="utf-8")
+    for label in ("min_length", "max_length", "pattern", "min", "max"):
+        assert label in constraint_chip_source
+    assert "formatNumeric" not in type_badge
+    assert "formatString" not in type_badge
+    assert "flex-wrap" in field_header
+    assert "break-all" in chip
+
+
 def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
     mutations = (ROOT / "frontend" / "src" / "api" / "mutations.ts").read_text(
         encoding="utf-8"

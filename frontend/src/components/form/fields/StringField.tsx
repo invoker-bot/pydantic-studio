@@ -8,6 +8,7 @@ import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
+import { StringConstraintChips } from "@/components/form/chrome/StringConstraintChips";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,7 @@ export function StringField({ node, path }: { node: StringNode; path: string }) 
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
+        <StringConstraintChips constraints={node} />
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <Input

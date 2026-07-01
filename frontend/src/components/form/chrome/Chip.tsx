@@ -12,7 +12,7 @@ export function Chip({
   return (
     <span
       title={title}
-      className="rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600"
+      className="break-all rounded bg-zinc-100 px-1.5 font-mono text-[10px] text-zinc-600"
     >
       {children}
     </span>
