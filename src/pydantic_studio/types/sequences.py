@@ -71,6 +71,7 @@ class ListBuilder:
             origin="list",
             items=_build_items(self._registry, item_type, seed, field_info),
             item_type_name=_fq(item_type),
+            item_annotation=item_type,
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
         )
@@ -98,6 +99,7 @@ class SetBuilder:
             origin="set",
             items=_build_items(self._registry, item_type, seed, field_info),
             item_type_name=_fq(item_type),
+            item_annotation=item_type,
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
         )
@@ -128,6 +130,7 @@ class TupleBuilder:
                 origin="tuple",
                 items=[],
                 item_type_name=_fq(object),
+                item_annotation=object,
                 min_length=c.get("min_length"),
                 max_length=c.get("max_length"),
             )
@@ -143,6 +146,7 @@ class TupleBuilder:
                 origin="tuple",
                 items=_build_items(self._registry, item_type, seed, field_info),
                 item_type_name=_fq(item_type),
+                item_annotation=item_type,
                 min_length=c.get("min_length"),
                 max_length=c.get("max_length"),
             )
@@ -169,6 +173,7 @@ class TupleBuilder:
             items=items,
             item_type_name=None,
             slot_type_names=[_fq(a) for a in args],
+            slot_annotations=list(args),
             min_length=len(args),
             max_length=len(args),
         )

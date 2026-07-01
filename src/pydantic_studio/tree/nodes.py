@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path as FsPath
-from typing import Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal, cast, get_args, get_origin
 from uuid import UUID
 
 from pydantic import (
@@ -1063,6 +1063,8 @@ class SequenceNode(FormNode):
     items: "list[AnyNode]" = []
     item_type_name: str | None = None
     slot_type_names: list[str] | None = None
+    item_annotation: Any | None = Field(default=None, exclude=True, repr=False)
+    slot_annotations: list[Any] | None = Field(default=None, exclude=True, repr=False)
     min_length: int | None = None
     max_length: int | None = None
     # Optional containers defaulting to None keep their display items
@@ -1448,6 +1450,78 @@ def _validation_error_messages(exc: Exception) -> list[str]:
     return [str(exc)]
 
 
+def _strip_optional_annotation(annotation: Any) -> Any:
+    from pydantic_studio.types.annotated import (
+        get_union_args,
+        is_optional_type,
+        strip_annotated,
+    )
+
+    annotation = strip_annotated(annotation)
+    if is_optional_type(annotation):
+        non_none = tuple(
+            arg for arg in get_union_args(annotation) if arg is not type(None)
+        )
+        if len(non_none) == 1:
+            return strip_annotated(non_none[0])
+    return annotation
+
+
+def _attach_runtime_annotations_to_group(group: GroupNode) -> None:
+    for child in group.fields:
+        field_info = group.schema_class.model_fields.get(child.name)
+        if field_info is not None:
+            _attach_runtime_annotations_to_node(child, field_info.annotation)
+
+
+def _attach_runtime_annotations_to_node(node: Any, annotation: Any) -> None:
+    annotation = _strip_optional_annotation(annotation)
+    if isinstance(node, GroupNode):
+        _attach_runtime_annotations_to_group(node)
+        return
+    if isinstance(node, SequenceNode):
+        args = get_args(annotation)
+        origin = get_origin(annotation)
+        if origin in {list, set}:
+            item_annotation = args[0] if args else object
+            node.item_annotation = item_annotation
+            for item in node.items:
+                _attach_runtime_annotations_to_node(item, item_annotation)
+            return
+        if annotation is tuple or origin is tuple:
+            if len(args) == 2 and args[1] is Ellipsis:
+                item_annotation = args[0]
+                node.item_annotation = item_annotation
+                for item in node.items:
+                    _attach_runtime_annotations_to_node(item, item_annotation)
+            elif args:
+                node.slot_annotations = list(args)
+                for item, item_annotation in zip(node.items, args, strict=False):
+                    _attach_runtime_annotations_to_node(item, item_annotation)
+        return
+    if isinstance(node, UnionNode) and node.selected is not None:
+        args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
+        if node.selected_index is not None and node.selected_index < len(args):
+            _attach_runtime_annotations_to_node(node.selected, args[node.selected_index])
+
+
+def _sequence_item_annotation(seq: SequenceNode, index: int) -> Any | None:
+    if seq.origin == "tuple_fixed":
+        if seq.slot_annotations is not None and index < len(seq.slot_annotations):
+            if seq.slot_type_names is not None and index < len(seq.slot_type_names):
+                _resolve_type_name(seq.slot_type_names[index])
+            return seq.slot_annotations[index]
+        if seq.slot_type_names is not None and index < len(seq.slot_type_names):
+            return _resolve_type_name(seq.slot_type_names[index])
+        return None
+    resolved_type = None
+    if seq.item_type_name is not None:
+        resolved_type = _resolve_type_name(seq.item_type_name)
+    if seq.item_annotation is not None:
+        return seq.item_annotation
+    return resolved_type
+
+
 def _validate_seed_against_node(
     node: Any,
     seed: Any,
@@ -1514,28 +1588,29 @@ def _validate_seed_against_node(
             errors.append(f"length must be >= {node.min_length}")
         if node.max_length is not None and length > node.max_length:
             errors.append(f"length must be <= {node.max_length}")
-        from pydantic.fields import FieldInfo
 
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         values = list(seed)
-        item_type_names = (
-            node.slot_type_names
-            if node.origin == "tuple_fixed"
-            else [node.item_type_name] * len(values)
-        )
+        if node.origin == "tuple_fixed":
+            expected_length = None
+            if node.slot_annotations is not None:
+                expected_length = len(node.slot_annotations)
+            elif node.slot_type_names is not None:
+                expected_length = len(node.slot_type_names)
+            if expected_length is not None and len(values) != expected_length:
+                errors.append(f"length must be exactly {expected_length}")
         registry = default_registry()
         for index, value in enumerate(values):
-            if item_type_names is None or index >= len(item_type_names):
+            item_type = _sequence_item_annotation(node, index)
+            if item_type is None:
                 continue
-            item_type_name = item_type_names[index]
-            if item_type_name is None:
-                continue
-            item_type = _resolve_type_name(item_type_name)
+            item_field = field_info_from_annotation(item_type)
             try:
                 child = registry.find(item_type).build(
                     item_type,
-                    FieldInfo(annotation=item_type),
+                    item_field,
                     value,
                 )
             except ValidationError as exc:
@@ -1814,6 +1889,7 @@ class FormTree(BaseModel):
         from the validation context (which ``draft_load`` supplies)."""
         if self.schema_class is None and info.context and "schema_class" in info.context:
             self.schema_class = info.context["schema_class"]
+        _attach_runtime_annotations_to_group(self.root)
         if len(self.snapshots) > self.snapshot_limit:
             self._trim_snapshot_history()
         return self
@@ -2324,9 +2400,8 @@ class FormTree(BaseModel):
     def _build_sequence_items(
         self, seq: SequenceNode, value: Any
     ) -> tuple[ValidationResult, list[AnyNode]]:
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         errors = list(seq.validate_value(value))
         if errors:
@@ -2338,26 +2413,25 @@ class FormTree(BaseModel):
             return length_result, []
 
         if seq.origin == "tuple_fixed":
-            if seq.slot_type_names is None:
+            expected_length = None
+            if seq.slot_annotations is not None:
+                expected_length = len(seq.slot_annotations)
+            elif seq.slot_type_names is not None:
+                expected_length = len(seq.slot_type_names)
+            if expected_length is None:
                 return ValidationResult.fail(["fixed tuple has no slot_type_names"]), []
-            item_type_names = seq.slot_type_names
-        else:
-            if seq.item_type_name is None:
-                return ValidationResult.fail(["sequence has no item_type_name"]), []
-            item_type_names = [seq.item_type_name] * len(values)
-
-        if len(item_type_names) != len(values):
-            return ValidationResult.fail(
-                [f"length must be exactly {len(item_type_names)}"]
-            ), []
+            if expected_length != len(values):
+                return ValidationResult.fail(
+                    [f"length must be exactly {expected_length}"]
+                ), []
 
         reg = default_registry()
         items: list[AnyNode] = []
-        for index, (item_type_name, raw_value) in enumerate(
-            zip(item_type_names, values, strict=True)
-        ):
-            item_type = _resolve_type_name(item_type_name)
-            item_field = FieldInfo(annotation=item_type)
+        for index, raw_value in enumerate(values):
+            item_type = _sequence_item_annotation(seq, index)
+            if item_type is None:
+                return ValidationResult.fail(["sequence has no item_type_name"]), []
+            item_field = field_info_from_annotation(item_type)
             item_builder = reg.find(item_type)
             try:
                 probe = item_builder.build(item_type, item_field, None)
@@ -2395,24 +2469,23 @@ class FormTree(BaseModel):
 
     def add_item(self, path: str, value: Any = _UNSET_VALUE) -> ValidationResult:
         """Append a default child to the SequenceNode at ``path``."""
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         seq = self._walk_to_sequence(path)
         if seq.origin == "tuple_fixed":
             return ValidationResult.fail(["cannot add to a fixed-length tuple"])
-        if seq.item_type_name is None:
+        item_type = _sequence_item_annotation(seq, len(seq.items))
+        if item_type is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
         length_result = self._validate_sequence_length(seq, len(seq.items) + 1)
         if not length_result.ok:
             return length_result
         # Resolve + build BEFORE snapshotting — failure here must not pollute
         # the undo history (mirrors the validate-first contract of set_value).
-        item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
-        item_field = FieldInfo(annotation=item_type)
+        item_field = field_info_from_annotation(item_type)
         child, errors = _build_seeded_node(builder, item_type, item_field, value)
         if errors:
             return ValidationResult.fail(errors)
@@ -2457,10 +2530,9 @@ class FormTree(BaseModel):
         self, path: str, index: int, value: Any = _UNSET_VALUE
     ) -> ValidationResult:
         """Insert a new child at ``index`` in the SequenceNode at ``path``."""
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         seq = self._walk_to_sequence(path)
         if seq.origin == "tuple_fixed":
@@ -2472,14 +2544,14 @@ class FormTree(BaseModel):
             return index_result
         if not (0 <= index <= len(seq.items)):
             return ValidationResult.fail([f"index {index} out of range"])
-        if seq.item_type_name is None:
+        item_type = _sequence_item_annotation(seq, index)
+        if item_type is None:
             return ValidationResult.fail(["sequence has no item_type_name"])
         length_result = self._validate_sequence_length(seq, len(seq.items) + 1)
         if not length_result.ok:
             return length_result
-        item_type = _resolve_type_name(seq.item_type_name)
         builder = default_registry().find(item_type)
-        item_field = FieldInfo(annotation=item_type)
+        item_field = field_info_from_annotation(item_type)
         child, errors = _build_seeded_node(builder, item_type, item_field, value)
         if errors:
             return ValidationResult.fail(errors)
@@ -2791,6 +2863,7 @@ class FormTree(BaseModel):
             self._trim_snapshot_history()
         self.cursor -= 1
         self.root = _snap.restore(self.snapshots[self.cursor])
+        _attach_runtime_annotations_to_group(self.root)
         return True
 
     def redo(self) -> bool:
@@ -2801,6 +2874,7 @@ class FormTree(BaseModel):
             return False
         self.cursor += 1
         self.root = _snap.restore(self.snapshots[self.cursor])
+        _attach_runtime_annotations_to_group(self.root)
         return True
 
     def _walk_to_union(self, path: str) -> UnionNode:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Annotated, cast
 
 import pytest
 from pydantic import BaseModel, Field
@@ -19,6 +19,10 @@ class ConstrainedList(BaseModel):
 class OptionalListHost(BaseModel):
     tags: list[str] | None = None
     seeded: list[str] | None = Field(default_factory=lambda: ["default"])
+
+
+class AnnotatedItemListHost(BaseModel):
+    values: list[Annotated[int, Field(gt=0)]] = Field(default_factory=list)
 
 
 def test_sequence_node_construct() -> None:
@@ -271,6 +275,19 @@ def test_add_item_rejects_invalid_typed_value_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_add_item_rejects_annotated_item_constraint_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedItemListHost)
+
+    result = tree.add_item("values", -1)
+
+    assert result.ok is False
+    assert result.errors == ("must be > 0",)
+    values = tree.root.find("values")
+    assert isinstance(values, SequenceNode)
+    assert values.items == []
+    assert tree.snapshots == []
+
+
 def test_add_item_rejects_explicit_none_without_mutating() -> None:
     tree = build_form_tree(WithList)
 
@@ -481,6 +498,20 @@ def test_set_value_rejects_invalid_sequence_item_without_mutating() -> None:
     assert result.errors == ("[0]: expected int, got str",)
     assert [cast("IntNode", item).value for item in counts.items] == [1, 2]
     assert [item.name for item in counts.items] == ["0", "1"]
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_annotated_sequence_item_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedItemListHost, existing={"values": [1]})
+    values = tree.root.find("values")
+    assert isinstance(values, SequenceNode)
+
+    result = tree.set_value("values", [-1])
+
+    assert result.ok is False
+    assert result.errors == ("[0]: must be > 0",)
+    assert [cast("IntNode", item).value for item in values.items] == [1]
+    assert [item.name for item in values.items] == ["0"]
     assert tree.snapshots == []
 
 
