@@ -93,7 +93,7 @@ export default function App() {
   }
   if (error || !data) {
     return (
-      <div className="p-8 text-red-600">
+      <div role="alert" aria-atomic="true" className="p-8 text-red-600">
         Failed to load tree:{" "}
         {error instanceof Error ? error.message : String(error)}
       </div>

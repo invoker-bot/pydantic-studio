@@ -2,7 +2,74 @@
 
 from __future__ import annotations
 
+import socket
+import threading
+import time as _time
+from contextlib import closing, contextmanager
+from typing import TYPE_CHECKING
+
+import uvicorn
 from playwright.sync_api import Page, expect
+from pydantic import BaseModel
+from starlette.responses import JSONResponse
+
+from pydantic_studio import StudioServer, build_form_tree
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+
+class _BrokenLoadSchema(BaseModel):
+    name: str = "demo-service"
+
+
+def _find_free_port() -> int:
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+@contextmanager
+def _serve_broken_tree_load() -> Iterator[str]:
+    port = _find_free_port()
+    tree = build_form_tree(_BrokenLoadSchema)
+    server = StudioServer(tree=tree, save_path=None)
+
+    @server.app.middleware("http")
+    async def fail_tree_load(request, call_next):
+        if request.url.path == "/api/tree":
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "tree unavailable"},
+            )
+        return await call_next(request)
+
+    config = uvicorn.Config(
+        server.app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        ws="none",
+    )
+    uvi = uvicorn.Server(config)
+    thread = threading.Thread(target=uvi.run, daemon=True)
+    thread.start()
+
+    deadline = _time.time() + 5.0
+    while _time.time() < deadline:
+        try:
+            with closing(socket.create_connection(("127.0.0.1", port), timeout=0.2)):
+                break
+        except OSError:
+            _time.sleep(0.05)
+    else:
+        raise RuntimeError(f"uvicorn never bound to :{port}")
+
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        uvi.should_exit = True
+        thread.join(timeout=2.0)
 
 
 def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> None:
@@ -35,6 +102,17 @@ def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> No
     )
 
     assert broken == []
+
+
+def test_tree_load_failure_is_announced(page: Page) -> None:
+    with _serve_broken_tree_load() as base_url:
+        page.goto(f"{base_url}/")
+
+        expect(page.get_by_text("Failed to load tree")).to_be_visible(timeout=12000)
+        alert = page.get_by_role("alert")
+        expect(alert).to_contain_text("Failed to load tree", timeout=5000)
+        expect(alert).to_contain_text("GET /api/tree failed: HTTP 500")
+        expect(alert).to_have_attribute("aria-atomic", "true")
 
 
 def test_field_validation_errors_are_announced_as_alerts(
