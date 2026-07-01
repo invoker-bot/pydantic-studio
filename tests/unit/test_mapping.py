@@ -96,6 +96,28 @@ def test_set_value_can_clear_optional_dict_to_null() -> None:
     assert tree.to_instance().labels is None
 
 
+def test_add_entry_after_clearing_optional_dict_does_not_restore_old_entries() -> None:
+    tree = build_form_tree(OptionalDictHost, existing={"labels": {"old": 1}})
+
+    clear_result = tree.set_value("labels", None)
+    add_result = tree.add_entry("labels", "new", 2)
+
+    assert clear_result.ok is True
+    assert add_result.ok is True
+    assert tree.to_python()["labels"] == {"new": 2}
+    assert tree.to_instance().labels == {"new": 2}
+
+
+def test_add_entry_after_existing_null_does_not_restore_seeded_default() -> None:
+    tree = build_form_tree(OptionalDictHost, existing={"seeded": None})
+
+    result = tree.add_entry("seeded", "new", 2)
+
+    assert result.ok is True
+    assert tree.to_python()["seeded"] == {"new": 2}
+    assert tree.to_instance().seeded == {"new": 2}
+
+
 def test_add_entry_appends() -> None:
     tree = build_form_tree(WithDict)
     result = tree.add_entry("settings", "timeout", 30)

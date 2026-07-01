@@ -153,6 +153,28 @@ def test_set_value_can_clear_optional_list_to_null() -> None:
     assert tree.to_instance().tags is None
 
 
+def test_add_item_after_clearing_optional_list_does_not_restore_old_items() -> None:
+    tree = build_form_tree(OptionalListHost, existing={"tags": ["old"]})
+
+    clear_result = tree.set_value("tags", None)
+    add_result = tree.add_item("tags", "new")
+
+    assert clear_result.ok is True
+    assert add_result.ok is True
+    assert tree.to_python()["tags"] == ["new"]
+    assert tree.to_instance().tags == ["new"]
+
+
+def test_add_item_after_existing_null_does_not_restore_seeded_default() -> None:
+    tree = build_form_tree(OptionalListHost, existing={"seeded": None})
+
+    result = tree.add_item("seeded", "new")
+
+    assert result.ok is True
+    assert tree.to_python()["seeded"] == ["new"]
+    assert tree.to_instance().seeded == ["new"]
+
+
 def test_set_to_instance_round_trip() -> None:
     tree = build_form_tree(WithSet, existing={"flags": {"x", "y"}})
     instance = tree.to_instance()

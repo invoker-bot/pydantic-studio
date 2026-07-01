@@ -13,7 +13,7 @@ from pydantic import (
     WrapValidator,
 )
 
-from pydantic_studio.tree.nodes import GroupNode
+from pydantic_studio.tree.nodes import GroupNode, MappingNode, SequenceNode
 from pydantic_studio.types.aliases import (
     input_value_or_missing_for_field,
     is_missing_input_value,
@@ -72,6 +72,12 @@ def _mark_explicit_null(child: Any) -> None:
     if hasattr(child, "omitted"):
         child.omitted = True
     if isinstance(child, GroupNode):
+        return
+    if isinstance(child, SequenceNode):
+        child.items = []
+        return
+    if isinstance(child, MappingNode):
+        child.entries = []
         return
     if hasattr(child, "selected"):
         child.selected = None

@@ -2066,6 +2066,7 @@ class FormTree(BaseModel):
                     return ValidationResult.ok()
 
                 self._push_snapshot(_snap.take(self.root))
+                write_target.items = []
                 write_target.omitted = True
                 write_target.emit_null = True
                 write_target.error = None
@@ -2107,6 +2108,7 @@ class FormTree(BaseModel):
                     return ValidationResult.ok()
 
                 self._push_snapshot(_snap.take(self.root))
+                write_target.entries = []
                 write_target.omitted = True
                 write_target.emit_null = True
                 write_target.error = None
