@@ -236,6 +236,24 @@ def test_true_union_transforming_variant_is_preselected_from_wire_value() -> Non
     assert dumped["credential"] == "ENC[union]"
 
 
+def test_true_union_transform_validation_error_keeps_raw_value_for_repair() -> None:
+    def _strict(value: Any) -> str:
+        if value == "bad":
+            raise ValueError("nope")
+        return str(value)
+
+    class _StrictUnion(BaseModel):
+        value: Annotated[str, PlainValidator(_strict)] | int
+
+    tree = build_form_tree(_StrictUnion, existing={"value": "bad"})
+    value = tree._resolve_path("value")
+
+    assert isinstance(value, UnionNode)
+    assert value.selected_index == 0
+    assert value.selected is not None
+    assert value.selected.value == "bad"
+
+
 def test_sequence_true_union_transforming_variant_is_preselected() -> None:
     tree = build_form_tree(
         _UnionVaultList,

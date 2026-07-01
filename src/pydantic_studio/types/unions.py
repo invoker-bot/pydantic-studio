@@ -101,12 +101,19 @@ class UnionBuilder:
         """
         if candidate is None:
             return None, None
+        transform_fallback: tuple[int, Any] | None = None
         for i, v_type in enumerate(variants):
             variant_field_info = field_info_from_annotation(v_type)
             if has_transforming_validator(variant_field_info):
                 try:
                     parsed = validate_existing(variant_field_info, candidate)
                 except ValidationError:
+                    if transform_fallback is None:
+                        v_builder = self._registry.find(v_type)
+                        transform_fallback = (
+                            i,
+                            v_builder.build(v_type, variant_field_info, candidate),
+                        )
                     continue
                 v_builder = self._registry.find(v_type)
                 selected = v_builder.build(v_type, variant_field_info, parsed)
@@ -137,4 +144,6 @@ class UnionBuilder:
                     v_type, variant_field_info, validated
                 )
                 return i, selected
+        if transform_fallback is not None:
+            return transform_fallback
         return None, None
