@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from types import SimpleNamespace
 
 from ruamel.yaml import YAML
 
@@ -27,7 +28,7 @@ def _collect_pytest_count(args: list[str]) -> int:
             "pytest collection failed while counting tests:\n"
             f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
         )
-    match = re.search(r"(\d+) tests collected", result.stdout)
+    match = re.search(r"(\d+) tests? collected", result.stdout)
     if match is None:
         raise AssertionError(f"could not parse pytest collection count:\n{result.stdout}")
     return int(match.group(1))
@@ -41,25 +42,47 @@ def _count_e2e_tests() -> int:
     return _collect_pytest_count(["tests/e2e", "-p", "playwright", "-o", "addopts=-ra"])
 
 
-def test_release_gate_counts_default_tests_without_manual_constant() -> None:
-    source = (ROOT / "tests" / "unit" / "test_release_readiness_docs.py").read_text(
-        encoding="utf-8"
-    )
-    manual_constant_name = "DEFAULT" + "_TEST_COUNT"
+def test_release_gate_counts_default_tests_with_pytest_collection(monkeypatch) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
 
-    assert manual_constant_name not in source
-    assert "_count_default_tests()" in source
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout="1 test collected in 0.01s", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert _count_default_tests() == 1
+    command, kwargs = calls[0]
+    assert command == [sys.executable, "-m", "pytest", "--collect-only", "-q"]
+    assert kwargs["cwd"] == ROOT
+    assert kwargs["timeout"] == 30
 
 
-def test_release_gate_counts_e2e_tests_with_pytest_collection() -> None:
-    source = (ROOT / "tests" / "unit" / "test_release_readiness_docs.py").read_text(
-        encoding="utf-8"
-    )
-    ast_parse_name = "ast" + ".parse"
+def test_release_gate_counts_e2e_tests_with_pytest_collection(monkeypatch) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
 
-    assert ast_parse_name not in source
-    assert "_collect_pytest_count(" in source
-    assert "tests/e2e" in source
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout="51 tests collected in 0.03s", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert _count_e2e_tests() == 51
+    command, kwargs = calls[0]
+    assert command == [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests/e2e",
+        "-p",
+        "playwright",
+        "-o",
+        "addopts=-ra",
+        "--collect-only",
+        "-q",
+    ]
+    assert kwargs["cwd"] == ROOT
+    assert kwargs["timeout"] == 30
 
 
 def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
