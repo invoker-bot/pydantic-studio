@@ -26,7 +26,13 @@ from pydantic_studio.io import (
 )
 from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.console import run_console_app
-from pydantic_studio.renderers.html import StudioServer, mount_html_app, run_html_app
+from pydantic_studio.renderers.html import (
+    StudioEmbedManager,
+    StudioServer,
+    mount_embed_app,
+    mount_html_app,
+    run_html_app,
+)
 from pydantic_studio.renderers.textual_ import StudioApp, StudioScreen, run_app
 from pydantic_studio.session import EditSession, SubmitResult
 from pydantic_studio.tree.builder import (
@@ -118,6 +124,7 @@ __all__ = [
     "SequenceNode",
     "StringNode",
     "StudioApp",
+    "StudioEmbedManager",
     "StudioScreen",
     "StudioServer",
     "SubmitResult",
@@ -143,6 +150,7 @@ __all__ = [
     "load_json",
     "load_toml",
     "load_yaml",
+    "mount_embed_app",
     "mount_html_app",
     "register_builder",
     "reset_default_registry",
