@@ -35,3 +35,17 @@ def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> No
     )
 
     assert broken == []
+
+
+def test_field_validation_errors_are_announced_as_alerts(
+    page: Page, fastapi_url: str
+) -> None:
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_role("heading", name="_DemoSchema")).to_be_visible(timeout=5000)
+
+    workers = page.get_by_label("workers", exact=True)
+    workers.fill("0")
+    workers.blur()
+
+    alert = page.get_by_role("alert")
+    expect(alert).to_contain_text("must be >= 1", timeout=5000)
