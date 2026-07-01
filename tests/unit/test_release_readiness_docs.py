@@ -3,25 +3,70 @@
 from __future__ import annotations
 
 import ast
+import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_TEST_COUNT = 1238
+
+
+def _count_tests_in_file(path: Path) -> int:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    count = 0
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith(
+            "test_"
+        ):
+            count += 1
+        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            count += sum(
+                isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+                and child.name.startswith("test_")
+                for child in node.body
+            )
+    return count
+
+
+def _count_tests(paths: list[Path]) -> int:
+    return sum(_count_tests_in_file(path) for path in paths)
 
 
 def _count_e2e_tests() -> int:
-    count = 0
-    for path in sorted((ROOT / "tests" / "e2e").glob("test_*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        count += sum(
-            isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-            and node.name.startswith("test_")
-            for node in tree.body
+    return _count_tests(sorted((ROOT / "tests" / "e2e").glob("test_*.py")))
+
+
+def _count_default_tests() -> int:
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise AssertionError(
+            "pytest collection failed while counting default tests:\n"
+            f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
         )
-    return count
+    match = re.search(r"(\d+) tests collected", result.stdout)
+    if match is None:
+        raise AssertionError(f"could not parse pytest collection count:\n{result.stdout}")
+    return int(match.group(1))
+
+
+def test_release_gate_counts_default_tests_without_manual_constant() -> None:
+    source = (ROOT / "tests" / "unit" / "test_release_readiness_docs.py").read_text(
+        encoding="utf-8"
+    )
+    manual_constant_name = "DEFAULT" + "_TEST_COUNT"
+
+    assert manual_constant_name not in source
+    assert "_count_default_tests()" in source
 
 
 def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
@@ -32,18 +77,19 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 
 def test_release_gate_docs_use_current_test_counts() -> None:
+    default_count = _count_default_tests()
     e2e_count = _count_e2e_tests()
-    total_count = DEFAULT_TEST_COUNT + e2e_count
+    total_count = default_count + e2e_count
     expectations = {
         "README.md": (
             str(total_count),
-            f"{DEFAULT_TEST_COUNT} default",
+            f"{default_count} default",
             f"{e2e_count} explicit Playwright browser e2e tests",
             f"{e2e_count} browser tests",
         ),
         "CLAUDE.md": (
             str(total_count),
-            f"{DEFAULT_TEST_COUNT} default",
+            f"{default_count} default",
             f"{e2e_count} explicit Playwright browser e2e tests",
         ),
     }
