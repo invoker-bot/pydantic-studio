@@ -158,6 +158,7 @@ def test_tree_load_failure_is_announced(page: Page) -> None:
         alert = page.get_by_role("alert")
         expect(alert).to_contain_text("Failed to load tree", timeout=5000)
         expect(alert).to_contain_text("GET /api/tree failed: HTTP 500")
+        expect(alert).to_contain_text("tree unavailable")
         expect(alert).to_have_attribute("aria-atomic", "true")
 
 
