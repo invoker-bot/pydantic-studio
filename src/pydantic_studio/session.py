@@ -68,6 +68,13 @@ class EditSession:
         """Validate and optionally persist the current tree."""
         from pydantic_studio import save_yaml
 
+        if self.cancelled:
+            return SubmitResult(
+                ok=False,
+                outcome=self.outcome,
+                errors=("session already cancelled",),
+            )
+
         try:
             if self.save_path is not None:
                 try:

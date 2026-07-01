@@ -93,6 +93,23 @@ def test_cancel_sets_cancelled_and_is_idempotent() -> None:
     assert session.done is True
 
 
+def test_submit_after_cancel_does_not_overwrite_cancelled_outcome(tmp_path: Path) -> None:
+    out = tmp_path / "config.yaml"
+    session = EditSession(tree=build_form_tree(_ValidSchema), save_path=out)
+    session.cancel()
+
+    result = session.submit()
+
+    assert result == SubmitResult(
+        ok=False,
+        outcome=EditOutcome("cancelled"),
+        errors=("session already cancelled",),
+    )
+    assert session.cancelled is True
+    assert session.submitted is False
+    assert not out.exists()
+
+
 def test_dirty_tracks_tree_changes() -> None:
     tree = build_form_tree(_ValidSchema)
     session = EditSession(tree=tree)
