@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
+import sys
 from pathlib import Path
-
-import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_mkdocs_strict_build(tmp_path: Path) -> None:
     """mkdocs build --strict succeeds (catches broken links + missing pages)."""
-    if shutil.which("mkdocs") is None:
-        pytest.skip("mkdocs not on PATH (dev dep not synced)")
-
     site_dir = tmp_path / "site"
     result = subprocess.run(
         [
+            sys.executable,
+            "-m",
             "mkdocs",
             "build",
             "--strict",
@@ -33,7 +30,7 @@ def test_mkdocs_strict_build(tmp_path: Path) -> None:
         cwd=str(REPO_ROOT),
     )
     if result.returncode != 0:
-        pytest.fail(
+        raise AssertionError(
             f"mkdocs build --strict failed:\nSTDOUT:\n{result.stdout}\n\n"
             f"STDERR:\n{result.stderr}"
         )
