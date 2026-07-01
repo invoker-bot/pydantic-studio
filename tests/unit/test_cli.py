@@ -225,6 +225,19 @@ class TestRun:
         assert "config.ini" in result.output
         assert "nosuch" not in result.output.lower()
 
+    def test_run_input_extension_preflight_follows_dispatch_map(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from pydantic_studio.io import dispatch as dispatch_module
+
+        monkeypatch.setitem(dispatch_module._EXT_MAP, ".cfg", "yaml")
+        cfg = tmp_path / "config.cfg"
+
+        result = runner.invoke(app, ["run", "nosuch:Foo", str(cfg)])
+
+        assert result.exit_code == 2
+        assert "could not import module 'nosuch'" in result.output.lower()
+
 
 class TestCheck:
     def test_check_silent_on_valid(self, tmp_path) -> None:

@@ -33,9 +33,6 @@ from pydantic_studio.tree.nodes import (
 )
 
 _JSON_VALUE_ADAPTER = TypeAdapter(object)
-_YAML_SUFFIXES = {".yaml", ".yml"}
-_TOML_SUFFIXES = {".toml"}
-_JSON_SUFFIXES = {".json"}
 
 app = typer.Typer(
     name="pydantic-studio",
@@ -199,11 +196,11 @@ def _fill_json_payload(tree: Any) -> str:
 
 def _fill_payload_for_path(tree: Any, path: Path) -> str | None:
     suffix = path.suffix.lower()
-    if suffix in _YAML_SUFFIXES:
+    if suffix in {".yaml", ".yml"}:
         return _fill_yaml_payload(tree)
-    if suffix in _TOML_SUFFIXES:
+    if suffix == ".toml":
         return _fill_toml_payload(tree)
-    if suffix in _JSON_SUFFIXES:
+    if suffix == ".json":
         return _fill_json_payload(tree)
     return None
 
@@ -250,10 +247,12 @@ def _write_fill_output_for_cli(tree: Any, out: Path) -> None:
 
 
 def _validate_config_file_extension_for_cli(path: Path) -> None:
-    supported = _YAML_SUFFIXES | _TOML_SUFFIXES | _JSON_SUFFIXES
+    from pydantic_studio.io.dispatch import supported_extensions
+
+    supported = set(supported_extensions())
     suffix = path.suffix.lower()
     if suffix not in supported:
-        expected = ", ".join(sorted(supported))
+        expected = ", ".join(supported_extensions())
         msg = (
             f"unsupported config file extension {suffix!r} for {path}; "
             f"expected one of {expected}"

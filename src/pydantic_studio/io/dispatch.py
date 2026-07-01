@@ -21,6 +21,11 @@ _EXT_MAP: dict[str, _Format] = {
 _SUPPORTED_FORMATS = ("json", "toml", "yaml")
 
 
+def supported_extensions() -> tuple[str, ...]:
+    """Return config file extensions understood by load/save dispatch."""
+    return tuple(sorted(_EXT_MAP))
+
+
 def _format_for_path(path: Path) -> _Format:
     ext = path.suffix.lower()
     fmt = _EXT_MAP.get(ext)
