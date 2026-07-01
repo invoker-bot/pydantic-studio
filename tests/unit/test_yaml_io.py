@@ -118,6 +118,53 @@ class TestLoadYaml:
         assert tree.to_instance().inner == OptionalInner(known="yes")
         assert "inner.stale" in captured.err
 
+    def test_load_list_item_unknown_field_warns_with_path(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class Item(BaseModel):
+            known: str = "ok"
+
+        class ListConfig(BaseModel):
+            items: list[Item] = Field(default_factory=list)
+
+        src = tmp_path / "list-items.yaml"
+        src.write_text(
+            "items:\n"
+            "  - known: yes\n"
+            "    stale: ignored\n",
+            encoding="utf-8",
+        )
+
+        tree = load_yaml(src, ListConfig)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().items == [Item(known="yes")]
+        assert "items.0.stale" in captured.err
+
+    def test_load_mapping_item_unknown_field_warns_with_path(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class Item(BaseModel):
+            known: str = "ok"
+
+        class MappingConfig(BaseModel):
+            items: dict[str, Item] = Field(default_factory=dict)
+
+        src = tmp_path / "mapping-items.yaml"
+        src.write_text(
+            "items:\n"
+            "  primary:\n"
+            "    known: yes\n"
+            "    stale: ignored\n",
+            encoding="utf-8",
+        )
+
+        tree = load_yaml(src, MappingConfig)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().items == {"primary": Item(known="yes")}
+        assert "items.primary.stale" in captured.err
+
     def test_load_alias_field_does_not_warn_as_unknown(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -421,6 +468,61 @@ class TestSaveYamlPreservesComments:
         content = src.read_text(encoding="utf-8")
         assert "stale" not in content
         assert "inner.stale" in captured.err
+
+    def test_list_item_unknown_field_warns_and_is_dropped_on_save(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pydantic_studio import save_yaml
+
+        class Item(BaseModel):
+            known: str = "ok"
+
+        class ListConfig(BaseModel):
+            items: list[Item] = Field(default_factory=list)
+
+        src = tmp_path / "list-items.yaml"
+        src.write_text(
+            "items:\n"
+            "  - known: yes\n"
+            "    stale: ignored\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, ListConfig)
+        capsys.readouterr()
+        save_yaml(tree, src)
+        captured = capsys.readouterr()
+
+        content = src.read_text(encoding="utf-8")
+        assert "stale" not in content
+        assert "items.0.stale" in captured.err
+
+    def test_mapping_item_unknown_field_warns_and_is_dropped_on_save(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pydantic_studio import save_yaml
+
+        class Item(BaseModel):
+            known: str = "ok"
+
+        class MappingConfig(BaseModel):
+            items: dict[str, Item] = Field(default_factory=dict)
+
+        src = tmp_path / "mapping-items.yaml"
+        src.write_text(
+            "items:\n"
+            "  primary:\n"
+            "    known: yes\n"
+            "    stale: ignored\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, MappingConfig)
+        capsys.readouterr()
+        save_yaml(tree, src)
+        captured = capsys.readouterr()
+
+        content = src.read_text(encoding="utf-8")
+        assert "stale" not in content
+        assert "items.primary.stale" in captured.err
 
     def test_alias_path_unknown_sibling_warns_and_is_dropped_on_save(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]

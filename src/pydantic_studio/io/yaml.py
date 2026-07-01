@@ -15,9 +15,9 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard, get_args, get_origin
 
 from pydantic import BaseModel
 from ruamel.yaml import YAML
@@ -276,14 +276,8 @@ def _copy_comment_if_present(
     return True
 
 
-def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
-    """If ``field_info`` is a BaseModel field, return the model class.
-    Otherwise return None.
-
-    Used by ``_build_commented_map`` to recurse into nested groups for
-    description-comment generation.
-    """
-    annotation = strip_annotated(field_info.annotation)
+def _unwrap_schema_annotation(annotation: Any) -> Any:
+    annotation = strip_annotated(annotation)
     if annotation is None:
         return None
     if is_optional_type(annotation):
@@ -294,9 +288,55 @@ def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
         ]
         if len(nested_args) == 1:
             annotation = nested_args[0]
+    return annotation
+
+
+def _schema_class_from_annotation(annotation: Any) -> type[BaseModel] | None:
+    annotation = _unwrap_schema_annotation(annotation)
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         return annotation
     return None
+
+
+def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
+    """If ``field_info`` is a BaseModel field, return the model class.
+    Otherwise return None.
+
+    Used by ``_build_commented_map`` to recurse into nested groups for
+    description-comment generation.
+    """
+    return _schema_class_from_annotation(field_info.annotation)
+
+
+def _sequence_item_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
+    annotation = _unwrap_schema_annotation(field_info.annotation)
+    if get_origin(annotation) not in {list, tuple, set, frozenset}:
+        return None
+
+    item_annotations = [arg for arg in get_args(annotation) if arg is not Ellipsis]
+    if not item_annotations:
+        return None
+
+    item_schemas = [_schema_class_from_annotation(arg) for arg in item_annotations]
+    first = item_schemas[0]
+    if first is None or any(schema is not first for schema in item_schemas):
+        return None
+    return first
+
+
+def _mapping_value_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
+    annotation = _unwrap_schema_annotation(field_info.annotation)
+    if get_origin(annotation) not in {dict, Mapping}:
+        return None
+
+    args = get_args(annotation)
+    if len(args) < 2:
+        return None
+    return _schema_class_from_annotation(args[1])
+
+
+def _is_sequence_value(value: Any) -> TypeGuard[Sequence[Any]]:
+    return isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray)
 
 
 def _field_info_for_key(schema: type[BaseModel], key: str) -> FieldInfo | None:
@@ -328,6 +368,20 @@ def _unknown_key_paths(
         nested_schema = _nested_schema_class(field_info)
         if nested_schema is not None and isinstance(value, Mapping):
             paths.extend(_unknown_key_paths(value, nested_schema, f"{path}."))
+        sequence_item_schema = _sequence_item_schema_class(field_info)
+        if sequence_item_schema is not None and _is_sequence_value(value):
+            for index, item in enumerate(value):
+                if isinstance(item, Mapping):
+                    paths.extend(
+                        _unknown_key_paths(item, sequence_item_schema, f"{path}.{index}.")
+                    )
+        mapping_value_schema = _mapping_value_schema_class(field_info)
+        if mapping_value_schema is not None and isinstance(value, Mapping):
+            for item_key, item in value.items():
+                if isinstance(item, Mapping):
+                    paths.extend(
+                        _unknown_key_paths(item, mapping_value_schema, f"{path}.{item_key}.")
+                    )
         alias_path_tails = _alias_path_tails_for_key(schema, key_str)
         if alias_path_tails and isinstance(value, Mapping):
             paths.extend(_unknown_key_paths_for_input_paths(value, alias_path_tails, f"{path}."))
@@ -414,6 +468,44 @@ def _dropped_source_key_paths(
                     f"{path}.",
                 )
             )
+        sequence_item_schema = _sequence_item_schema_class(field_info)
+        if (
+            sequence_item_schema is not None
+            and _is_sequence_value(value)
+            and _is_sequence_value(nested_data)
+        ):
+            for index, item in enumerate(value):
+                if index >= len(nested_data):
+                    continue
+                nested_item_data = nested_data[index]
+                if isinstance(item, Mapping) and isinstance(nested_item_data, Mapping):
+                    paths.extend(
+                        _dropped_source_key_paths(
+                            item,
+                            nested_item_data,
+                            sequence_item_schema,
+                            f"{path}.{index}.",
+                        )
+                    )
+        mapping_value_schema = _mapping_value_schema_class(field_info)
+        if (
+            mapping_value_schema is not None
+            and isinstance(value, Mapping)
+            and isinstance(nested_data, Mapping)
+        ):
+            for item_key, item in value.items():
+                if item_key not in nested_data:
+                    continue
+                nested_item_data = nested_data[item_key]
+                if isinstance(item, Mapping) and isinstance(nested_item_data, Mapping):
+                    paths.extend(
+                        _dropped_source_key_paths(
+                            item,
+                            nested_item_data,
+                            mapping_value_schema,
+                            f"{path}.{item_key}.",
+                        )
+                    )
         alias_path_tails = _alias_path_tails_for_key(schema, key_str)
         if alias_path_tails and isinstance(value, Mapping):
             paths.extend(_unknown_key_paths_for_input_paths(value, alias_path_tails, f"{path}."))
