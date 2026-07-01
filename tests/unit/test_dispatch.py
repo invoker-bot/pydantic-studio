@@ -15,6 +15,14 @@ if TYPE_CHECKING:
 
 
 class TestFormatForPath:
+    def test_io_package_reexports_format_helpers(self) -> None:
+        from pathlib import Path
+
+        import pydantic_studio.io as io_api
+
+        assert io_api.format_for_path(Path("x.yaml")) == "yaml"
+        assert io_api.supported_extensions() == (".json", ".toml", ".yaml", ".yml")
+
     def test_uses_public_format_helper_only(self) -> None:
         import pydantic_studio.io.dispatch as dispatch_module
 
