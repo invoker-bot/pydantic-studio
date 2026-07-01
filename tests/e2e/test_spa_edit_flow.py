@@ -122,6 +122,23 @@ def test_history_buttons_reflect_available_actions(
 
 
 def test_rejected_history_action_is_announced(page: Page, fastapi_url: str) -> None:
+    # A rejected history action must be surfaced via role="alert". Force the
+    # rejection deterministically by letting every mutation through except the
+    # undo, which the (intercepted) server rejects. The previous version raced
+    # a double-click to produce one success + one rejection, which was
+    # timing-dependent — reliable only inside the warmed-up full suite and
+    # flaky under React 19's more aggressive commit batching.
+    def _reject_undo(route):
+        if '"op":"undo"' in (route.request.post_data or ""):
+            route.fulfill(
+                status=400,
+                content_type="application/json",
+                json={"detail": "nothing to undo"},
+            )
+        else:
+            route.continue_()
+
+    page.route("**/api/mutations", _reject_undo)
     page.goto(f"{fastapi_url}/")
 
     name_input = page.get_by_label("name", exact=True)
@@ -134,11 +151,14 @@ def test_rejected_history_action_is_announced(page: Page, fastapi_url: str) -> N
 
     preview = page.get_by_test_id("tree-preview")
     expect(preview).to_contain_text("history-race", timeout=5000)
+    expect(undo).to_be_enabled()
 
-    undo.dblclick()
+    undo.click()
 
     alert = page.get_by_role("alert")
-    expect(alert).to_contain_text("Undo failed: nothing to undo", timeout=5000)
-    expect(preview).to_contain_text("name: demo-service", timeout=5000)
-    expect(undo).to_be_disabled()
-    expect(redo).to_be_enabled()
+    expect(alert).to_contain_text("Undo failed", timeout=5000)
+    expect(alert).to_contain_text("nothing to undo")
+    # The rejected undo leaves the tree untouched and history intact.
+    expect(preview).to_contain_text("history-race")
+    expect(undo).to_be_enabled()
+    expect(redo).to_be_disabled()

@@ -56,13 +56,19 @@ export default function App() {
   const [submitErrors, setSubmitErrors] = useState<SubmitError[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [requiredCursor, setRequiredCursor] = useState(0);
-  const successfulMutationTimes = useMutationState({
+  const mutationTimes = useMutationState({
     filters: { mutationKey: APPLY_MUTATION_KEY },
-    select: (mutation) =>
-      mutation.state.status === "success" ? mutation.state.submittedAt : 0,
+    select: (mutation) => ({
+      status: mutation.state.status,
+      submittedAt: mutation.state.submittedAt,
+    }),
   });
-  const latestSuccessfulMutationAt = successfulMutationTimes.reduce(
-    (latest, submittedAt) => Math.max(latest, submittedAt),
+  const latestSuccessfulMutationAt = mutationTimes.reduce(
+    (latest, m) => (m.status === "success" ? Math.max(latest, m.submittedAt) : latest),
+    0,
+  );
+  const latestErrorMutationAt = mutationTimes.reduce(
+    (latest, m) => (m.status === "error" ? Math.max(latest, m.submittedAt) : latest),
     0,
   );
   const lastSeenSuccessfulMutationAt = useRef(latestSuccessfulMutationAt);
@@ -98,8 +104,20 @@ export default function App() {
     if (latestSuccessfulMutationAt <= lastSeenSuccessfulMutationAt.current) return;
     lastSeenSuccessfulMutationAt.current = latestSuccessfulMutationAt;
     if (submitErrors.length > 0) setSubmitErrors([]);
-    if (actionError) setActionError(null);
-  }, [latestSuccessfulMutationAt, submitErrors.length, actionError]);
+    // Only let a fresh success clear the action error if it is the most
+    // recently submitted mutation. A concurrent failure submitted later —
+    // e.g. the losing half of a double-click undo race — must keep its
+    // announcement instead of being swallowed by its sibling's success
+    // (React 19 batches both commits together, exposing this).
+    if (actionError && latestSuccessfulMutationAt >= latestErrorMutationAt) {
+      setActionError(null);
+    }
+  }, [
+    latestSuccessfulMutationAt,
+    latestErrorMutationAt,
+    submitErrors.length,
+    actionError,
+  ]);
 
   // A failed submit scrolls straight to the first offending field —
   // the banner is the summary, the field is the destination.
