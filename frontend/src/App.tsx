@@ -39,15 +39,16 @@ export default function App() {
   const [submitErrors, setSubmitErrors] = useState<SubmitError[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [requiredCursor, setRequiredCursor] = useState(0);
-  const appliedMutationTimes = useMutationState({
+  const successfulMutationTimes = useMutationState({
     filters: { mutationKey: APPLY_MUTATION_KEY },
-    select: (mutation) => mutation.state.submittedAt,
+    select: (mutation) =>
+      mutation.state.status === "success" ? mutation.state.submittedAt : 0,
   });
-  const latestAppliedMutationAt = appliedMutationTimes.reduce(
+  const latestSuccessfulMutationAt = successfulMutationTimes.reduce(
     (latest, submittedAt) => Math.max(latest, submittedAt),
     0,
   );
-  const lastSeenAppliedMutationAt = useRef(latestAppliedMutationAt);
+  const lastSeenSuccessfulMutationAt = useRef(latestSuccessfulMutationAt);
 
   const flags = useMemo<FormFlags>(
     () => ({
@@ -77,10 +78,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (latestAppliedMutationAt <= lastSeenAppliedMutationAt.current) return;
-    lastSeenAppliedMutationAt.current = latestAppliedMutationAt;
+    if (latestSuccessfulMutationAt <= lastSeenSuccessfulMutationAt.current) return;
+    lastSeenSuccessfulMutationAt.current = latestSuccessfulMutationAt;
     if (submitErrors.length > 0) setSubmitErrors([]);
-  }, [latestAppliedMutationAt, submitErrors.length]);
+    if (actionError) setActionError(null);
+  }, [latestSuccessfulMutationAt, submitErrors.length, actionError]);
 
   // A failed submit scrolls straight to the first offending field —
   // the banner is the summary, the field is the destination.

@@ -124,6 +124,25 @@ def test_save_transport_failure_is_announced(page: Page) -> None:
         expect(page.get_by_role("button", name="Save")).to_be_enabled()
 
 
+def test_action_error_clears_after_successful_edit(page: Page) -> None:
+    with _serve_broken_action_tree("submit") as base_url:
+        page.goto(f"{base_url}/")
+        name_input = page.get_by_label("name", exact=True)
+        expect(name_input).to_be_visible(timeout=5000)
+
+        page.get_by_role("button", name="Save").click()
+        action_error = page.get_by_test_id("action-error")
+        expect(action_error).to_contain_text("Save failed", timeout=5000)
+
+        name_input.fill("edited-after-save-failure")
+        name_input.blur()
+
+        expect(page.get_by_test_id("tree-preview")).to_contain_text(
+            "edited-after-save-failure", timeout=5000
+        )
+        expect(action_error).to_have_count(0)
+
+
 def test_cancel_transport_failure_is_announced(page: Page) -> None:
     with _serve_broken_action_tree("cancel") as base_url:
         page.goto(f"{base_url}/")
