@@ -89,6 +89,50 @@ class _RequiredPlainValidatorUnionHolder(BaseModel):
     ]
 
 
+def _reject_blocked_payload(value: Any) -> str | _SeededListPayload:
+    candidate = (
+        _SeededListPayload.model_validate(value)
+        if isinstance(value, dict)
+        else value
+    )
+    if isinstance(candidate, _SeededListPayload) and candidate.items == [9]:
+        raise ValueError("payload blocked")
+    return candidate
+
+
+class _PlainValidatorGroupUnionHolder(BaseModel):
+    value: Annotated[
+        str | _SeededListPayload,
+        PlainValidator(_reject_blocked_payload),
+    ] = Field(default_factory=_SeededListPayload)
+
+
+def _reject_blocked_sequence(value: Any) -> str | list[int]:
+    if value == [9]:
+        raise ValueError("sequence blocked")
+    return value
+
+
+class _PlainValidatorSequenceUnionHolder(BaseModel):
+    value: Annotated[
+        str | list[int],
+        PlainValidator(_reject_blocked_sequence),
+    ] = "start"
+
+
+def _reject_blocked_mapping(value: Any) -> str | dict[str, int]:
+    if value == {"x": 9}:
+        raise ValueError("mapping blocked")
+    return value
+
+
+class _PlainValidatorMappingUnionHolder(BaseModel):
+    value: Annotated[
+        str | dict[str, int],
+        PlainValidator(_reject_blocked_mapping),
+    ] = "start"
+
+
 class _OptionalAnnotatedHolder(BaseModel):
     maybe_count: Annotated[int, Field(gt=0)] | None = None
     maybe_name: Annotated[str, Field(min_length=2)] | None = None
@@ -365,6 +409,44 @@ def test_set_value_rejects_unselected_union_field_plain_validator_without_mutati
     assert val.selected_index is None
     assert val.selected is None
     assert tree.snapshots == []
+
+
+def test_set_value_rejects_selected_group_union_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(
+        _PlainValidatorGroupUnionHolder,
+        existing={"value": {"items": [1]}},
+    )
+
+    result = tree.set_value("value", {"items": [9]})
+
+    assert result.ok is False
+    assert result.errors == ("Value error, payload blocked",)
+    assert tree.to_instance().value == _SeededListPayload(items=[1])
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_selected_sequence_union_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_PlainValidatorSequenceUnionHolder)
+    assert tree.select_variant("value", 1, seed=[1]).ok is True
+
+    result = tree.set_value("value", [9])
+
+    assert result.ok is False
+    assert result.errors == ("Value error, sequence blocked",)
+    assert tree.to_instance().value == [1]
+    assert len(tree.snapshots) == 1
+
+
+def test_set_value_rejects_selected_mapping_union_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_PlainValidatorMappingUnionHolder)
+    assert tree.select_variant("value", 1, seed={"x": 1}).ok is True
+
+    result = tree.set_value("value", {"x": 9})
+
+    assert result.ok is False
+    assert result.errors == ("Value error, mapping blocked",)
+    assert tree.to_instance().value == {"x": 1}
+    assert len(tree.snapshots) == 1
 
 
 def test_select_variant_rejects_invalid_seed_without_mutating() -> None:

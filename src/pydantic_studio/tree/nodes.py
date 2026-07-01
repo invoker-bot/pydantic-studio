@@ -2279,6 +2279,20 @@ class FormTree(BaseModel):
                     target.error = message
                     return result
 
+                if isinstance(target, UnionNode):
+                    candidate_selected = write_target.model_copy(
+                        update={"fields": fields, "omitted": False, "emit_null": False}
+                    )
+                    union_errors = _validate_union_selected_against_node(
+                        target,
+                        target.selected_index,
+                        candidate_selected,
+                    )
+                    if union_errors:
+                        write_target.error = union_errors[0]
+                        target.error = union_errors[0]
+                        return ValidationResult.fail(union_errors)
+
                 self._push_snapshot(_snap.take(self.root))
                 write_target.fields = fields
                 write_target.omitted = False
@@ -2321,6 +2335,20 @@ class FormTree(BaseModel):
                 target.error = message
                 return result
 
+            if isinstance(target, UnionNode):
+                candidate_selected = write_target.model_copy(
+                    update={"items": items, "omitted": False, "emit_null": False}
+                )
+                union_errors = _validate_union_selected_against_node(
+                    target,
+                    target.selected_index,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
+
             self._push_snapshot(_snap.take(self.root))
             write_target.items = items
             write_target.omitted = False
@@ -2362,6 +2390,20 @@ class FormTree(BaseModel):
                 write_target.error = message
                 target.error = message
                 return result
+
+            if isinstance(target, UnionNode):
+                candidate_selected = write_target.model_copy(
+                    update={"entries": entries, "omitted": False, "emit_null": False}
+                )
+                union_errors = _validate_union_selected_against_node(
+                    target,
+                    target.selected_index,
+                    candidate_selected,
+                )
+                if union_errors:
+                    write_target.error = union_errors[0]
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
             self._push_snapshot(_snap.take(self.root))
             write_target.entries = entries
