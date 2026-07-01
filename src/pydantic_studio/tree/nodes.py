@@ -316,6 +316,8 @@ class FloatNode(FormNode):
         # Accept int (Pydantic coerces). Reject bool.
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return (f"expected float, got {type(value).__name__}",)
+        if not self.allow_inf_nan and not math.isfinite(value):
+            return ("must be finite",)
         errors: list[str] = []
         value_is_nan = math.isnan(value)
         if self.ge is not None and (value_is_nan or value < self.ge):

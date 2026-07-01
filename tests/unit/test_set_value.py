@@ -33,6 +33,10 @@ class ConstrainedFloatSchema(BaseModel):
     quarter_step: float = Field(default=0.5, multiple_of=0.25)
 
 
+class FiniteFloatSchema(BaseModel):
+    ratio: float = Field(default=0.5, allow_inf_nan=False)
+
+
 class ConstrainedDecimalSchema(BaseModel):
     at_least: Decimal = Field(default=Decimal("1.00"), ge=Decimal("1.00"))
     at_most: Decimal = Field(default=Decimal("1.00"), le=Decimal("2.00"))
@@ -166,6 +170,31 @@ def test_set_float_value_rejects_nan_against_bounds_without_mutating() -> None:
     assert result.errors == ("must be >= 0.5",)
     assert node.value == 0.5
     assert node.error == "must be >= 0.5"
+
+
+def test_float_field_propagates_allow_inf_nan_constraint() -> None:
+    tree = build_form_tree(FiniteFloatSchema)
+    node = tree.root.find("ratio")
+
+    assert node is not None
+    assert node.allow_inf_nan is False
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_set_float_value_rejects_non_finite_when_disallowed_without_mutating(
+    value: float,
+) -> None:
+    tree = build_form_tree(FiniteFloatSchema)
+    node = tree.root.find("ratio")
+    assert node is not None
+    assert node.value == 0.5
+
+    result = tree.set_value("ratio", value)
+
+    assert result.ok is False
+    assert result.errors == ("must be finite",)
+    assert node.value == 0.5
+    assert node.error == "must be finite"
 
 
 @pytest.mark.parametrize(

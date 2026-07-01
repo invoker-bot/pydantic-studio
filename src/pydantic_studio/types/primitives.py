@@ -96,6 +96,7 @@ class FloatBuilder:
             gt=c.get("gt"),
             lt=c.get("lt"),
             multiple_of=c.get("multiple_of"),
+            allow_inf_nan=c.get("allow_inf_nan", True),
         )
 
 

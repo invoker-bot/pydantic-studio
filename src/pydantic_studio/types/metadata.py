@@ -3,8 +3,8 @@
 Pydantic v2 stores constraints in ``field_info.metadata`` as objects from
 ``annotated_types`` (``Ge``, ``Le``, ``Gt``, ``Lt``, ``MultipleOf``,
 ``MinLen``, ``MaxLen``, ``Interval``, ``Len``) plus Pydantic's own
-``StringConstraints`` and ``Decimal`` helpers. ``Field(min_length=...)``
-calls also normalize into the same shape.
+general, ``StringConstraints`` and ``Decimal`` helpers.
+``Field(min_length=...)`` calls also normalize into the same shape.
 
 This module flattens those into a plain dict so each builder picks the
 keys it understands.
@@ -23,6 +23,7 @@ def extract_constraints(field_info: FieldInfo) -> dict[str, Any]:
 
     Recognized keys:
         ge, le, gt, lt, multiple_of   — numeric (annotated_types.Interval/Ge/Le/Gt/Lt/MultipleOf)
+        allow_inf_nan                 — float (pydantic general metadata)
         min_length, max_length        — sequence/string
                                       (annotated_types.MinLen/MaxLen, StringConstraints)
         pattern                       — string (StringConstraints.pattern, only ``str`` instances —
@@ -43,6 +44,7 @@ def extract_constraints(field_info: FieldInfo) -> dict[str, Any]:
             ("gt", "gt"),
             ("lt", "lt"),
             ("multiple_of", "multiple_of"),
+            ("allow_inf_nan", "allow_inf_nan"),
             ("min_length", "min_length"),
             ("max_length", "max_length"),
             ("max_digits", "max_digits"),

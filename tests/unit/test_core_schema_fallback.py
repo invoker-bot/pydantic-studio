@@ -167,6 +167,26 @@ class RangedFloat:
         return value if isinstance(value, cls) else cls(value)
 
 
+class FiniteCoreFloat:
+    """Wraps ``float`` with allow_inf_nan disabled in core schema."""
+
+    def __init__(self, value: float) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.float_schema(allow_inf_nan=False),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> FiniteCoreFloat:
+        return value if isinstance(value, cls) else cls(value)
+
+
 class SmallList:
     """Wraps ``list[str]`` with min/max length on the container."""
 
@@ -275,6 +295,16 @@ def test_ranged_float_propagates_ge_le_multiple_of():
     assert v_node.ge == -1.0
     assert v_node.le == 1.0
     assert v_node.multiple_of == 0.1
+
+
+def test_core_schema_float_propagates_allow_inf_nan_constraint():
+    class M(BaseModel):
+        v: FiniteCoreFloat
+
+    tree = build_form_tree(M)
+    v_node = next(c for c in tree.root.fields if c.name == "v")
+    assert isinstance(v_node, FloatNode)
+    assert v_node.allow_inf_nan is False
 
 
 def test_small_list_propagates_container_length_constraints():

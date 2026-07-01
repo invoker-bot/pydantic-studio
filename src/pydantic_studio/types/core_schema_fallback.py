@@ -275,9 +275,10 @@ def _extract_metadata_from_schema(schema: Any) -> list[Any]:
     ``core_schema`` dict.
 
     Returns at most one ``SimpleNamespace`` carrying whichever of
-    ``ge`` / ``le`` / ``gt`` / ``lt`` / ``multiple_of`` / ``min_length`` /
-    ``max_length`` / ``pattern`` / ``max_digits`` / ``decimal_places``
-    the schema's leaf declares — exactly the attribute names
+    ``ge`` / ``le`` / ``gt`` / ``lt`` / ``multiple_of`` /
+    ``allow_inf_nan`` / ``min_length`` / ``max_length`` / ``pattern`` /
+    ``max_digits`` / ``decimal_places`` the schema's leaf declares —
+    exactly the attribute names
     ``extract_constraints`` (`metadata.py`) reads. Returns ``[]`` when
     the leaf is unconstrained.
 
@@ -298,6 +299,10 @@ def _extract_metadata_from_schema(schema: Any) -> list[Any]:
             v = schema.get(key)
             if v is not None:
                 captured[key] = v
+        if kind == "float":
+            v = schema.get("allow_inf_nan")
+            if v is not None:
+                captured["allow_inf_nan"] = v
         if kind == "decimal":
             for key in ("max_digits", "decimal_places"):
                 v = schema.get(key)
