@@ -26,6 +26,14 @@ const HEARTBEAT_INTERVAL_MS = 10_000;
 const EDITOR_HEADING_ID = "studio-editor-heading";
 const PREVIEW_HEADING_ID = "studio-preview-heading";
 
+function submitErrorHeading(errors: SubmitError[]): string {
+  const allSaveErrors = errors.every((err) =>
+    err.message.startsWith("could not save"),
+  );
+  const label = allSaveErrors ? "save error" : "validation error";
+  return `${errors.length} ${label}${errors.length === 1 ? "" : "s"}:`;
+}
+
 export default function App() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["tree"],
@@ -278,8 +286,7 @@ export default function App() {
               className="rounded border border-red-300 bg-red-50 p-3 text-sm"
             >
               <p className="font-semibold text-red-900 mb-1">
-                {submitErrors.length} validation error
-                {submitErrors.length === 1 ? "" : "s"}:
+                {submitErrorHeading(submitErrors)}
               </p>
               <ul className="text-red-700 list-disc list-inside space-y-1">
                 {submitErrors.map((err, idx) => (

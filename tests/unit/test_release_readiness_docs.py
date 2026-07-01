@@ -63,11 +63,11 @@ def test_release_gate_counts_e2e_tests_with_pytest_collection(monkeypatch) -> No
 
     def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
         calls.append((command, kwargs))
-        return SimpleNamespace(returncode=0, stdout="51 tests collected in 0.03s", stderr="")
+        return SimpleNamespace(returncode=0, stdout="52 tests collected in 0.03s", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    assert _count_e2e_tests() == 51
+    assert _count_e2e_tests() == 52
     command, kwargs = calls[0]
     assert command == [
         sys.executable,

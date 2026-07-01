@@ -20,6 +20,7 @@ from playwright.sync_api import Page, expect
 from pydantic import BaseModel
 
 from pydantic_studio import StudioServer, build_form_tree
+from pydantic_studio.session import SubmitResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -48,6 +49,48 @@ def _serve_broken_action_tree(action: Literal["submit", "cancel"]) -> Iterator[s
         server.session.submit = fail_action
     else:
         server.session.cancel = fail_action
+    config = uvicorn.Config(
+        server.app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        ws="none",
+    )
+    uvi = uvicorn.Server(config)
+    thread = threading.Thread(target=uvi.run, daemon=True)
+    thread.start()
+
+    deadline = _time.time() + 5.0
+    while _time.time() < deadline:
+        try:
+            with closing(socket.create_connection(("127.0.0.1", port), timeout=0.2)):
+                break
+        except OSError:
+            _time.sleep(0.05)
+    else:
+        raise RuntimeError(f"uvicorn never bound to :{port}")
+
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        uvi.should_exit = True
+        thread.join(timeout=2.0)
+
+
+@contextmanager
+def _serve_save_failure_tree() -> Iterator[str]:
+    port = _find_free_port()
+    tree = build_form_tree(_BrokenSubmitSchema)
+    server = StudioServer(tree=tree, save_path=None)
+
+    def fail_to_save() -> SubmitResult:
+        return SubmitResult(
+            ok=False,
+            errors=("could not save to config.ini: unsupported file extension",),
+            paths=(),
+        )
+
+    server.session.submit = fail_to_save
     config = uvicorn.Config(
         server.app,
         host="127.0.0.1",
@@ -147,6 +190,20 @@ def test_save_bad_request_transport_failure_is_announced(
     expect(alert).not_to_contain_text("ZodError")
     expect(alert).not_to_contain_text("Unexpected token")
     expect(page.get_by_role("button", name="Save")).to_be_enabled()
+
+
+def test_save_persistence_failure_is_announced_as_save_error(page: Page) -> None:
+    with _serve_save_failure_tree() as base_url:
+        page.goto(f"{base_url}/")
+        expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+        page.get_by_role("button", name="Save").click()
+
+        submit_errors = page.get_by_test_id("submit-errors")
+        expect(submit_errors).to_contain_text("1 save error:", timeout=5000)
+        expect(submit_errors).to_contain_text("could not save to config.ini")
+        expect(submit_errors).not_to_contain_text("validation error")
+        expect(page.get_by_role("button", name="Save")).to_be_enabled()
 
 
 def test_action_error_clears_after_successful_edit(page: Page) -> None:
