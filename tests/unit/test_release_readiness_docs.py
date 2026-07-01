@@ -20,14 +20,14 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 def test_release_gate_docs_use_current_test_counts() -> None:
     expectations = {
         "README.md": (
-            "1253",
+            "1254",
             "1212 default",
-            "41 explicit Playwright browser e2e tests",
+            "42 explicit Playwright browser e2e tests",
         ),
         "CLAUDE.md": (
-            "1253",
+            "1254",
             "1212 default",
-            "41 explicit Playwright browser e2e tests",
+            "42 explicit Playwright browser e2e tests",
         ),
     }
     for doc, snippets in expectations.items():
