@@ -34,7 +34,11 @@ export function UnionField({
         {node.required && <RequiredBadge />}
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
-      <div className="flex flex-wrap gap-1">
+      <div
+        role="group"
+        aria-label={`${node.name} variants`}
+        className="flex flex-wrap gap-1"
+      >
         {node.variant_type_names.map((variantName, index) => {
           const active = node.selected_index === index;
           return (
@@ -43,6 +47,7 @@ export function UnionField({
               type="button"
               variant={active ? "default" : "outline"}
               size="sm"
+              aria-pressed={active}
               disabled={readonlyVariant}
               onClick={() => onSelect(index)}
             >

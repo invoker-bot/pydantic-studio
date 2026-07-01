@@ -8,6 +8,26 @@ import re
 from playwright.sync_api import Page, expect
 
 
+def test_union_variant_buttons_expose_selected_state(
+    page: Page, fastapi_url: str
+) -> None:
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    variant_group = page.get_by_role("group", name="notifier variants")
+    expect(variant_group).to_be_visible(timeout=5000)
+
+    email_chip = variant_group.get_by_role("button", name="_EmailNotifier")
+    slack_chip = variant_group.get_by_role("button", name="_SlackNotifier")
+    expect(email_chip).to_have_attribute("aria-pressed", "true")
+    expect(slack_chip).to_have_attribute("aria-pressed", "false")
+
+    slack_chip.click()
+
+    expect(email_chip).to_have_attribute("aria-pressed", "false")
+    expect(slack_chip).to_have_attribute("aria-pressed", "true")
+
+
 def test_switch_union_variant(page: Page, fastapi_url: str) -> None:
     page.goto(f"{fastapi_url}/")
     expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
