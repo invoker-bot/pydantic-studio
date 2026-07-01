@@ -145,8 +145,14 @@ export default function App() {
   };
 
   const handleCancel = () => {
+    setActionError(null);
     cancel.mutate(undefined, {
       onSuccess: () => setStatus("cancelled"),
+      onError: (err) => {
+        setActionError(
+          `Cancel failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      },
     });
   };
   const isActionPending = submit.isPending || cancel.isPending || history.isPending;

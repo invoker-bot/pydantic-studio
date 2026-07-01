@@ -13,7 +13,7 @@ import socket
 import threading
 import time as _time
 from contextlib import closing, contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import uvicorn
 from playwright.sync_api import Page, expect
@@ -36,15 +36,18 @@ def _find_free_port() -> int:
 
 
 @contextmanager
-def _serve_broken_submit_tree() -> Iterator[str]:
+def _serve_broken_action_tree(action: Literal["submit", "cancel"]) -> Iterator[str]:
     port = _find_free_port()
     tree = build_form_tree(_BrokenSubmitSchema)
     server = StudioServer(tree=tree, save_path=None)
 
-    def fail_submit():
-        raise RuntimeError("submit backend unavailable")
+    def fail_action():
+        raise RuntimeError(f"{action} backend unavailable")
 
-    server.session.submit = fail_submit
+    if action == "submit":
+        server.session.submit = fail_action
+    else:
+        server.session.cancel = fail_action
     config = uvicorn.Config(
         server.app,
         host="127.0.0.1",
@@ -103,7 +106,7 @@ def test_cancel_click_shows_cancelled_state(page: Page, fastapi_url: str) -> Non
 
 
 def test_save_transport_failure_is_announced(page: Page) -> None:
-    with _serve_broken_submit_tree() as base_url:
+    with _serve_broken_action_tree("submit") as base_url:
         page.goto(f"{base_url}/")
         expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
 
@@ -113,3 +116,16 @@ def test_save_transport_failure_is_announced(page: Page) -> None:
         expect(alert).to_contain_text("Save failed", timeout=5000)
         expect(alert).to_contain_text("HTTP 500")
         expect(page.get_by_role("button", name="Save")).to_be_enabled()
+
+
+def test_cancel_transport_failure_is_announced(page: Page) -> None:
+    with _serve_broken_action_tree("cancel") as base_url:
+        page.goto(f"{base_url}/")
+        expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+        page.get_by_role("button", name="Cancel").click()
+
+        alert = page.get_by_role("alert")
+        expect(alert).to_contain_text("Cancel failed", timeout=5000)
+        expect(alert).to_contain_text("HTTP 500")
+        expect(page.get_by_role("button", name="Cancel")).to_be_enabled()
