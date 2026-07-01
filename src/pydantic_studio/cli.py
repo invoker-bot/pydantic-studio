@@ -275,7 +275,7 @@ def _validate_edit_save_path_or_exit(path: Path) -> None:
     try:
         _validate_config_file_extension_for_cli(path)
     except ValueError as e:
-        typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from e
 
 

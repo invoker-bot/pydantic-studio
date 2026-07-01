@@ -88,6 +88,7 @@ def test_edit_new_file_with_unknown_extension_errors_before_renderer(
 
     assert result.exit_code == 1
     assert "unsupported config file extension" in result.output
+    assert "edit failed" not in result.output.lower()
     assert called is False
 
 
@@ -104,6 +105,7 @@ def test_edit_existing_file_with_unknown_extension_uses_edit_extension_error(
 
     assert result.exit_code == 1
     assert "unsupported config file extension" in result.output
+    assert "edit failed" not in result.output.lower()
     assert "could not load" not in result.output
 
 
@@ -112,6 +114,7 @@ def test_edit_file_extension_is_rejected_before_schema_import(tmp_path: Path) ->
 
     assert result.exit_code == 1
     assert "unsupported config file extension" in result.output
+    assert "edit failed" not in result.output.lower()
     assert "nosuch" not in result.output.lower()
 
 
