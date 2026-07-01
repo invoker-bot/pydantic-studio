@@ -2,12 +2,26 @@
 
 from __future__ import annotations
 
+import ast
 import tomllib
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_TEST_COUNT = 1212
+
+
+def _count_e2e_tests() -> int:
+    count = 0
+    for path in sorted((ROOT / "tests" / "e2e").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        count += sum(
+            isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+            and node.name.startswith("test_")
+            for node in tree.body
+        )
+    return count
 
 
 def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
@@ -18,16 +32,19 @@ def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
 
 
 def test_release_gate_docs_use_current_test_counts() -> None:
+    e2e_count = _count_e2e_tests()
+    total_count = DEFAULT_TEST_COUNT + e2e_count
     expectations = {
         "README.md": (
-            "1254",
-            "1212 default",
-            "42 explicit Playwright browser e2e tests",
+            str(total_count),
+            f"{DEFAULT_TEST_COUNT} default",
+            f"{e2e_count} explicit Playwright browser e2e tests",
+            f"{e2e_count} browser tests",
         ),
         "CLAUDE.md": (
-            "1254",
-            "1212 default",
-            "42 explicit Playwright browser e2e tests",
+            str(total_count),
+            f"{DEFAULT_TEST_COUNT} default",
+            f"{e2e_count} explicit Playwright browser e2e tests",
         ),
     }
     for doc, snippets in expectations.items():

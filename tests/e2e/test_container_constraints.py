@@ -31,6 +31,10 @@ class _ContainerLimitSchema(BaseModel):
     )
 
 
+class _SingleTagLimitSchema(BaseModel):
+    tags: list[str] = Field(default_factory=list, max_length=1)
+
+
 def _find_free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -38,9 +42,9 @@ def _find_free_port() -> int:
 
 
 @contextmanager
-def _serve_tree() -> Iterator[str]:
+def _serve_tree(schema: type[BaseModel] = _ContainerLimitSchema) -> Iterator[str]:
     port = _find_free_port()
-    tree = build_form_tree(_ContainerLimitSchema)
+    tree = build_form_tree(schema)
     server = StudioServer(tree=tree, save_path=None)
     config = uvicorn.Config(
         server.app,
@@ -99,3 +103,20 @@ def test_container_constraint_controls_disable_at_boundaries(page: Page) -> None
         expect(page.get_by_text("2 entries")).to_be_visible(timeout=5000)
         expect(env_add).to_be_disabled()
         expect(page.get_by_role("button", name="remove entry one")).to_be_enabled()
+
+
+def test_sequence_add_race_announces_rejected_length_mutation(page: Page) -> None:
+    with _serve_tree(_SingleTagLimitSchema) as base_url:
+        page.goto(f"{base_url}/")
+        expect(page.get_by_role("heading", name="_SingleTagLimitSchema")).to_be_visible(
+            timeout=5000
+        )
+
+        add_button = page.get_by_role("button", name="add tags item")
+        add_button.dblclick()
+
+        alert = page.get_by_role("alert")
+        expect(alert).to_contain_text("length must be <= 1", timeout=5000)
+        describedby = add_button.get_attribute("aria-describedby")
+        assert describedby is not None
+        expect(page.locator(f'[id="{describedby}"]')).to_have_attribute("role", "alert")

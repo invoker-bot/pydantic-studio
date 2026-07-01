@@ -1,8 +1,13 @@
+import { useState } from "react";
+
 import type { SequenceNodeData } from "@/api/schemas";
 import { useApplyMutation } from "@/api/mutations";
 import { ContainerConstraintChips } from "@/components/form/chrome/ContainerConstraintChips";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import {
+  FieldError,
+  fieldErrorControlProps,
+} from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -23,17 +28,35 @@ export function SequenceField({
 }: { node: SequenceNodeData; path: string }) {
   const mutation = useApplyMutation();
   const flags = useFormFlags();
+  const [structureError, setStructureError] = useState<string | null>(null);
   const readonlyStructure = hasReadonlyUnder(flags, path);
   const structureDisabled = readonlyStructure || node.origin === "tuple_fixed";
+  const structureErrorPath = `${path}.structure`;
   const itemCount = node.items.length;
   const atMinLength = node.min_length !== null && itemCount <= node.min_length;
   const atMaxLength = node.max_length !== null && itemCount >= node.max_length;
 
-  const onAdd = () => mutation.mutate({ op: "add_item", path });
+  const structuralErrorProps = fieldErrorControlProps(
+    structureError,
+    structureErrorPath,
+  );
+  const onStructureError = (e: unknown) =>
+    setStructureError(e instanceof Error ? e.message : String(e));
+  const onAdd = () =>
+    mutation.mutate(
+      { op: "add_item", path },
+      { onSuccess: () => setStructureError(null), onError: onStructureError },
+    );
   const onRemove = (index: number) =>
-    mutation.mutate({ op: "remove_item", path, index });
+    mutation.mutate(
+      { op: "remove_item", path, index },
+      { onSuccess: () => setStructureError(null), onError: onStructureError },
+    );
   const onMove = (from: number, to: number) =>
-    mutation.mutate({ op: "move_item", path, from, to });
+    mutation.mutate(
+      { op: "move_item", path, from, to },
+      { onSuccess: () => setStructureError(null), onError: onStructureError },
+    );
 
   // item_type_name is null for tuple_fixed (heterogeneous slots); fall
   // back to a generic "item" label for the +Add button.
@@ -69,6 +92,7 @@ export function SequenceField({
                   disabled={structureDisabled || index === 0}
                   onClick={() => onMove(index, index - 1)}
                   aria-label={`move ${node.name}[${index}] up`}
+                  {...structuralErrorProps}
                 >
                   ^
                 </Button>
@@ -79,6 +103,7 @@ export function SequenceField({
                   disabled={structureDisabled || index === itemCount - 1}
                   onClick={() => onMove(index, index + 1)}
                   aria-label={`move ${node.name}[${index}] down`}
+                  {...structuralErrorProps}
                 >
                   v
                 </Button>
@@ -89,6 +114,7 @@ export function SequenceField({
                   disabled={structureDisabled || atMinLength}
                   onClick={() => onRemove(index)}
                   aria-label={`remove ${node.name}[${index}]`}
+                  {...structuralErrorProps}
                 >
                   x
                 </Button>
@@ -107,10 +133,12 @@ export function SequenceField({
           disabled={structureDisabled || atMaxLength}
           onClick={onAdd}
           aria-label={`add ${node.name} item`}
+          {...structuralErrorProps}
         >
           + Add {itemLabel}
         </Button>
       </div>
+      <FieldError message={structureError} path={structureErrorPath} />
       <FieldError message={node.error} />
     </FieldRow>
   );
