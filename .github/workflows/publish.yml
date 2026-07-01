@@ -46,7 +46,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install Python dependencies
-        run: uv sync --locked --all-extras --python 3.13
+        run: uv sync --all-extras --python 3.13
 
       - name: Verify uv environment Python
         run: |
