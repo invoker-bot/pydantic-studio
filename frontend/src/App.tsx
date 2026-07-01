@@ -23,6 +23,8 @@ import { missingRequiredPaths } from "@/lib/required";
 type Status = "editing" | "saved" | "cancelled";
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
+const EDITOR_HEADING_ID = "studio-editor-heading";
+const PREVIEW_HEADING_ID = "studio-preview-heading";
 
 export default function App() {
   const { data, isLoading, error } = useQuery({
@@ -176,10 +178,15 @@ export default function App() {
 
   return (
     <div className="grid min-h-screen grid-cols-1 gap-6 bg-white p-4 font-sans sm:p-6 lg:grid-cols-2 lg:gap-8 lg:p-8">
-      <section className="min-w-0 space-y-6">
+      <section
+        aria-labelledby={EDITOR_HEADING_ID}
+        className="min-w-0 space-y-6"
+      >
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold">{schemaName}</h1>
+            <h1 id={EDITOR_HEADING_ID} className="text-2xl font-semibold">
+              {schemaName}
+            </h1>
             <p className="mt-1 break-words text-xs text-zinc-500">
               {data.schema_name}
             </p>
@@ -280,8 +287,14 @@ export default function App() {
           <FormField node={data.root} path="" />
         </FormFlagsContext.Provider>
       </section>
-      <section className="min-w-0 space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <section
+        aria-labelledby={PREVIEW_HEADING_ID}
+        className="min-w-0 space-y-2"
+      >
+        <h2
+          id={PREVIEW_HEADING_ID}
+          className="text-xs font-semibold uppercase tracking-wide text-zinc-500"
+        >
           Live YAML preview
         </h2>
         <pre

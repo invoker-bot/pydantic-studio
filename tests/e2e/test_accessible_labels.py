@@ -130,6 +130,16 @@ def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> No
     assert broken == []
 
 
+def test_editor_and_preview_sections_are_named_regions(
+    page: Page, fastapi_url: str
+) -> None:
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_role("heading", name="_DemoSchema")).to_be_visible(timeout=5000)
+
+    expect(page.get_by_role("region", name="_DemoSchema")).to_be_visible()
+    expect(page.get_by_role("region", name="Live YAML preview")).to_be_visible()
+
+
 def test_tree_loading_state_is_announced(page: Page) -> None:
     with _serve_delayed_tree_load() as base_url:
         page.goto(f"{base_url}/")
