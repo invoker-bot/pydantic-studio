@@ -24,6 +24,11 @@ def test_top_level_imports():
     assert hasattr(ps, "ValidationFailedError")
 
 
+def test_top_level_io_format_helpers():
+    assert ps.format_for_path("config.yaml") == "yaml"
+    assert ps.supported_extensions() == (".json", ".toml", ".yaml", ".yml")
+
+
 def test_embeddable_session_exports():
     assert hasattr(ps, "EditSession")
     assert hasattr(ps, "SubmitResult")

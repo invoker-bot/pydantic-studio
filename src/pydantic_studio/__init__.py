@@ -11,6 +11,7 @@ from pydantic_studio.exceptions import (
     ValidationFailedError,
 )
 from pydantic_studio.io import (
+    format_for_path,
     load_config,
     load_json,
     load_toml,
@@ -20,6 +21,7 @@ from pydantic_studio.io import (
     save_json,
     save_toml,
     save_yaml,
+    supported_extensions,
 )
 from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.console import run_console_app
@@ -133,6 +135,7 @@ __all__ = [
     "delete_draft",
     "draft_newer_than",
     "find_draft",
+    "format_for_path",
     "load_config",
     "load_draft",
     "load_json",
@@ -150,4 +153,5 @@ __all__ = [
     "save_json",
     "save_toml",
     "save_yaml",
+    "supported_extensions",
 ]
