@@ -93,6 +93,40 @@ def test_web_variant_selector_switches_root_model(page: Page) -> None:
         expect(preview).to_contain_text("channel: '#alerts'", timeout=5000)
 
 
+def test_web_variant_selector_transport_failure_is_announced(page: Page) -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=WebEmail, label="Email"),
+                VariantSpec(id="slack", model=WebSlack, label="Slack"),
+            ]
+        ),
+        selected_id="email",
+        discriminator="class_name",
+        persistence="inline_discriminator",
+    )
+
+    with _serve_tree(tree) as base_url:
+        page.route(
+            "**/api/mutations",
+            lambda route: route.fulfill(status=500, body="mutation unavailable"),
+        )
+        page.goto(f"{base_url}/")
+
+        variant = page.get_by_label("Variant")
+        expect(variant).to_have_text("Email", timeout=5000)
+        variant.click()
+        page.get_by_role("option", name="Slack").click()
+
+        alert = page.get_by_role("alert")
+        expect(alert).to_contain_text("Variant failed:", timeout=5000)
+        expect(alert).to_contain_text("HTTP 500")
+        describedby = variant.get_attribute("aria-describedby")
+        assert describedby is not None
+        expect(page.locator(f'[id="{describedby}"]')).to_have_attribute("role", "alert")
+        expect(variant).to_have_text("Email")
+
+
 def test_web_variant_selector_disables_root_switch_when_any_path_is_readonly(
     page: Page,
 ) -> None:
