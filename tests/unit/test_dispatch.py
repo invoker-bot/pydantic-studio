@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.io.dispatch import _format_for_path, load_config, save_config
+from pydantic_studio.io.dispatch import format_for_path, load_config, save_config
 from tests.fixtures.schemas import Server
 
 if TYPE_CHECKING:
@@ -15,27 +15,33 @@ if TYPE_CHECKING:
 
 
 class TestFormatForPath:
+    def test_uses_public_format_helper_only(self) -> None:
+        import pydantic_studio.io.dispatch as dispatch_module
+
+        assert dispatch_module.format_for_path is format_for_path
+        assert not hasattr(dispatch_module, "_format_for_path")
+
     def test_yaml(self) -> None:
         from pathlib import Path
 
-        assert _format_for_path(Path("x.yaml")) == "yaml"
-        assert _format_for_path(Path("x.yml")) == "yaml"
+        assert format_for_path(Path("x.yaml")) == "yaml"
+        assert format_for_path(Path("x.yml")) == "yaml"
 
     def test_toml(self) -> None:
         from pathlib import Path
 
-        assert _format_for_path(Path("x.toml")) == "toml"
+        assert format_for_path(Path("x.toml")) == "toml"
 
     def test_json(self) -> None:
         from pathlib import Path
 
-        assert _format_for_path(Path("x.json")) == "json"
+        assert format_for_path(Path("x.json")) == "json"
 
     def test_unknown_extension_raises(self) -> None:
         from pathlib import Path
 
         with pytest.raises(ValueError, match="cannot infer format"):
-            _format_for_path(Path("x.xml"))
+            format_for_path(Path("x.xml"))
 
 
 class TestDispatcher:

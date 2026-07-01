@@ -40,10 +40,6 @@ def format_for_path(path: str | Path) -> _Format:
     return fmt
 
 
-def _format_for_path(path: Path) -> _Format:
-    return format_for_path(path)
-
-
 def _validate_format(format: str) -> _Format:
     if format not in _SUPPORTED_FORMATS:
         expected = ", ".join(_SUPPORTED_FORMATS)
