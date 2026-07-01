@@ -231,6 +231,7 @@ export interface SequenceNodeData {
   description: string | null;
   required: boolean;
   error: string | null;
+  omitted: boolean;
   origin: "list" | "set" | "tuple" | "tuple_fixed";
   items: FormNodeData[];
   item_type_name: string | null;        // null for tuple_fixed; FQ name otherwise
@@ -242,6 +243,7 @@ export interface SequenceNodeData {
 export const SequenceNodeSchema: z.ZodType<SequenceNodeData> = z.lazy(() =>
   NodeBase.extend({
     kind: z.literal("sequence"),
+    omitted: z.boolean(),
     origin: z.enum(["list", "set", "tuple", "tuple_fixed"]),
     items: z.array(FormNodeSchema),
     item_type_name: z.string().nullable(),
@@ -260,6 +262,7 @@ export interface MappingNodeData {
   description: string | null;
   required: boolean;
   error: string | null;
+  omitted: boolean;
   entries: Array<[FormNodeData, FormNodeData]>;
   key_type_name: string;
   value_type_name: string;
@@ -270,6 +273,7 @@ export interface MappingNodeData {
 export const MappingNodeSchema: z.ZodType<MappingNodeData> = z.lazy(() =>
   NodeBase.extend({
     kind: z.literal("mapping"),
+    omitted: z.boolean(),
     entries: z.array(z.tuple([FormNodeSchema, FormNodeSchema])),
     key_type_name: z.string(),
     value_type_name: z.string(),

@@ -187,6 +187,24 @@ def test_tree_to_json_marks_omitted_optional_group() -> None:
     assert primary["omitted"] is True
 
 
+def test_tree_to_json_emits_omitted_on_container_nodes() -> None:
+    # Regression: SequenceNode/MappingNode serialize `omitted` over the wire,
+    # just like GroupNode. The strict frontend Zod schemas (NodeBase.strict())
+    # must declare `omitted` for these kinds too — otherwise the SPA rejects
+    # any config with a list/dict field ("Unrecognized key(s): 'omitted'") and
+    # the form hangs on "Loading tree...". Default pytest excludes tests/e2e,
+    # so this contract test guards the wire shape the TS schemas depend on.
+    tree = build_form_tree(_Outer)
+
+    data = tree_to_json(tree)
+
+    fields = {f["name"]: f for f in data["root"]["fields"]}
+    assert fields["tags"]["kind"] == "sequence"
+    assert "omitted" in fields["tags"]
+    assert fields["env"]["kind"] == "mapping"
+    assert "omitted" in fields["env"]
+
+
 def test_tree_to_json_includes_clean_history_state() -> None:
     tree = build_form_tree(_Primitive, existing={"name": "alpha", "workers": 8})
 
