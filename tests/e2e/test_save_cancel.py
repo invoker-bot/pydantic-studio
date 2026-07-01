@@ -92,6 +92,9 @@ def test_save_click_marks_submitted_and_shows_success(
     page.get_by_role("button", name="Save").click()
 
     expect(page.get_by_text("Saved", exact=False)).to_be_visible(timeout=5000)
+    status = page.get_by_role("status")
+    expect(status).to_contain_text("Saved")
+    expect(status).to_have_attribute("aria-atomic", "true")
     expect(page.get_by_role("button", name="Save")).to_have_count(0)
 
 
@@ -102,6 +105,9 @@ def test_cancel_click_shows_cancelled_state(page: Page, fastapi_url: str) -> Non
     page.get_by_role("button", name="Cancel").click()
 
     expect(page.get_by_text("Cancelled", exact=False)).to_be_visible(timeout=5000)
+    status = page.get_by_role("status")
+    expect(status).to_contain_text("Cancelled")
+    expect(status).to_have_attribute("aria-atomic", "true")
     expect(page.get_by_role("button", name="Save")).to_have_count(0)
 
 

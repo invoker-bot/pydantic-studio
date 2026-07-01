@@ -112,7 +112,11 @@ export default function App() {
   if (status === "saved") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center space-y-2">
+        <div
+          role="status"
+          aria-atomic="true"
+          className="text-center space-y-2"
+        >
           <h1 className="text-3xl font-semibold text-emerald-600">Saved</h1>
           <p className="text-sm text-zinc-500">You may close this tab.</p>
         </div>
@@ -122,7 +126,11 @@ export default function App() {
   if (status === "cancelled") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center space-y-2">
+        <div
+          role="status"
+          aria-atomic="true"
+          className="text-center space-y-2"
+        >
           <h1 className="text-3xl font-semibold text-zinc-500">Cancelled</h1>
           <p className="text-sm text-zinc-500">No changes were saved.</p>
         </div>
