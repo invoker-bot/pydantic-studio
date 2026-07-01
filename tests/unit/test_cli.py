@@ -143,6 +143,16 @@ class TestFill:
         assert "could not write" in result.output.lower()
         assert "config.ini" in result.output
 
+    def test_fill_output_extension_is_rejected_before_schema_import(self, tmp_path) -> None:
+        out = tmp_path / "config.ini"
+
+        result = runner.invoke(app, ["fill", "nosuch:Foo", "--out", str(out)])
+
+        assert result.exit_code == 1
+        assert "could not write" in result.output.lower()
+        assert "config.ini" in result.output
+        assert "nosuch" not in result.output.lower()
+
     def test_fill_output_directory_reports_file_path(self, tmp_path) -> None:
         out = tmp_path / "config.yaml"
         out.mkdir()

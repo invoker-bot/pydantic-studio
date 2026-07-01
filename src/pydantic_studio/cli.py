@@ -249,7 +249,7 @@ def _write_fill_output_for_cli(tree: Any, out: Path) -> None:
         raise typer.Exit(code=1) from e
 
 
-def _validate_edit_save_path_for_cli(path: Path) -> None:
+def _validate_config_file_extension_for_cli(path: Path) -> None:
     supported = _YAML_SUFFIXES | _TOML_SUFFIXES | _JSON_SUFFIXES
     suffix = path.suffix.lower()
     if suffix not in supported:
@@ -263,9 +263,17 @@ def _validate_edit_save_path_for_cli(path: Path) -> None:
 
 def _validate_edit_save_path_or_exit(path: Path) -> None:
     try:
-        _validate_edit_save_path_for_cli(path)
+        _validate_config_file_extension_for_cli(path)
     except ValueError as e:
         typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+
+def _validate_fill_output_path_or_exit(path: Path) -> None:
+    try:
+        _validate_config_file_extension_for_cli(path)
+    except ValueError as e:
+        typer.secho(f"{path}: could not write: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from e
 
 
@@ -314,6 +322,8 @@ def fill(
     ),
 ) -> None:
     """Emit a config stub populated with the schema's defaults."""
+    if out is not None:
+        _validate_fill_output_path_or_exit(out)
     schema = _load_schema(target)
     tree = build_form_tree(schema)
     if out is not None:
