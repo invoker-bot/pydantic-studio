@@ -51,6 +51,26 @@ def test_submit_with_save_path_writes_yaml(tmp_path: Path) -> None:
     assert load_yaml(out, _ValidSchema).to_instance().name == "alpha"
 
 
+def test_submit_after_success_is_idempotent_and_does_not_rewrite(
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "config.yaml"
+    tree = build_form_tree(_ValidSchema)
+    session = EditSession(tree=tree, save_path=out)
+    first = session.submit()
+    assert first == SubmitResult(ok=True, outcome=EditOutcome("submitted"))
+
+    blocked_path = tmp_path / "directory-target"
+    blocked_path.mkdir()
+    session.save_path = blocked_path
+
+    second = session.submit()
+
+    assert second == SubmitResult(ok=True, outcome=EditOutcome("submitted"))
+    assert session.submitted is True
+    assert session.cancelled is False
+
+
 def test_submit_validation_failure_leaves_outcome_unset(tmp_path: Path) -> None:
     out = tmp_path / "config.yaml"
     tree = build_form_tree(_RequiredSchema)
