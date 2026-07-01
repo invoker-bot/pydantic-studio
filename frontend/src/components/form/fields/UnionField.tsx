@@ -1,7 +1,12 @@
+import { useState } from "react";
+
 import type { UnionNodeData } from "@/api/schemas";
 import { useApplyMutation } from "@/api/mutations";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import {
+  FieldError,
+  fieldErrorControlProps,
+} from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -22,9 +27,29 @@ export function UnionField({
   const mutation = useApplyMutation();
   const flags = useFormFlags();
   const readonlyVariant = hasReadonlyUnder(flags, path);
+  const [variantError, setVariantError] = useState<string | null>(null);
+  const variantErrorPath = `${path}.variant`;
+  const variantErrorProps = fieldErrorControlProps(
+    variantError,
+    variantErrorPath,
+  );
 
-  const onSelect = (variant_index: number) =>
-    mutation.mutate({ op: "select_variant", path, variant_index });
+  const onSelect = (variant_index: number) => {
+    setVariantError(null);
+    mutation.mutate(
+      { op: "select_variant", path, variant_index },
+      {
+        onSuccess: () => setVariantError(null),
+        onError: (err) => {
+          setVariantError(
+            `Variant failed: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        },
+      },
+    );
+  };
 
   return (
     <FieldRow>
@@ -51,6 +76,7 @@ export function UnionField({
               aria-label={`select ${node.name} variant ${shortTypeName(variantName)}`}
               disabled={readonlyVariant}
               onClick={() => onSelect(index)}
+              {...variantErrorProps}
             >
               {shortTypeName(variantName)}
               {active && " v"}
@@ -67,6 +93,7 @@ export function UnionField({
           Pick a variant above to set a value.
         </p>
       )}
+      <FieldError message={variantError} path={variantErrorPath} />
       <FieldError message={node.error} />
     </FieldRow>
   );

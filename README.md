@@ -7,7 +7,7 @@ Textual TUI, and a React-backed local web app.
 
 [![status](https://img.shields.io/badge/status-alpha-blue)](#status)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
-[![tests](https://img.shields.io/badge/tests-1258%20passing-brightgreen)](#development)
+[![tests](https://img.shields.io/badge/tests-1259%20passing-brightgreen)](#development)
 
 ---
 
@@ -77,7 +77,7 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 1258 tests: 1212 default unit/integration/TUI/web smoke tests plus 46
+by 1259 tests: 1212 default unit/integration/TUI/web smoke tests plus 47
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
@@ -479,7 +479,7 @@ The unit-test default skips `tests/e2e/` and disables the `pytest-playwright` pl
 
 ```bash
 uv run playwright install chromium                                  # one-time, ~150 MB
-uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"    # 46 browser tests
+uv run python -m pytest tests/e2e -p playwright -o "addopts=-ra"    # 47 browser tests
 ```
 
 ## License

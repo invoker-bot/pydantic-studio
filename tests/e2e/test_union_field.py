@@ -90,3 +90,35 @@ def test_readonly_union_descendant_disables_variant_switch(
     )
     expect(slack_chip).to_be_visible(timeout=5000)
     expect(slack_chip).to_be_disabled()
+
+
+def test_union_variant_transport_failure_is_announced(
+    page: Page, fastapi_url: str
+) -> None:
+    page.route(
+        "**/api/mutations",
+        lambda route: route.fulfill(status=500, body="mutation unavailable"),
+    )
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    variant_group = page.get_by_role("group", name="notifier variants")
+    email_chip = variant_group.get_by_role(
+        "button", name="select notifier variant _EmailNotifier"
+    )
+    slack_chip = variant_group.get_by_role(
+        "button", name="select notifier variant _SlackNotifier"
+    )
+    expect(email_chip).to_have_attribute("aria-pressed", "true")
+    expect(slack_chip).to_have_attribute("aria-pressed", "false")
+
+    slack_chip.click()
+
+    alert = page.get_by_role("alert")
+    expect(alert).to_contain_text("Variant failed:", timeout=5000)
+    expect(alert).to_contain_text("HTTP 500")
+    describedby = slack_chip.get_attribute("aria-describedby")
+    assert describedby is not None
+    expect(page.locator(f'[id="{describedby}"]')).to_have_attribute("role", "alert")
+    expect(email_chip).to_have_attribute("aria-pressed", "true")
+    expect(slack_chip).to_have_attribute("aria-pressed", "false")
