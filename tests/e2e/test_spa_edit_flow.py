@@ -119,3 +119,26 @@ def test_history_buttons_reflect_available_actions(
     expect(preview).to_contain_text("history-enabled", timeout=5000)
     expect(undo).to_be_enabled()
     expect(redo).to_be_disabled()
+
+
+def test_rejected_history_action_is_announced(page: Page, fastapi_url: str) -> None:
+    page.goto(f"{fastapi_url}/")
+
+    name_input = page.get_by_label("name", exact=True)
+    undo = page.get_by_role("button", name="Undo")
+    redo = page.get_by_role("button", name="Redo")
+    expect(name_input).to_be_visible(timeout=5000)
+
+    name_input.fill("history-race")
+    name_input.blur()
+
+    preview = page.get_by_test_id("tree-preview")
+    expect(preview).to_contain_text("history-race", timeout=5000)
+
+    undo.dblclick()
+
+    alert = page.get_by_role("alert")
+    expect(alert).to_contain_text("Undo failed: nothing to undo", timeout=5000)
+    expect(preview).to_contain_text("name: demo-service", timeout=5000)
+    expect(undo).to_be_disabled()
+    expect(redo).to_be_enabled()

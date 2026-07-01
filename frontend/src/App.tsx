@@ -174,6 +174,19 @@ export default function App() {
       },
     });
   };
+  const handleHistoryAction = (label: "Undo" | "Redo", op: "undo" | "redo") => {
+    setActionError(null);
+    history.mutate(
+      { op },
+      {
+        onError: (err) => {
+          setActionError(
+            `${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        },
+      },
+    );
+  };
   const isActionPending = submit.isPending || cancel.isPending || history.isPending;
 
   return (
@@ -213,7 +226,7 @@ export default function App() {
               size="icon"
               aria-label="Undo"
               title="Undo"
-              onClick={() => history.mutate({ op: "undo" })}
+              onClick={() => handleHistoryAction("Undo", "undo")}
               disabled={isActionPending || !data.history.can_undo}
             >
               <Undo2 aria-hidden="true" />
@@ -223,7 +236,7 @@ export default function App() {
               size="icon"
               aria-label="Redo"
               title="Redo"
-              onClick={() => history.mutate({ op: "redo" })}
+              onClick={() => handleHistoryAction("Redo", "redo")}
               disabled={isActionPending || !data.history.can_redo}
             >
               <Redo2 aria-hidden="true" />
