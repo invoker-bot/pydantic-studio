@@ -184,10 +184,16 @@ def test_frontend_float_schema_accepts_non_finite_wire_strings() -> None:
     assert 'value: trimmed' in float_field
 
 
-def test_frontend_decimal_field_surfaces_precision_and_finite_constraints() -> None:
+def test_frontend_numeric_fields_surface_backend_constraints() -> None:
     schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
         encoding="utf-8"
     )
+    int_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "IntField.tsx"
+    ).read_text(encoding="utf-8")
+    float_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "FloatField.tsx"
+    ).read_text(encoding="utf-8")
     decimal_field = (
         ROOT / "frontend" / "src" / "components" / "form" / "fields" / "DecimalField.tsx"
     ).read_text(encoding="utf-8")
@@ -200,6 +206,15 @@ def test_frontend_decimal_field_surfaces_precision_and_finite_constraints() -> N
     assert decimal_schema is not None
     assert "allow_inf_nan: z.boolean()" in decimal_schema.group("body")
     assert "decimal_places: z.number().nullable()" in decimal_schema.group("body")
+    for field in (int_field, float_field, decimal_field):
+        assert "<NumericConstraintChips constraints={node} />" in field
+    constraint_chips = (
+        ROOT / "frontend" / "src" / "components" / "form" / "chrome" / "NumericConstraintChips.tsx"
+    )
+    assert constraint_chips.exists()
+    constraint_chip_source = constraint_chips.read_text(encoding="utf-8")
+    for label in ("ge", "le", "gt", "lt", "multiple_of", ">=", "<=", ">", "<", "multiple"):
+        assert label in constraint_chip_source
     assert "node.max_digits !== null" in decimal_field
     assert "node.decimal_places !== null" in decimal_field
     assert "!node.allow_inf_nan" in decimal_field

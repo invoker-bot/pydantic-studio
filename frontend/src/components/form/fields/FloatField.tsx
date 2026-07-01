@@ -8,6 +8,7 @@ import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
+import { NumericConstraintChips } from "@/components/form/chrome/NumericConstraintChips";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,7 @@ export function FloatField({ node, path }: { node: FloatNode; path: string }) {
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
+        <NumericConstraintChips constraints={node} />
         {!node.allow_inf_nan && <Chip>finite</Chip>}
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}

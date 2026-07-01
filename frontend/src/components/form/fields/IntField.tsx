@@ -7,6 +7,7 @@ import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
+import { NumericConstraintChips } from "@/components/form/chrome/NumericConstraintChips";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
 import { TypeBadge } from "@/components/form/chrome/TypeBadge";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ export function IntField({ node, path }: { node: IntNode; path: string }) {
         </Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
+        <NumericConstraintChips constraints={node} />
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
       <Input
