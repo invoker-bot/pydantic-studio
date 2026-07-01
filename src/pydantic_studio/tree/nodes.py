@@ -212,6 +212,7 @@ class FormNode(BaseModel):
     error: str | None = None
     nullable: bool = False
     emit_null: bool = False
+    validation_field_info: Any | None = Field(default=None, exclude=True, repr=False)
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
         """Return tuple of error messages for ``value`` against this node's
@@ -1453,6 +1454,63 @@ def _validation_error_messages(exc: Exception) -> list[str]:
     return [str(exc)]
 
 
+def _transforming_field_info(annotation: Any, field_info: Any | None = None) -> Any | None:
+    from pydantic_studio.types.transforms import (
+        field_info_from_annotation,
+        has_transforming_validator,
+    )
+
+    if field_info is not None and has_transforming_validator(field_info):
+        return field_info
+
+    candidate = field_info_from_annotation(_strip_optional_annotation(annotation))
+    if field_info is not None:
+        candidate = type(field_info).merge_field_infos(field_info, candidate)
+    if has_transforming_validator(candidate):
+        return candidate
+    return None
+
+
+def _attach_validation_field_info(
+    node: Any,
+    annotation: Any,
+    field_info: Any | None = None,
+) -> None:
+    if hasattr(node, "validation_field_info"):
+        node.validation_field_info = _transforming_field_info(annotation, field_info)
+
+
+def _candidate_python_value(node: Any, value: Any) -> Any:
+    if hasattr(node, "value") and hasattr(node, "model_copy"):
+        return node.model_copy(update={"value": value}).to_python()
+    return value
+
+
+def _validate_transforming_value_against_node(node: Any, value: Any) -> list[str]:
+    if value is None and (getattr(node, "nullable", False) or not node.required):
+        return []
+    field_info = getattr(node, "validation_field_info", None)
+    if field_info is None:
+        return []
+
+    from pydantic_studio.types.transforms import validate_existing
+
+    try:
+        validate_existing(field_info, _candidate_python_value(node, value))
+    except ValidationError as exc:
+        return _validation_error_messages(exc)
+    return []
+
+
+def _validate_value_against_node(node: Any, value: Any) -> list[str]:
+    validate_value = getattr(node, "validate_value", None)
+    if callable(validate_value):
+        errors = list(cast("tuple[str, ...]", validate_value(value)))
+        if errors:
+            return errors
+    return _validate_transforming_value_against_node(node, value)
+
+
 def _strip_optional_annotation(annotation: Any) -> Any:
     from pydantic_studio.types.annotated import (
         get_union_args,
@@ -1474,10 +1532,15 @@ def _attach_runtime_annotations_to_group(group: GroupNode) -> None:
     for child in group.fields:
         field_info = group.schema_class.model_fields.get(child.name)
         if field_info is not None:
-            _attach_runtime_annotations_to_node(child, field_info.annotation)
+            _attach_runtime_annotations_to_node(child, field_info.annotation, field_info)
 
 
-def _attach_runtime_annotations_to_node(node: Any, annotation: Any) -> None:
+def _attach_runtime_annotations_to_node(
+    node: Any,
+    annotation: Any,
+    field_info: Any | None = None,
+) -> None:
+    _attach_validation_field_info(node, annotation, field_info)
     annotation = _strip_optional_annotation(annotation)
     if isinstance(node, GroupNode):
         _attach_runtime_annotations_to_group(node)
@@ -1657,6 +1720,7 @@ def _validate_seed_against_node(
                 for message in _validation_error_messages(exc):
                     errors.append(f"[{index}]: {message}")
                 continue
+            _attach_runtime_annotations_to_node(child, item_type, item_field)
             for message in _validate_seed_against_node(
                 child,
                 value,
@@ -1690,6 +1754,7 @@ def _validate_seed_against_node(
                 for message in _validation_error_messages(exc):
                     errors.append(f"key {raw_key!r}: {message}")
                 continue
+            _attach_runtime_annotations_to_node(key_node, key_type, key_field)
             for message in _validate_seed_against_node(
                 key_node,
                 raw_key,
@@ -1702,6 +1767,7 @@ def _validate_seed_against_node(
                 for message in _validation_error_messages(exc):
                     errors.append(f"[{raw_key!r}]: {message}")
                 continue
+            _attach_runtime_annotations_to_node(value_node, value_type, value_field)
             for message in _validate_seed_against_node(
                 value_node,
                 raw_value,
@@ -1715,10 +1781,7 @@ def _validate_seed_against_node(
             seed,
             none_is_absent=none_is_absent,
         )
-    validate_value = getattr(node, "validate_value", None)
-    if callable(validate_value):
-        return list(cast("tuple[str, ...]", validate_value(seed)))
-    return []
+    return _validate_value_against_node(node, seed)
 
 
 def _build_seeded_node(
@@ -1733,15 +1796,18 @@ def _build_seeded_node(
         node = builder.build(type_, field_info, None)
     except ValidationError as exc:
         return None, _validation_error_messages(exc)
+    _attach_runtime_annotations_to_node(node, type_, field_info)
     if seed is _UNSET_VALUE:
         return node, []
     errors = _validate_seed_against_node(node, seed, none_is_absent=False)
     if errors:
         return None, errors
     try:
-        return builder.build(type_, field_info, seed), []
+        seeded = builder.build(type_, field_info, seed)
     except ValidationError as exc:
         return None, _validation_error_messages(exc)
+    _attach_runtime_annotations_to_node(seeded, type_, field_info)
+    return seeded, []
 
 
 def _reset_group_to_schema_defaults(group: GroupNode) -> None:
@@ -1754,6 +1820,7 @@ def _reset_group_to_schema_defaults(group: GroupNode) -> None:
         child_type = field_info.annotation or str
         child_builder = registry.find(child_type)
         child = child_builder.build(child_type, field_info, None)
+        _attach_runtime_annotations_to_node(child, child_type, field_info)
         child.name = name
         rebuilt.append(child)
     group.fields = rebuilt
@@ -2259,7 +2326,7 @@ class FormTree(BaseModel):
                 _snap.draft_save(self, self.draft_path)
             return ValidationResult.ok()
 
-        errors = write_target.validate_value(value)
+        errors = _validate_value_against_node(write_target, value)
         if errors:
             if isinstance(target, UnionNode):
                 result, variant_index, selected = self._build_union_variant_for_value(
@@ -2480,6 +2547,7 @@ class FormTree(BaseModel):
                 )
                 continue
 
+            _attach_runtime_annotations_to_node(probe, item_type, item_field)
             value_errors = _validate_seed_against_node(
                 probe,
                 raw_value,
@@ -2498,6 +2566,7 @@ class FormTree(BaseModel):
                 )
                 continue
 
+            _attach_runtime_annotations_to_node(child, item_type, item_field)
             child.name = str(index)
             items.append(child)
 
@@ -2701,6 +2770,7 @@ class FormTree(BaseModel):
         normalized_keys: list[Any] = []
         for raw_key, raw_value in value.items():
             key_probe = key_builder.build(key_type, key_field, None)
+            _attach_runtime_annotations_to_node(key_probe, key_type, key_field)
             key_errors = _validate_seed_against_node(
                 key_probe,
                 raw_key,
@@ -2718,12 +2788,14 @@ class FormTree(BaseModel):
                 )
                 continue
 
+            _attach_runtime_annotations_to_node(key_node, key_type, key_field)
             normalized_key = key_node.to_python()
             if any(existing_key == normalized_key for existing_key in normalized_keys):
                 errors.append(f"duplicate key {normalized_key!r}")
                 continue
 
             value_probe = value_builder.build(value_type, value_field, None)
+            _attach_runtime_annotations_to_node(value_probe, value_type, value_field)
             value_errors = _validate_seed_against_node(
                 value_probe,
                 raw_value,
@@ -2741,6 +2813,7 @@ class FormTree(BaseModel):
                 )
                 continue
 
+            _attach_runtime_annotations_to_node(value_node, value_type, value_field)
             key_node.name = "key"
             value_node.name = "value"
             entries.append((key_node, value_node))

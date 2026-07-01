@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import math
 from decimal import Decimal
+from typing import Annotated, Any
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainValidator
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.validation import ValidationResult
@@ -59,6 +60,16 @@ class ConstrainedStringSchema(BaseModel):
     at_most: str = Field(default="good", max_length=5)
     contains_marker: str = Field(default="abc", pattern="abc")
     unicode_letters: str = Field(default="abc", pattern=r"\p{L}+")
+
+
+def _reject_bad_string(value: Any) -> str:
+    if value == "bad":
+        raise ValueError("bad blocked")
+    return str(value)
+
+
+class PlainValidatorStringSchema(BaseModel):
+    token: Annotated[str, PlainValidator(_reject_bad_string)] = "ok"
 
 
 class NestedProfile(BaseModel):
@@ -306,6 +317,21 @@ def test_set_string_value_uses_pydantic_regex_engine_for_patterns() -> None:
     assert result.errors == (r"must match pattern \p{L}+",)
     assert node.value == "abc"
     assert node.error == r"must match pattern \p{L}+"
+
+
+def test_set_value_rejects_plain_validator_errors_without_mutating() -> None:
+    tree = build_form_tree(PlainValidatorStringSchema)
+    node = tree.root.find("token")
+    assert node is not None
+    assert node.value == "ok"
+
+    result = tree.set_value("token", "bad")
+
+    assert result.ok is False
+    assert result.errors == ("Value error, bad blocked",)
+    assert node.value == "ok"
+    assert node.error == "Value error, bad blocked"
+    assert tree.snapshots == []
 
 
 def test_set_value_replaces_nested_group_fields_and_undoes() -> None:
