@@ -291,7 +291,7 @@ def _validate_config_input_path_or_exit(path: Path) -> None:
     try:
         _validate_config_file_extension_for_cli(path)
     except ValueError as e:
-        typer.secho(f"{path}: could not load: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"{path}: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from e
 
 

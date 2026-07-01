@@ -245,7 +245,8 @@ class TestRun:
         result = runner.invoke(app, ["run", "nosuch:Foo", str(cfg)])
 
         assert result.exit_code == 1
-        assert "could not load" in result.output.lower()
+        assert "unsupported config file extension" in result.output
+        assert "could not load" not in result.output.lower()
         assert "config.ini" in result.output
         assert "nosuch" not in result.output.lower()
 
@@ -311,7 +312,8 @@ class TestCheck:
         result = runner.invoke(app, ["check", "nosuch:Foo", str(cfg)])
 
         assert result.exit_code == 1
-        assert "could not load" in result.output.lower()
+        assert "unsupported config file extension" in result.output
+        assert "could not load" not in result.output.lower()
         assert "config.ini" in result.output
         assert "nosuch" not in result.output.lower()
 
