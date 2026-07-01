@@ -249,6 +249,13 @@ def _write_fill_output_for_cli(tree: Any, out: Path) -> None:
         raise typer.Exit(code=1) from e
 
 
+def _exit_if_cancelled_outcome(outcome: object) -> None:
+    from pydantic_studio.outcome import EditOutcome
+
+    if isinstance(outcome, EditOutcome) and outcome.cancelled:
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def show(target: str) -> None:
     """Introspect a Pydantic schema and print its form-tree shape.
@@ -371,15 +378,15 @@ def edit(
         if frontend == "console":
             from pydantic_studio.renderers.console import run_console_app
 
-            run_console_app(tree=tree, save_path=save_path)
+            outcome = run_console_app(tree=tree, save_path=save_path)
         elif frontend == "tui":
             from pydantic_studio.renderers.textual_ import StudioApp
 
-            StudioApp(tree=tree, save_path=save_path).run()
+            outcome = StudioApp(tree=tree, save_path=save_path).run()
         elif frontend == "web":
             from pydantic_studio.renderers import html as html_module
 
-            html_module.run_html_app(tree=tree, save_path=save_path)
+            outcome = html_module.run_html_app(tree=tree, save_path=save_path)
         else:
             typer.secho(
                 f"Unknown frontend {frontend!r}. Use 'console', 'tui', or 'web'.",
@@ -387,6 +394,7 @@ def edit(
                 err=True,
             )
             raise typer.Exit(code=2)
+        _exit_if_cancelled_outcome(outcome)
     except CancelledByUser as e:
         raise typer.Exit(code=1) from e
     except (OSError, ValueError, ValidationFailedError) as e:

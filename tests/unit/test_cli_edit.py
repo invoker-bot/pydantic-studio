@@ -120,6 +120,25 @@ def test_edit_tui_frontend_routes_to_studio_app(monkeypatch) -> None:
     assert captured["tree"].root.find("port").value == 8080
 
 
+def test_edit_tui_cancelled_outcome_exits_without_failure_message(monkeypatch) -> None:
+    from pydantic_studio.outcome import EditOutcome
+
+    def fake_run(self) -> EditOutcome:
+        return EditOutcome("cancelled")
+
+    from pydantic_studio.renderers.textual_ import StudioApp
+
+    monkeypatch.setattr(StudioApp, "run", fake_run)
+
+    result = runner.invoke(
+        app,
+        ["edit", "--frontend", "tui", "tests.fixtures.schemas:Server"],
+    )
+
+    assert result.exit_code == 1
+    assert "edit failed" not in result.output.lower()
+
+
 def test_edit_unknown_schema_errors() -> None:
     result = runner.invoke(app, ["edit", "nosuch:Foo"])
     assert result.exit_code != 0
@@ -143,6 +162,25 @@ def test_edit_web_frontend(tmp_path, monkeypatch) -> None:
     )
     assert result.exit_code == 0
     assert "tree" in captured
+
+
+def test_edit_web_cancelled_outcome_exits_without_failure_message(monkeypatch) -> None:
+    from pydantic_studio.outcome import EditOutcome
+
+    def fake_run(tree, save_path=None) -> EditOutcome:
+        return EditOutcome("cancelled")
+
+    import pydantic_studio.renderers.html as html_module
+
+    monkeypatch.setattr(html_module, "run_html_app", fake_run)
+
+    result = runner.invoke(
+        app,
+        ["edit", "--frontend", "web", "tests.fixtures.schemas:Server"],
+    )
+
+    assert result.exit_code == 1
+    assert "edit failed" not in result.output.lower()
 
 
 def test_edit_unknown_frontend_errors() -> None:
