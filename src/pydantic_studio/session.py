@@ -118,3 +118,29 @@ def _validate_readonly_paths(readonly_paths: Iterable[str]) -> frozenset[str]:
             raise ValueError(msg) from exc
         validated.add(readonly_path)
     return frozenset(validated)
+
+
+def _reject_session_parameter_conflicts(
+    owner: str,
+    session: EditSession | None,
+    *,
+    tree: object | None,
+    save_path: object | None,
+    readonly_paths: object,
+) -> None:
+    if session is None:
+        return
+    conflicts: list[str] = []
+    if tree is not None:
+        conflicts.append("tree")
+    if save_path is not None:
+        conflicts.append("save_path")
+    if readonly_paths != ():
+        conflicts.append("readonly_paths")
+    if conflicts:
+        joined = ", ".join(conflicts)
+        msg = (
+            f"{owner} received session plus {joined}; pass tree, save_path, "
+            "and readonly_paths to EditSession instead"
+        )
+        raise TypeError(msg)

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 from starlette.applications import Starlette
 
-from pydantic_studio import build_form_tree
+from pydantic_studio import EditSession, build_form_tree
 from pydantic_studio.renderers.html import StudioServer, mount_html_app
 
 
@@ -28,6 +28,17 @@ def test_studio_server_app_mounts_under_starlette_prefix() -> None:
     tree = client.get("/studio/api/tree")
     assert tree.status_code == 200
     assert tree.json()["root"]["kind"] == "group"
+
+
+def test_studio_server_rejects_session_with_ignored_tree_arguments() -> None:
+    session = EditSession(tree=build_form_tree(_Schema))
+
+    with pytest.raises(TypeError, match="session"):
+        StudioServer(
+            tree=build_form_tree(_Schema),
+            readonly_paths={"name"},
+            session=session,
+        )
 
 
 def test_mount_html_app_mounts_under_starlette_prefix() -> None:
@@ -60,3 +71,16 @@ def test_mount_html_app_rejects_host_without_mount() -> None:
 
     with pytest.raises(TypeError, match="mount"):
         mount_html_app(_NoMount(), "/studio", tree=build_form_tree(_Schema))
+
+
+def test_mount_html_app_rejects_session_with_ignored_tree_arguments() -> None:
+    host = Starlette()
+    session = EditSession(tree=build_form_tree(_Schema))
+
+    with pytest.raises(TypeError, match="session"):
+        mount_html_app(
+            host,
+            "/studio",
+            tree=build_form_tree(_Schema),
+            session=session,
+        )

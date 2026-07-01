@@ -8,7 +8,7 @@ from textual.app import App
 from textual.binding import Binding
 
 from pydantic_studio.outcome import EditOutcome
-from pydantic_studio.session import EditSession
+from pydantic_studio.session import EditSession, _reject_session_parameter_conflicts
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -69,6 +69,13 @@ class StudioApp(App):
         session: EditSession | None = None,
     ) -> None:
         super().__init__()
+        _reject_session_parameter_conflicts(
+            "StudioApp",
+            session,
+            tree=tree,
+            save_path=save_path,
+            readonly_paths=readonly_paths,
+        )
         if session is None:
             if tree is None:
                 raise TypeError("StudioApp requires either tree or session")

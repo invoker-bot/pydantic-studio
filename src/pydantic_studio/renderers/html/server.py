@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from pydantic_studio.session import EditSession
+from pydantic_studio.session import EditSession, _reject_session_parameter_conflicts
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -59,6 +59,13 @@ class StudioServer:
         session: EditSession | None = None,
         base_path: str = "",
     ) -> None:
+        _reject_session_parameter_conflicts(
+            "StudioServer",
+            session,
+            tree=tree,
+            save_path=save_path,
+            readonly_paths=readonly_paths,
+        )
         if session is None:
             if tree is None:
                 raise TypeError("StudioServer requires either tree or session")

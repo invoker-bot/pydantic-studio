@@ -203,3 +203,16 @@ def test_studio_app_accepts_session_keyword() -> None:
     app = StudioApp(session=session)
     assert app.session is session
     assert app.tree is tree
+
+
+def test_studio_app_rejects_session_with_ignored_tree_arguments() -> None:
+    from pydantic_studio import EditSession
+
+    session = EditSession(tree=build_form_tree(_Schema))
+
+    with pytest.raises(TypeError, match="session"):
+        StudioApp(
+            tree=build_form_tree(_Schema),
+            readonly_paths={"name"},
+            session=session,
+        )
