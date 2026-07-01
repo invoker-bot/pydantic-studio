@@ -102,6 +102,7 @@ class EditSession:
             )
             return SubmitResult(ok=False, errors=errors, paths=paths)
 
+        self._initial_state = copy.deepcopy(self.tree.to_python())
         self.outcome = EditOutcome("submitted")
         return SubmitResult(ok=True, outcome=self.outcome)
 

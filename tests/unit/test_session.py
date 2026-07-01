@@ -51,6 +51,18 @@ def test_submit_with_save_path_writes_yaml(tmp_path: Path) -> None:
     assert load_yaml(out, _ValidSchema).to_instance().name == "alpha"
 
 
+def test_submit_success_resets_dirty_baseline() -> None:
+    tree = build_form_tree(_ValidSchema)
+    session = EditSession(tree=tree)
+    assert tree.set_value("name", "changed").ok is True
+    assert session.dirty is True
+
+    result = session.submit()
+
+    assert result == SubmitResult(ok=True, outcome=EditOutcome("submitted"))
+    assert session.dirty is False
+
+
 def test_submit_after_success_is_idempotent_and_does_not_rewrite(
     tmp_path: Path,
 ) -> None:
