@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import pytest
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PlainValidator
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import BoolNode, IntNode, StringNode, UnionNode
@@ -67,6 +67,26 @@ class _RequiredUnionHolder(BaseModel):
 
 class _AnnotatedUnionHolder(BaseModel):
     value: Annotated[int, Field(gt=0)] | Annotated[str, Field(min_length=2)]
+
+
+def _reject_blocked_union_value(value: Any) -> int | str:
+    if value == "blocked":
+        raise ValueError("union blocked")
+    return value
+
+
+class _PlainValidatorUnionHolder(BaseModel):
+    value: Annotated[
+        int | str,
+        PlainValidator(_reject_blocked_union_value),
+    ] = 1
+
+
+class _RequiredPlainValidatorUnionHolder(BaseModel):
+    value: Annotated[
+        int | str,
+        PlainValidator(_reject_blocked_union_value),
+    ]
 
 
 class _OptionalAnnotatedHolder(BaseModel):
@@ -309,6 +329,44 @@ def test_set_value_rejects_annotated_unselected_union_variant_without_mutating()
     assert tree.snapshots == []
 
 
+def test_set_value_rejects_union_field_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_PlainValidatorUnionHolder)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 1
+
+    result = tree.set_value("value", "blocked")
+
+    assert result.ok is False
+    assert result.errors == ("Value error, union blocked",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 1
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_unselected_union_field_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_RequiredPlainValidatorUnionHolder)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index is None
+    assert val.selected is None
+
+    result = tree.set_value("value", "blocked")
+
+    assert result.ok is False
+    assert result.errors == ("Value error, union blocked",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index is None
+    assert val.selected is None
+    assert tree.snapshots == []
+
+
 def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     tree = build_form_tree(WithUnion, existing={"value": "keep-me"})
 
@@ -350,6 +408,26 @@ def test_select_variant_rejects_explicit_none_seed_without_mutating() -> None:
     assert val.selected_index == 1
     assert isinstance(val.selected, StringNode)
     assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
+def test_select_variant_rejects_union_field_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_PlainValidatorUnionHolder)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 1
+
+    result = tree.select_variant("value", 1, seed="blocked")
+
+    assert result.ok is False
+    assert result.errors == ("Value error, union blocked",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 1
     assert tree.snapshots == []
 
 

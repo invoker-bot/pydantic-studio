@@ -83,7 +83,7 @@ class UnionBuilder:
             if default is not None:
                 selected_index, selected = self._preselect(variants, default)
 
-        return UnionNode(
+        union = UnionNode(
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
@@ -93,6 +93,8 @@ class UnionBuilder:
             selected_index=selected_index,
             selected=selected,
         )
+        union.validation_field_info = field_info if has_transforming_validator(field_info) else None
+        return union
 
     def _preselect(
         self, variants: list[Any], candidate: Any

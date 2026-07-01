@@ -1532,6 +1532,17 @@ def _validate_mapping_entries_against_node(
     return _validate_transforming_python_value_against_node(mp, candidate.to_python())
 
 
+def _validate_union_selected_against_node(
+    union: UnionNode,
+    selected_index: int | None,
+    selected: AnyNode | None,
+) -> list[str]:
+    candidate = union.model_copy(
+        update={"selected_index": selected_index, "selected": selected}
+    )
+    return _validate_transforming_python_value_against_node(union, candidate.to_python())
+
+
 def _validate_value_against_node(node: Any, value: Any) -> list[str]:
     validate_value = getattr(node, "validate_value", None)
     if callable(validate_value):
@@ -2218,6 +2229,14 @@ class FormTree(BaseModel):
                 if not result.ok:
                     target.error = result.errors[0] if result.errors else "invalid"
                     return result
+                union_errors = _validate_union_selected_against_node(
+                    target,
+                    variant_index,
+                    selected,
+                )
+                if union_errors:
+                    target.error = union_errors[0]
+                    return ValidationResult.fail(union_errors)
 
                 self._push_snapshot(_snap.take(self.root))
                 target.selected_index = variant_index
@@ -2367,6 +2386,15 @@ class FormTree(BaseModel):
                     value,
                 )
                 if result.ok:
+                    union_errors = _validate_union_selected_against_node(
+                        target,
+                        variant_index,
+                        selected,
+                    )
+                    if union_errors:
+                        write_target.error = union_errors[0]
+                        target.error = union_errors[0]
+                        return ValidationResult.fail(union_errors)
                     self._push_snapshot(_snap.take(self.root))
                     target.selected_index = variant_index
                     target.selected = selected
@@ -2384,6 +2412,20 @@ class FormTree(BaseModel):
             write_target.error = errors[0]
             target.error = errors[0]
             return ValidationResult.fail(list(errors))
+
+        if isinstance(target, UnionNode):
+            candidate_selected = cast("Any", write_target).model_copy(
+                update={"value": value}
+            )
+            union_errors = _validate_union_selected_against_node(
+                target,
+                target.selected_index,
+                candidate_selected,
+            )
+            if union_errors:
+                write_target.error = union_errors[0]
+                target.error = union_errors[0]
+                return ValidationResult.fail(union_errors)
 
         # Validation passed: snapshot before mutating so undo can revert.
         self._push_snapshot(_snap.take(self.root))
@@ -3092,6 +3134,11 @@ class FormTree(BaseModel):
             return ValidationResult.fail(
                 [f"variant {variant_index!r} did not build a selected node"]
             )
+        union_errors = _validate_union_selected_against_node(
+            union, variant_index, new_selected
+        )
+        if union_errors:
+            return ValidationResult.fail(union_errors)
         self._push_snapshot(_snap.take(self.root))
         union.selected_index = variant_index
         union.selected = new_selected
