@@ -9,12 +9,14 @@ required fields still missing.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from pydantic import BaseModel, Field
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.textual_ import StudioApp
-from pydantic_studio.renderers.textual_.widgets.help_bar import HelpBar
+from pydantic_studio.renderers.textual_.widgets.help_bar import HelpBar, describe_node
 
 
 class _Schema(BaseModel):
@@ -22,6 +24,16 @@ class _Schema(BaseModel):
     name: str = Field("svc", description="Service identifier")
     api_key: str = Field(..., description="Exchange API key")
     plain: bool = False
+
+
+class _DecimalSchema(BaseModel):
+    price: Decimal = Field(
+        default=Decimal("1.00"),
+        max_digits=4,
+        decimal_places=2,
+        allow_inf_nan=False,
+        description="Invoice amount",
+    )
 
 
 @pytest.mark.asyncio
@@ -44,6 +56,19 @@ async def test_help_bar_shows_focused_field_description_and_constraints() -> Non
         assert "ge=1" in bar.text
         assert "le=65535" in bar.text
         assert "int" in bar.text
+
+
+def test_help_bar_describes_decimal_precision_and_finite_constraint() -> None:
+    tree = build_form_tree(_DecimalSchema)
+    node = tree.root.find("price")
+
+    assert node is not None
+    text = describe_node(node)
+
+    assert "max_digits=4" in text
+    assert "decimal_places=2" in text
+    assert "finite" in text
+    assert "Invoice amount" in text
 
 
 @pytest.mark.asyncio

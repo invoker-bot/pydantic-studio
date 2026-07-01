@@ -22,6 +22,8 @@ _CONSTRAINT_ATTRS = (
     "gt",
     "lt",
     "multiple_of",
+    "max_digits",
+    "decimal_places",
     "min_length",
     "max_length",
     "pattern",
@@ -47,6 +49,8 @@ def describe_node(node: AnyNode, *, readonly: bool = False) -> str:
         value = getattr(node, attr, None)
         if value is not None:
             facts.append(f"{attr}={value}")
+    if getattr(node, "allow_inf_nan", True) is False:
+        facts.append("finite")
     hint = _CONTAINER_HINTS.get(getattr(node, "kind", ""))
     if hint is not None:
         facts.append(hint)
