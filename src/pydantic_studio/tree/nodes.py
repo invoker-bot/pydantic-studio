@@ -1486,8 +1486,11 @@ def _candidate_python_value(node: Any, value: Any) -> Any:
     return value
 
 
-def _validate_transforming_value_against_node(node: Any, value: Any) -> list[str]:
-    if value is None and (getattr(node, "nullable", False) or not node.required):
+def _validate_transforming_python_value_against_node(
+    node: Any,
+    python_value: Any,
+) -> list[str]:
+    if python_value is None and (getattr(node, "nullable", False) or not node.required):
         return []
     field_info = getattr(node, "validation_field_info", None)
     if field_info is None:
@@ -1496,10 +1499,37 @@ def _validate_transforming_value_against_node(node: Any, value: Any) -> list[str
     from pydantic_studio.types.transforms import validate_existing
 
     try:
-        validate_existing(field_info, _candidate_python_value(node, value))
+        validate_existing(field_info, python_value)
     except ValidationError as exc:
         return _validation_error_messages(exc)
     return []
+
+
+def _validate_transforming_value_against_node(node: Any, value: Any) -> list[str]:
+    return _validate_transforming_python_value_against_node(
+        node,
+        _candidate_python_value(node, value),
+    )
+
+
+def _validate_sequence_items_against_node(
+    seq: SequenceNode,
+    items: list[AnyNode],
+) -> list[str]:
+    candidate = seq.model_copy(
+        update={"items": items, "omitted": False, "emit_null": False}
+    )
+    return _validate_transforming_python_value_against_node(seq, candidate.to_python())
+
+
+def _validate_mapping_entries_against_node(
+    mp: MappingNode,
+    entries: list[tuple[AnyNode, AnyNode]],
+) -> list[str]:
+    candidate = mp.model_copy(
+        update={"entries": entries, "omitted": False, "emit_null": False}
+    )
+    return _validate_transforming_python_value_against_node(mp, candidate.to_python())
 
 
 def _validate_value_against_node(node: Any, value: Any) -> list[str]:
@@ -1678,6 +1708,9 @@ def _validate_seed_against_node(
                 none_is_absent=False,
             ):
                 errors.append(f"{child.name}: {message}")
+        if errors:
+            return errors
+        errors.extend(_validate_transforming_python_value_against_node(node, data))
         return errors
     if isinstance(node, SequenceNode):
         if not isinstance(seed, (list, tuple, set, frozenset)):
@@ -2488,10 +2521,11 @@ class FormTree(BaseModel):
         from pydantic_studio.tree.builder import default_registry
 
         builder = default_registry().find(group.schema_class)
+        field_info = group.validation_field_info or FieldInfo(annotation=group.schema_class)
         candidate, errors = _build_seeded_node(
             builder,
             group.schema_class,
-            FieldInfo(annotation=group.schema_class),
+            field_info,
             value,
         )
         if errors:
@@ -2572,6 +2606,9 @@ class FormTree(BaseModel):
 
         if errors:
             return ValidationResult.fail(errors), []
+        container_errors = _validate_sequence_items_against_node(seq, items)
+        if container_errors:
+            return ValidationResult.fail(container_errors), []
         return ValidationResult.ok(), items
 
     def add_item(self, path: str, value: Any = _UNSET_VALUE) -> ValidationResult:
@@ -2598,9 +2635,13 @@ class FormTree(BaseModel):
             return ValidationResult.fail(errors)
         if child is None:
             return ValidationResult.fail(["sequence item did not build a child node"])
-        child.name = str(len(seq.items))
+        new_items = [*seq.items, child]
+        container_errors = _validate_sequence_items_against_node(seq, new_items)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
         self._push_snapshot(_snap.take(self.root))
-        seq.items = [*seq.items, child]
+        child.name = str(len(seq.items))
+        seq.items = new_items
         seq.omitted = False
         seq.emit_null = False
         seq.error = None
@@ -2621,8 +2662,11 @@ class FormTree(BaseModel):
         length_result = self._validate_sequence_length(seq, len(seq.items) - 1)
         if not length_result.ok:
             return length_result
-        self._push_snapshot(_snap.take(self.root))
         new_items = [it for i, it in enumerate(seq.items) if i != index]
+        container_errors = _validate_sequence_items_against_node(seq, new_items)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
+        self._push_snapshot(_snap.take(self.root))
         for i, it in enumerate(new_items):
             it.name = str(i)
         seq.items = new_items
@@ -2664,8 +2708,11 @@ class FormTree(BaseModel):
             return ValidationResult.fail(errors)
         if child is None:
             return ValidationResult.fail(["sequence item did not build a child node"])
-        self._push_snapshot(_snap.take(self.root))
         new_items = [*seq.items[:index], child, *seq.items[index:]]
+        container_errors = _validate_sequence_items_against_node(seq, new_items)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
+        self._push_snapshot(_snap.take(self.root))
         for i, it in enumerate(new_items):
             it.name = str(i)
         seq.items = new_items
@@ -2699,10 +2746,13 @@ class FormTree(BaseModel):
             )
         if from_index == to_index:
             return ValidationResult.ok()
-        self._push_snapshot(_snap.take(self.root))
         items = list(seq.items)
         item = items.pop(from_index)
         items.insert(to_index, item)
+        container_errors = _validate_sequence_items_against_node(seq, items)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
+        self._push_snapshot(_snap.take(self.root))
         for i, it in enumerate(items):
             it.name = str(i)
         seq.items = items
@@ -2821,6 +2871,9 @@ class FormTree(BaseModel):
 
         if errors:
             return ValidationResult.fail(errors), []
+        container_errors = _validate_mapping_entries_against_node(mp, entries)
+        if container_errors:
+            return ValidationResult.fail(container_errors), []
         return ValidationResult.ok(), entries
 
     def add_entry(
@@ -2857,10 +2910,14 @@ class FormTree(BaseModel):
             return ValidationResult.fail(value_errors)
         if v_node is None:
             return ValidationResult.fail(["mapping value did not build a child node"])
+        new_entries = [*mp.entries, (k_node, v_node)]
+        container_errors = _validate_mapping_entries_against_node(mp, new_entries)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
+        self._push_snapshot(_snap.take(self.root))
         k_node.name = "key"
         v_node.name = "value"
-        self._push_snapshot(_snap.take(self.root))
-        mp.entries = [*mp.entries, (k_node, v_node)]
+        mp.entries = new_entries
         mp.omitted = False
         mp.emit_null = False
         mp.error = None
@@ -2881,8 +2938,12 @@ class FormTree(BaseModel):
         length_result = self._validate_mapping_length(mp, len(mp.entries) - 1)
         if not length_result.ok:
             return length_result
+        new_entries = [e for i, e in enumerate(mp.entries) if i != index]
+        container_errors = _validate_mapping_entries_against_node(mp, new_entries)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
         self._push_snapshot(_snap.take(self.root))
-        mp.entries = [e for i, e in enumerate(mp.entries) if i != index]
+        mp.entries = new_entries
         mp.omitted = False
         mp.emit_null = False
         mp.error = None
@@ -2925,10 +2986,13 @@ class FormTree(BaseModel):
         )
         if not unique_result.ok:
             return unique_result
-        # Validation passed — push snapshot and mutate.
-        self._push_snapshot(_snap.take(self.root))
         entries = list(mp.entries)
         entries[index] = (candidate_key, value_node)
+        container_errors = _validate_mapping_entries_against_node(mp, entries)
+        if container_errors:
+            return ValidationResult.fail(container_errors)
+        # Validation passed — push snapshot and mutate.
+        self._push_snapshot(_snap.take(self.root))
         mp.entries = entries
         mp.omitted = False
         mp.emit_null = False

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainValidator
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import GroupNode, IntNode, SequenceNode, StringNode
@@ -23,6 +23,16 @@ class OptionalListHost(BaseModel):
 
 class AnnotatedItemListHost(BaseModel):
     values: list[Annotated[int, Field(gt=0)]] = Field(default_factory=list)
+
+
+def _reject_empty_sequence(value: Any) -> list[int]:
+    if value == []:
+        raise ValueError("empty sequence blocked")
+    return list(value)
+
+
+class PlainValidatorListHost(BaseModel):
+    values: Annotated[list[int], PlainValidator(_reject_empty_sequence)] = [1]
 
 
 def test_sequence_node_construct() -> None:
@@ -471,6 +481,19 @@ def test_remove_item_rejects_sequence_min_length_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_remove_item_rejects_container_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(PlainValidatorListHost)
+    values = tree.root.find("values")
+    assert isinstance(values, SequenceNode)
+
+    result = tree.remove_item("values", 0)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, empty sequence blocked",)
+    assert values.to_python() == [1]
+    assert tree.snapshots == []
+
+
 def test_set_value_replaces_sequence_items_and_undoes() -> None:
     tree = build_form_tree(WithList, existing={"tags": ["old"]})
     tags = tree.root.find("tags")
@@ -485,6 +508,19 @@ def test_set_value_replaces_sequence_items_and_undoes() -> None:
     tags = tree.root.find("tags")
     assert isinstance(tags, SequenceNode)
     assert [cast("StringNode", item).value for item in tags.items] == ["old"]
+
+
+def test_set_value_rejects_container_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(PlainValidatorListHost)
+    values = tree.root.find("values")
+    assert isinstance(values, SequenceNode)
+
+    result = tree.set_value("values", [])
+
+    assert result.ok is False
+    assert result.errors == ("Value error, empty sequence blocked",)
+    assert values.to_python() == [1]
+    assert tree.snapshots == []
 
 
 def test_set_value_rejects_invalid_sequence_item_without_mutating() -> None:

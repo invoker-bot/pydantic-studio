@@ -81,6 +81,20 @@ class NestedProfileSchema(BaseModel):
     profile: NestedProfile = Field(default_factory=NestedProfile)
 
 
+def _reject_bad_profile(value: Any) -> NestedProfile:
+    profile = value if isinstance(value, NestedProfile) else NestedProfile.model_validate(value)
+    if profile.host == "bad":
+        raise ValueError("bad profile blocked")
+    return profile
+
+
+class PlainValidatorNestedProfileSchema(BaseModel):
+    profile: Annotated[
+        NestedProfile,
+        PlainValidator(_reject_bad_profile),
+    ] = Field(default_factory=NestedProfile)
+
+
 def test_set_valid_value_returns_ok() -> None:
     tree = build_form_tree(Schema)
     result = tree.set_value("name", "Alice")
@@ -358,5 +372,19 @@ def test_set_value_rejects_invalid_nested_group_field_without_mutating() -> None
 
     assert result.ok is False
     assert result.errors == ("port: must be >= 1",)
+    assert tree.to_instance().profile == NestedProfile(host="old.local", port=5432)
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_nested_group_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(
+        PlainValidatorNestedProfileSchema,
+        existing={"profile": {"host": "old.local", "port": 5432}},
+    )
+
+    result = tree.set_value("profile", {"host": "bad", "port": 5432})
+
+    assert result.ok is False
+    assert result.errors == ("Value error, bad profile blocked",)
     assert tree.to_instance().profile == NestedProfile(host="old.local", port=5432)
     assert tree.snapshots == []

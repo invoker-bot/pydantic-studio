@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainValidator
 
 from pydantic_studio import build_form_tree
 from pydantic_studio.tree.nodes import IntNode, MappingNode, StringNode
@@ -37,6 +37,16 @@ class AnnotatedMappingHost(BaseModel):
         Annotated[str, Field(min_length=2)],
         Annotated[int, Field(gt=0)],
     ] = Field(default_factory=dict)
+
+
+def _reject_empty_mapping(value: Any) -> dict[str, int]:
+    if value == {}:
+        raise ValueError("empty mapping blocked")
+    return dict(value)
+
+
+class PlainValidatorDictHost(BaseModel):
+    values: Annotated[dict[str, int], PlainValidator(_reject_empty_mapping)] = {"a": 1}
 
 
 def test_dict_builder_constructs_mapping_node() -> None:
@@ -297,6 +307,19 @@ def test_remove_entry_rejects_mapping_min_length_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_remove_entry_rejects_container_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(PlainValidatorDictHost)
+    values = tree.root.find("values")
+    assert isinstance(values, MappingNode)
+
+    result = tree.remove_entry("values", 0)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, empty mapping blocked",)
+    assert values.to_python() == {"a": 1}
+    assert tree.snapshots == []
+
+
 @pytest.mark.parametrize(
     ("operation", "expected_error"),
     [
@@ -373,6 +396,19 @@ def test_rename_key_rejects_normalized_duplicate_key_without_mutating() -> None:
         Path("existing.yaml"): 1,
         Path("other.yaml"): 2,
     }
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_container_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(PlainValidatorDictHost)
+    values = tree.root.find("values")
+    assert isinstance(values, MappingNode)
+
+    result = tree.set_value("values", {})
+
+    assert result.ok is False
+    assert result.errors == ("Value error, empty mapping blocked",)
+    assert values.to_python() == {"a": 1}
     assert tree.snapshots == []
 
 
