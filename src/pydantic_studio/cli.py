@@ -277,6 +277,14 @@ def _validate_fill_output_path_or_exit(path: Path) -> None:
         raise typer.Exit(code=1) from e
 
 
+def _validate_config_input_path_or_exit(path: Path) -> None:
+    try:
+        _validate_config_file_extension_for_cli(path)
+    except ValueError as e:
+        typer.secho(f"{path}: could not load: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+
 def _exit_if_cancelled_outcome(outcome: object) -> None:
     from pydantic_studio.outcome import EditOutcome
 
@@ -343,6 +351,7 @@ def run(
 
     from pydantic_studio.exceptions import ValidationFailedError
 
+    _validate_config_input_path_or_exit(file)
     schema = _load_schema(target)
     tree = _load_config_for_cli(file, schema)
     try:
@@ -363,6 +372,7 @@ def check(
 
     from pydantic_studio.exceptions import ValidationFailedError
 
+    _validate_config_input_path_or_exit(file)
     schema = _load_schema(target)
     tree = _load_config_for_cli(file, schema)
     try:

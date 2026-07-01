@@ -215,6 +215,16 @@ class TestRun:
         assert "could not load" in result.output.lower()
         assert "bad.yaml" in result.output
 
+    def test_run_input_extension_is_rejected_before_schema_import(self, tmp_path) -> None:
+        cfg = tmp_path / "config.ini"
+
+        result = runner.invoke(app, ["run", "nosuch:Foo", str(cfg)])
+
+        assert result.exit_code == 1
+        assert "could not load" in result.output.lower()
+        assert "config.ini" in result.output
+        assert "nosuch" not in result.output.lower()
+
 
 class TestCheck:
     def test_check_silent_on_valid(self, tmp_path) -> None:
@@ -257,6 +267,16 @@ class TestCheck:
         assert result.exit_code == 1
         assert "could not load" in result.output.lower()
         assert "missing.yaml" in result.output
+
+    def test_check_input_extension_is_rejected_before_schema_import(self, tmp_path) -> None:
+        cfg = tmp_path / "config.ini"
+
+        result = runner.invoke(app, ["check", "nosuch:Foo", str(cfg)])
+
+        assert result.exit_code == 1
+        assert "could not load" in result.output.lower()
+        assert "config.ini" in result.output
+        assert "nosuch" not in result.output.lower()
 
 
 class TestFillFormats:
