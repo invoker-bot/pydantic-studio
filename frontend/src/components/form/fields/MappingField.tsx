@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { MappingNodeData, FormNodeData } from "@/api/schemas";
 import { useApplyMutation } from "@/api/mutations";
+import { ContainerConstraintChips } from "@/components/form/chrome/ContainerConstraintChips";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -59,6 +60,10 @@ export function MappingField({
   const mutation = useApplyMutation();
   const flags = useFormFlags();
   const readonlyStructure = hasReadonlyUnder(flags, path);
+  const structureDisabled = readonlyStructure;
+  const entryCount = node.entries.length;
+  const atMinLength = node.min_length !== null && entryCount <= node.min_length;
+  const atMaxLength = node.max_length !== null && entryCount >= node.max_length;
 
   const onAdd = () => {
     mutation.mutate({ op: "add_entry", path, key: nextDefaultKey(node) });
@@ -74,8 +79,9 @@ export function MappingField({
         <Label className="text-sm font-medium">{node.name}</Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
+        <ContainerConstraintChips constraints={node} />
         <span className="text-xs text-zinc-400">
-          {node.entries.length} {node.entries.length === 1 ? "entry" : "entries"}
+          {entryCount} {entryCount === 1 ? "entry" : "entries"}
         </span>
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
@@ -88,7 +94,8 @@ export function MappingField({
             valuePath={childPath(path, index)}
             onRenameKey={(new_key) => onRenameKey(index, new_key)}
             onRemove={() => onRemove(index)}
-            readonlyStructure={readonlyStructure}
+            removeDisabled={structureDisabled || atMinLength}
+            keyDisabled={structureDisabled}
           />
         ))}
         <Button
@@ -96,7 +103,7 @@ export function MappingField({
           variant="outline"
           size="sm"
           className="w-full border-dashed text-zinc-500"
-          disabled={readonlyStructure}
+          disabled={structureDisabled || atMaxLength}
           onClick={onAdd}
         >
           + Add Entry
@@ -113,14 +120,16 @@ function MappingEntry({
   valuePath,
   onRenameKey,
   onRemove,
-  readonlyStructure,
+  removeDisabled,
+  keyDisabled,
 }: {
   entryKey: string;
   valueNode: FormNodeData;
   valuePath: string;
   onRenameKey: (new_key: string) => void;
   onRemove: () => void;
-  readonlyStructure: boolean;
+  removeDisabled: boolean;
+  keyDisabled: boolean;
 }) {
   const [keyLocal, setKeyLocal] = useState(entryKey);
   useEffect(() => setKeyLocal(entryKey), [entryKey]);
@@ -136,13 +145,13 @@ function MappingEntry({
           }}
           className="h-7 text-xs font-mono"
           aria-label="entry key"
-          disabled={readonlyStructure}
+          disabled={keyDisabled}
         />
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          disabled={readonlyStructure}
+          disabled={removeDisabled}
           onClick={onRemove}
           aria-label="remove entry"
         >

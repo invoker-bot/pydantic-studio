@@ -260,6 +260,59 @@ def test_frontend_string_field_surfaces_constraints_as_chips_not_type_badge() ->
     assert "break-all" in chip
 
 
+def test_frontend_container_fields_surface_length_constraints_and_disable_boundaries() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+    sequence_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "SequenceField.tsx"
+    ).read_text(encoding="utf-8")
+    mapping_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "MappingField.tsx"
+    ).read_text(encoding="utf-8")
+    sequence_schema = re.search(
+        r"export const SequenceNodeSchema: z\.ZodType<SequenceNodeData> = "
+        r"z\.lazy\(\(\) =>\n  NodeBase\.extend\(\{(?P<body>.*?)\}\),\n\);",
+        schema,
+        re.S,
+    )
+    mapping_schema = re.search(
+        r"export const MappingNodeSchema: z\.ZodType<MappingNodeData> = "
+        r"z\.lazy\(\(\) =>\n  NodeBase\.extend\(\{(?P<body>.*?)\}\),\n\);",
+        schema,
+        re.S,
+    )
+
+    for match in (sequence_schema, mapping_schema):
+        assert match is not None
+        assert "min_length: z.number().nullable()" in match.group("body")
+        assert "max_length: z.number().nullable()" in match.group("body")
+    for field in (sequence_field, mapping_field):
+        assert "<ContainerConstraintChips constraints={node} />" in field
+        assert "atMaxLength" in field
+        assert "atMinLength" in field
+        assert "structureDisabled" in field
+    constraint_chips = (
+        ROOT
+        / "frontend"
+        / "src"
+        / "components"
+        / "form"
+        / "chrome"
+        / "ContainerConstraintChips.tsx"
+    )
+    assert constraint_chips.exists()
+    constraint_chip_source = constraint_chips.read_text(encoding="utf-8")
+    for label in ("min_length", "max_length", "min", "max"):
+        assert label in constraint_chip_source
+    assert "disabled={structureDisabled || atMaxLength}" in sequence_field
+    assert "disabled={structureDisabled || atMaxLength}" in mapping_field
+    assert "removeDisabled={structureDisabled || atMinLength}" in mapping_field
+    assert "disabled={removeDisabled}" in mapping_field
+    assert "disabled={structureDisabled || atMinLength}" in sequence_field
+    assert 'node.origin === "tuple_fixed"' in sequence_field
+
+
 def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
     mutations = (ROOT / "frontend" / "src" / "api" / "mutations.ts").read_text(
         encoding="utf-8"

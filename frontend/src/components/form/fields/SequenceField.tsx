@@ -1,5 +1,6 @@
 import type { SequenceNodeData } from "@/api/schemas";
 import { useApplyMutation } from "@/api/mutations";
+import { ContainerConstraintChips } from "@/components/form/chrome/ContainerConstraintChips";
 import { Description } from "@/components/form/chrome/Description";
 import { FieldError } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
@@ -23,6 +24,10 @@ export function SequenceField({
   const mutation = useApplyMutation();
   const flags = useFormFlags();
   const readonlyStructure = hasReadonlyUnder(flags, path);
+  const structureDisabled = readonlyStructure || node.origin === "tuple_fixed";
+  const itemCount = node.items.length;
+  const atMinLength = node.min_length !== null && itemCount <= node.min_length;
+  const atMaxLength = node.max_length !== null && itemCount >= node.max_length;
 
   const onAdd = () => mutation.mutate({ op: "add_item", path });
   const onRemove = (index: number) =>
@@ -42,8 +47,9 @@ export function SequenceField({
         <Label className="text-sm font-medium">{node.name}</Label>
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
+        <ContainerConstraintChips constraints={node} />
         <span className="text-xs text-zinc-400">
-          {node.items.length} {node.items.length === 1 ? "item" : "items"}
+          {itemCount} {itemCount === 1 ? "item" : "items"}
         </span>
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}
@@ -60,7 +66,7 @@ export function SequenceField({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={readonlyStructure || index === 0}
+                  disabled={structureDisabled || index === 0}
                   onClick={() => onMove(index, index - 1)}
                   aria-label={`move ${node.name}[${index}] up`}
                 >
@@ -70,7 +76,7 @@ export function SequenceField({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={readonlyStructure || index === node.items.length - 1}
+                  disabled={structureDisabled || index === itemCount - 1}
                   onClick={() => onMove(index, index + 1)}
                   aria-label={`move ${node.name}[${index}] down`}
                 >
@@ -80,7 +86,7 @@ export function SequenceField({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={readonlyStructure}
+                  disabled={structureDisabled || atMinLength}
                   onClick={() => onRemove(index)}
                   aria-label={`remove ${node.name}[${index}]`}
                 >
@@ -98,7 +104,7 @@ export function SequenceField({
           variant="outline"
           size="sm"
           className="w-full border-dashed text-zinc-500"
-          disabled={readonlyStructure}
+          disabled={structureDisabled || atMaxLength}
           onClick={onAdd}
         >
           + Add {itemLabel}
