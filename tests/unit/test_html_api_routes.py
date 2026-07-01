@@ -410,6 +410,18 @@ def test_api_cancel_marks_server_cancelled() -> None:
     assert server.cancelled is True
 
 
+def test_api_cancel_after_submit_returns_conflict_without_changing_outcome() -> None:
+    server, client = _server_and_client({"name": "alpha", "workers": 4})
+    assert client.post("/api/submit").status_code == 200
+
+    response = client.post("/api/cancel")
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "session already submitted"}
+    assert server.submitted is True
+    assert server.cancelled is False
+
+
 def test_api_mutations_after_cancel_are_rejected_without_mutating() -> None:
     server, client = _server_and_client({"name": "alpha", "workers": 4})
     assert client.post("/api/cancel").status_code == 200
