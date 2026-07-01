@@ -25,6 +25,7 @@ from ruamel.yaml.comments import CommentedMap
 
 from pydantic_studio.tree.builder import build_form_tree
 from pydantic_studio.types.aliases import InputPath, field_input_paths, top_level_input_keys
+from pydantic_studio.types.annotated import get_union_args, is_optional_type, strip_annotated
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -282,9 +283,17 @@ def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
     Used by ``_build_commented_map`` to recurse into nested groups for
     description-comment generation.
     """
-    annotation = field_info.annotation
+    annotation = strip_annotated(field_info.annotation)
     if annotation is None:
         return None
+    if is_optional_type(annotation):
+        nested_args = [
+            strip_annotated(arg)
+            for arg in get_union_args(annotation)
+            if arg is not type(None)
+        ]
+        if len(nested_args) == 1:
+            annotation = nested_args[0]
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         return annotation
     return None

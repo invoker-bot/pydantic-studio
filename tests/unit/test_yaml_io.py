@@ -95,6 +95,29 @@ class TestLoadYaml:
         assert tree.to_instance().address.city == "London"
         assert "address.obsolete_zip" in captured.err
 
+    def test_load_optional_nested_unknown_field_warns_with_path(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        class OptionalInner(BaseModel):
+            known: str = "ok"
+
+        class OptionalOuter(BaseModel):
+            inner: OptionalInner | None = None
+
+        src = tmp_path / "optional-nested.yaml"
+        src.write_text(
+            "inner:\n"
+            "  known: yes\n"
+            "  stale: ignored\n",
+            encoding="utf-8",
+        )
+
+        tree = load_yaml(src, OptionalOuter)
+        captured = capsys.readouterr()
+
+        assert tree.to_instance().inner == OptionalInner(known="yes")
+        assert "inner.stale" in captured.err
+
     def test_load_alias_field_does_not_warn_as_unknown(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -371,6 +394,33 @@ class TestSaveYamlPreservesComments:
         content = src.read_text(encoding="utf-8")
         assert "obsolete_zip" not in content
         assert "address.obsolete_zip" in captured.err
+
+    def test_optional_nested_unknown_field_warns_and_is_dropped_on_save(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from pydantic_studio import save_yaml
+
+        class OptionalInner(BaseModel):
+            known: str = "ok"
+
+        class OptionalOuter(BaseModel):
+            inner: OptionalInner | None = None
+
+        src = tmp_path / "optional-nested.yaml"
+        src.write_text(
+            "inner:\n"
+            "  known: yes\n"
+            "  stale: ignored\n",
+            encoding="utf-8",
+        )
+        tree = load_yaml(src, OptionalOuter)
+        capsys.readouterr()
+        save_yaml(tree, src)
+        captured = capsys.readouterr()
+
+        content = src.read_text(encoding="utf-8")
+        assert "stale" not in content
+        assert "inner.stale" in captured.err
 
     def test_alias_path_unknown_sibling_warns_and_is_dropped_on_save(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
