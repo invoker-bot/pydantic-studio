@@ -75,6 +75,8 @@ def _json_safe_non_finite(value: Any) -> Any:
 def _strip_node_internal_fields(value: Any) -> None:
     """Remove node implementation details from the JSON API payload."""
     if isinstance(value, dict):
+        value.pop("nullable", None)
+        value.pop("emit_null", None)
         for child in value.values():
             _strip_node_internal_fields(child)
     elif isinstance(value, list):

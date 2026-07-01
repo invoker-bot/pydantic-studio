@@ -238,6 +238,24 @@ def test_tree_to_json_nested_group_renders_as_group_node() -> None:
     assert host["value"] == "db.internal"
 
 
+def test_tree_to_json_omits_null_tracking_internal_fields() -> None:
+    tree = build_form_tree(_Outer, existing={"primary": None})
+
+    data = tree_to_json(tree)
+
+    def walk(value: object) -> None:
+        if isinstance(value, dict):
+            assert "nullable" not in value
+            assert "emit_null" not in value
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    walk(data["root"])
+
+
 def test_tree_to_json_sequence_renders_as_sequence_node_with_items() -> None:
     tree = build_form_tree(_Outer, existing={"primary": {"host": "x"}, "tags": ["a", "b"]})
     data = tree_to_json(tree)

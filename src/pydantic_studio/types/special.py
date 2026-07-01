@@ -222,6 +222,8 @@ class NoneBuilder:
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
+            nullable=True,
+            emit_null=True,
             mode="null",
             value=None,
         )

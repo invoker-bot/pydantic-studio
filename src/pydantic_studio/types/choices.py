@@ -48,6 +48,7 @@ class LiteralBuilder:
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
+            nullable=None in choices,
             value=existing if existing is not None else default,
             default=default,
             choices=choices,

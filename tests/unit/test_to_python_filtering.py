@@ -17,6 +17,10 @@ class Outer(BaseModel):
     inner: Inner = Inner()
 
 
+class NullableDefaults(BaseModel):
+    nickname: str | None = "guest"
+
+
 def test_nested_defaults_are_materialized() -> None:
     tree = build_form_tree(Outer)
     out = tree.root.to_python()
@@ -38,3 +42,20 @@ def test_nested_partially_filled() -> None:
     instance = tree.to_instance()
     assert instance.inner.a == 99
     assert instance.inner.b == "default-b"
+
+
+def test_set_value_none_overrides_nullable_scalar_default() -> None:
+    tree = build_form_tree(NullableDefaults)
+
+    result = tree.set_value("nickname", None)
+
+    assert result.ok is True
+    assert tree.to_python()["nickname"] is None
+    assert tree.to_instance().nickname is None
+
+
+def test_existing_none_overrides_nullable_scalar_default() -> None:
+    tree = build_form_tree(NullableDefaults, existing={"nickname": None})
+
+    assert tree.to_python()["nickname"] is None
+    assert tree.to_instance().nickname is None

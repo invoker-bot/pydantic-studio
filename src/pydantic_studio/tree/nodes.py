@@ -210,6 +210,8 @@ class FormNode(BaseModel):
     description: str | None = None
     required: bool = True
     error: str | None = None
+    nullable: bool = False
+    emit_null: bool = False
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
         """Return tuple of error messages for ``value`` against this node's
@@ -1227,6 +1229,8 @@ class GroupNode(FormNode):
         for f in self.fields:
             v = f.to_python()
             if v is None:
+                if f.emit_null:
+                    out[f.name] = None
                 continue
             out[f.name] = v
         if not out and not self.required:
@@ -1935,6 +1939,7 @@ class FormTree(BaseModel):
                 self._push_snapshot(_snap.take(self.root))
                 _reset_group_to_schema_defaults(target)
                 target.omitted = True
+                target.emit_null = target.nullable
                 for group in walked_groups:
                     if group.omitted:
                         group.omitted = False
@@ -1950,6 +1955,7 @@ class FormTree(BaseModel):
             self._push_snapshot(_snap.take(self.root))
             target.fields = fields
             target.omitted = False
+            target.emit_null = False
             target.error = None
             for group in walked_groups:
                 if group.omitted:
@@ -1960,6 +1966,21 @@ class FormTree(BaseModel):
 
         write_target = target
         if isinstance(target, UnionNode):
+            if value is None and target.nullable:
+                if target.selected is None and target.emit_null:
+                    return ValidationResult.ok()
+
+                self._push_snapshot(_snap.take(self.root))
+                target.selected_index = None
+                target.selected = None
+                target.emit_null = True
+                target.error = None
+                for group in walked_groups:
+                    if group.omitted:
+                        group.omitted = False
+                if self.draft_path is not None:
+                    _snap.draft_save(self, self.draft_path)
+                return ValidationResult.ok()
             if target.selected is None:
                 result, variant_index, selected = self._build_union_variant_for_value(
                     target,
@@ -1972,6 +1993,7 @@ class FormTree(BaseModel):
                 self._push_snapshot(_snap.take(self.root))
                 target.selected_index = variant_index
                 target.selected = selected
+                target.emit_null = False
                 target.error = None
                 for group in walked_groups:
                     if group.omitted:
@@ -2000,6 +2022,7 @@ class FormTree(BaseModel):
                 self._push_snapshot(_snap.take(self.root))
                 _reset_group_to_schema_defaults(write_target)
                 write_target.omitted = True
+                write_target.emit_null = write_target.nullable
             else:
                 result, fields = self._build_group_fields(write_target, value)
                 if not result.ok:
@@ -2011,11 +2034,13 @@ class FormTree(BaseModel):
                 self._push_snapshot(_snap.take(self.root))
                 write_target.fields = fields
                 write_target.omitted = False
+                write_target.emit_null = False
                 write_target.error = None
             for group in walked_groups:
                 if group.omitted:
                     group.omitted = False
             if isinstance(target, UnionNode):
+                target.emit_null = False
                 target.error = None
             if self.draft_path is not None:
                 _snap.draft_save(self, self.draft_path)
@@ -2031,11 +2056,13 @@ class FormTree(BaseModel):
 
             self._push_snapshot(_snap.take(self.root))
             write_target.items = items
+            write_target.emit_null = False
             write_target.error = None
             for group in walked_groups:
                 if group.omitted:
                     group.omitted = False
             if isinstance(target, UnionNode):
+                target.emit_null = False
                 target.error = None
             if self.draft_path is not None:
                 _snap.draft_save(self, self.draft_path)
@@ -2051,11 +2078,13 @@ class FormTree(BaseModel):
 
             self._push_snapshot(_snap.take(self.root))
             write_target.entries = entries
+            write_target.emit_null = False
             write_target.error = None
             for group in walked_groups:
                 if group.omitted:
                     group.omitted = False
             if isinstance(target, UnionNode):
+                target.emit_null = False
                 target.error = None
             if self.draft_path is not None:
                 _snap.draft_save(self, self.draft_path)
@@ -2072,6 +2101,7 @@ class FormTree(BaseModel):
                     self._push_snapshot(_snap.take(self.root))
                     target.selected_index = variant_index
                     target.selected = selected
+                    target.emit_null = False
                     target.error = None
                     for group in walked_groups:
                         if group.omitted:
@@ -2090,6 +2120,7 @@ class FormTree(BaseModel):
         self._push_snapshot(_snap.take(self.root))
         editable_target = cast("Any", write_target)
         editable_target.value = value
+        editable_target.emit_null = value is None and editable_target.nullable
         editable_target.error = None
         # Editing any descendant activates omitted optional groups on the
         # path — from now on the group materializes instead of None.
@@ -2097,6 +2128,7 @@ class FormTree(BaseModel):
             if group.omitted:
                 group.omitted = False
         if isinstance(target, UnionNode):
+            target.emit_null = False
             target.error = None
         if self.draft_path is not None:
             _snap.draft_save(self, self.draft_path)

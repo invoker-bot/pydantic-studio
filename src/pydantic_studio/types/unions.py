@@ -49,6 +49,7 @@ class UnionBuilder:
             inner_builder = self._registry.find(inner_type)
             inner = inner_builder.build(inner_type, field_info, existing)
             inner.required = False  # Optional implies not required
+            inner.nullable = True
             # Optional[Model] defaulting to None starts *omitted*: the
             # demoted GroupNode pre-fills children with schema defaults
             # for display, but the field's value is still None until the
@@ -75,6 +76,7 @@ class UnionBuilder:
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
+            nullable=is_optional_type(unwrapped),
             variant_type_names=[_fq(v) for v in variants],
             selected_index=selected_index,
             selected=selected,

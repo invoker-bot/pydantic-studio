@@ -47,6 +47,7 @@ class AnyBuilder:
             name=field_info.alias or "<unnamed>",
             description=field_info.description,
             required=field_info.is_required(),
+            nullable=True,
             mode=AnyValueNode.infer_mode(seed),
             value=seed,
         )

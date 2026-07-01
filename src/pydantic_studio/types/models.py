@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, get_args
 
 from pydantic import (
     BaseModel,
@@ -14,7 +14,11 @@ from pydantic import (
 )
 
 from pydantic_studio.tree.nodes import GroupNode
-from pydantic_studio.types.aliases import input_value_for_field
+from pydantic_studio.types.aliases import (
+    input_value_or_missing_for_field,
+    is_missing_input_value,
+)
+from pydantic_studio.types.annotated import is_literal_type, is_optional_type, strip_annotated
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -52,6 +56,28 @@ def _parse_existing(field_info: FieldInfo, raw: Any) -> Any:
         return TypeAdapter(annotation).validate_python(raw)
     except ValidationError:
         return raw
+
+
+def _field_allows_none(field_info: FieldInfo) -> bool:
+    annotation = strip_annotated(field_info.annotation)
+    if annotation is Any or annotation is None or annotation is type(None):
+        return True
+    if is_optional_type(annotation):
+        return True
+    return is_literal_type(annotation) and None in get_args(annotation)
+
+
+def _mark_explicit_null(child: Any) -> None:
+    child.emit_null = True
+    if isinstance(child, GroupNode):
+        child.omitted = True
+        return
+    if hasattr(child, "selected"):
+        child.selected = None
+    if hasattr(child, "selected_index"):
+        child.selected_index = None
+    if hasattr(child, "value"):
+        child.value = None
 
 
 class GroupBuilder:
@@ -96,10 +122,16 @@ class GroupBuilder:
             if child_type is None:
                 child_type = str  # fallback — shouldn't happen in practice
             child_builder = self._registry.find(child_type)
-            child_existing = input_value_for_field(existing_dict, fname, finfo)
+            child_existing = input_value_or_missing_for_field(existing_dict, fname, finfo)
+            explicit_null = child_existing is None
+            if is_missing_input_value(child_existing):
+                child_existing = None
             if child_existing is not None and _has_transforming_validator(finfo):
                 child_existing = _parse_existing(finfo, child_existing)
             child = child_builder.build(child_type, finfo, child_existing)
+            child.nullable = _field_allows_none(finfo)
+            if explicit_null:
+                _mark_explicit_null(child)
             # The child builder uses ``field_info.alias`` (or "<unnamed>") as a
             # placeholder; overwrite with the real field-attribute name from
             # the parent's ``model_fields`` so users' aliases stay untouched.
