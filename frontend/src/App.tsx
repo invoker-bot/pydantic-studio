@@ -34,6 +34,15 @@ function submitErrorHeading(errors: SubmitError[]): string {
   return `${errors.length} ${label}${errors.length === 1 ? "" : "s"}:`;
 }
 
+function notifyHost(type: "pydantic-studio:submitted" | "pydantic-studio:cancelled") {
+  // window.parent === window when run standalone (not embedded in an
+  // iframe) — posting to ourselves in that case is harmless.
+  window.parent.postMessage(
+    { type, sessionId: window.__PYDANTIC_STUDIO__?.sessionId },
+    window.location.origin,
+  );
+}
+
 export default function App() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["tree"],
@@ -161,6 +170,7 @@ export default function App() {
       onSuccess: (response) => {
         if (response.ok) {
           setStatus("saved");
+          notifyHost("pydantic-studio:submitted");
         } else {
           setSubmitErrors(response.errors);
         }
@@ -176,7 +186,10 @@ export default function App() {
   const handleCancel = () => {
     setActionError(null);
     cancel.mutate(undefined, {
-      onSuccess: () => setStatus("cancelled"),
+      onSuccess: () => {
+        setStatus("cancelled");
+        notifyHost("pydantic-studio:cancelled");
+      },
       onError: (err) => {
         setActionError(
           `Cancel failed: ${err instanceof Error ? err.message : String(err)}`,

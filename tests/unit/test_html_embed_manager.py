@@ -44,6 +44,7 @@ def test_session_base_path_carries_full_external_prefix() -> None:
     index = client.get(f"/s/{sid}/")
     assert index.status_code == 200
     assert f'"basePath": "/config-studio/s/{sid}"' in index.text
+    assert f'"sessionId": "{sid}"' in index.text
 
 
 def test_mount_embed_app_mounts_manager_onto_host_at_prefix() -> None:

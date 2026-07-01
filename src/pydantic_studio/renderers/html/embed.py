@@ -104,7 +104,9 @@ class StudioEmbedManager:
             readonly_paths=readonly_paths,
         )
         base_path = f"{self.host_external_path}/s/{session_id}"
-        server = StudioServer(session=session, base_path=base_path)
+        server = StudioServer(
+            session=session, base_path=base_path, session_id=session_id
+        )
         self.app.mount(f"/s/{session_id}", server.app)
         route = self.app.router.routes[-1]
         self._sessions[session_id] = (server, route)

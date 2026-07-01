@@ -58,6 +58,7 @@ class StudioServer:
         readonly_paths: Iterable[str] = (),
         session: EditSession | None = None,
         base_path: str = "",
+        session_id: str | None = None,
     ) -> None:
         _reject_session_parameter_conflicts(
             "StudioServer",
@@ -76,6 +77,7 @@ class StudioServer:
             )
         self.session = session
         self.base_path = normalize_base_path(base_path)
+        self.session_id = session_id
         self.app = FastAPI()
         self.last_heartbeat_ts: float = 0.0
         self.heartbeat_timeout_seconds = heartbeat_timeout_seconds
@@ -162,10 +164,13 @@ class StudioServer:
                 'href="/static/dist/',
                 f'href="{escaped_base_path}/static/dist/',
             )
-        config = _json_for_script({"basePath": self.base_path})
+        config: dict[str, str] = {"basePath": self.base_path}
+        if self.session_id is not None:
+            config["sessionId"] = self.session_id
+        config_json = _json_for_script(config)
         script = (
             "<script>"
-            f"window.__PYDANTIC_STUDIO__ = {config};"
+            f"window.__PYDANTIC_STUDIO__ = {config_json};"
             "</script>"
         )
         index = index.replace("</head>", f"    {script}\n  </head>")

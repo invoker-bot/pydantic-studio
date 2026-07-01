@@ -2,6 +2,7 @@ declare global {
   interface Window {
     __PYDANTIC_STUDIO__?: {
       basePath?: string;
+      sessionId?: string;
     };
   }
 }
