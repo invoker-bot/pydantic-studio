@@ -128,7 +128,14 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.get("/api/tree", response_class=JSONResponse)
     async def api_tree() -> JSONResponse:
-        return JSONResponse(content=_tree_payload(server))
+        try:
+            payload = _tree_payload(server)
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"tree load failed: {exc}"},
+            )
+        return JSONResponse(content=payload)
 
     @app.post("/api/mutations", response_class=JSONResponse)
     async def api_mutations(request: Request) -> JSONResponse:

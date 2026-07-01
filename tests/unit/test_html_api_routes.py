@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time as _time
+from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
@@ -11,6 +12,9 @@ from pydantic_studio import build_form_tree
 from pydantic_studio.renderers.html import StudioServer
 from pydantic_studio.session import SubmitResult
 from pydantic_studio.variants import VariantRegistry, VariantSpec, build_variant_form_tree
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class _Demo(BaseModel):
@@ -90,6 +94,25 @@ def test_api_tree_returns_json_for_non_finite_float_defaults() -> None:
     value = next(f for f in body["root"]["fields"] if f["name"] == "value")
     assert value["value"] == "NaN"
     assert value["default"] == "NaN"
+
+
+def test_api_tree_exception_returns_json_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic_studio.renderers.html import routes
+
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+
+    def broken_tree_payload(_server: StudioServer) -> dict[str, object]:
+        raise RuntimeError("tree backend unavailable")
+
+    monkeypatch.setattr(routes, "_tree_payload", broken_tree_payload)
+    response = TestClient(server.app, raise_server_exceptions=False).get("/api/tree")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {"detail": "tree load failed: tree backend unavailable"}
 
 
 def test_api_mutations_accept_non_finite_float_wire_strings() -> None:
