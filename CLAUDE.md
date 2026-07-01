@@ -11,8 +11,8 @@ immediately.
   YAML / TOML / JSON config files against a strongly-typed schema.
 - **Status**: v0.4.0 alpha — all 9 implementation phases, the
   task-oriented overhaul, TUI form mode, the React-backed web app, and
-  root model variants are merged on master. Current local gate: 1255
-  tests: 1212 default tests plus 43 explicit Playwright browser e2e tests, ruff
+  root model variants are merged on master. Current local gate: 1256
+  tests: 1212 default tests plus 44 explicit Playwright browser e2e tests, ruff
   clean, pyright clean for production code, `mkdocs build --strict`
   clean, frontend bundle build clean, `uv build` clean, `twine check`
   clean, and wheel/sdist install smoke clean. CI runs the default suite

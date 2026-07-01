@@ -35,6 +35,10 @@ class _SingleTagLimitSchema(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=1)
 
 
+class _SingleEnvLimitSchema(BaseModel):
+    env: dict[str, int] = Field(default_factory=dict, max_length=1)
+
+
 def _find_free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -113,6 +117,23 @@ def test_sequence_add_race_announces_rejected_length_mutation(page: Page) -> Non
         )
 
         add_button = page.get_by_role("button", name="add tags item")
+        add_button.dblclick()
+
+        alert = page.get_by_role("alert")
+        expect(alert).to_contain_text("length must be <= 1", timeout=5000)
+        describedby = add_button.get_attribute("aria-describedby")
+        assert describedby is not None
+        expect(page.locator(f'[id="{describedby}"]')).to_have_attribute("role", "alert")
+
+
+def test_mapping_add_race_announces_rejected_length_mutation(page: Page) -> None:
+    with _serve_tree(_SingleEnvLimitSchema) as base_url:
+        page.goto(f"{base_url}/")
+        expect(page.get_by_role("heading", name="_SingleEnvLimitSchema")).to_be_visible(
+            timeout=5000
+        )
+
+        add_button = page.get_by_role("button", name="add env entry")
         add_button.dblclick()
 
         alert = page.get_by_role("alert")

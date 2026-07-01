@@ -63,17 +63,31 @@ export function MappingField({
 }: { node: MappingNodeData; path: string }) {
   const mutation = useApplyMutation();
   const flags = useFormFlags();
+  const [structureError, setStructureError] = useState<string | null>(null);
   const readonlyStructure = hasReadonlyUnder(flags, path);
   const structureDisabled = readonlyStructure;
+  const structureErrorPath = `${path}.structure`;
   const entryCount = node.entries.length;
   const atMinLength = node.min_length !== null && entryCount <= node.min_length;
   const atMaxLength = node.max_length !== null && entryCount >= node.max_length;
 
+  const structuralErrorProps = fieldErrorControlProps(
+    structureError,
+    structureErrorPath,
+  );
+  const onStructureError = (e: unknown) =>
+    setStructureError(e instanceof Error ? e.message : String(e));
   const onAdd = () => {
-    mutation.mutate({ op: "add_entry", path, key: nextDefaultKey(node) });
+    mutation.mutate(
+      { op: "add_entry", path, key: nextDefaultKey(node) },
+      { onSuccess: () => setStructureError(null), onError: onStructureError },
+    );
   };
   const onRemove = (index: number) =>
-    mutation.mutate({ op: "remove_entry", path, index });
+    mutation.mutate(
+      { op: "remove_entry", path, index },
+      { onSuccess: () => setStructureError(null), onError: onStructureError },
+    );
 
   return (
     <FieldRow>
@@ -98,6 +112,7 @@ export function MappingField({
             valuePath={childPath(path, index)}
             onRemove={() => onRemove(index)}
             removeDisabled={structureDisabled || atMinLength}
+            removeErrorProps={structuralErrorProps}
             keyDisabled={structureDisabled}
           />
         ))}
@@ -109,10 +124,12 @@ export function MappingField({
           disabled={structureDisabled || atMaxLength}
           onClick={onAdd}
           aria-label={`add ${node.name} entry`}
+          {...structuralErrorProps}
         >
           + Add Entry
         </Button>
       </div>
+      <FieldError message={structureError} path={structureErrorPath} />
       <FieldError message={node.error} />
     </FieldRow>
   );
@@ -126,6 +143,7 @@ function MappingEntry({
   valuePath,
   onRemove,
   removeDisabled,
+  removeErrorProps,
   keyDisabled,
 }: {
   entryKey: string;
@@ -135,6 +153,7 @@ function MappingEntry({
   valuePath: string;
   onRemove: () => void;
   removeDisabled: boolean;
+  removeErrorProps: ReturnType<typeof fieldErrorControlProps>;
   keyDisabled: boolean;
 }) {
   const mutation = useApplyMutation();
@@ -185,6 +204,7 @@ function MappingEntry({
           disabled={removeDisabled}
           onClick={onRemove}
           aria-label={`remove entry ${entryKey}`}
+          {...removeErrorProps}
         >
           x
         </Button>
