@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from pydantic_studio.tree.nodes import MappingNode
 from pydantic_studio.types.annotated import strip_annotated
 from pydantic_studio.types.metadata import extract_constraints
+from pydantic_studio.types.transforms import (
+    field_info_from_annotation,
+    parse_existing_if_transforming,
+)
 from pydantic_studio.types.utils import _fq, field_default
 
 if TYPE_CHECKING:
@@ -25,8 +29,6 @@ class DictBuilder:
         return get_origin(strip_annotated(type_)) is dict
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> MappingNode:
-        from pydantic.fields import FieldInfo as _FI
-
         unwrapped = strip_annotated(type_)
         args = get_args(unwrapped)
         key_type = args[0] if len(args) >= 1 else str
@@ -38,9 +40,11 @@ class DictBuilder:
         if isinstance(seed, dict):
             key_builder = self._registry.find(key_type)
             value_builder = self._registry.find(value_type)
-            key_finfo = _FI(annotation=key_type)
-            value_finfo = _FI(annotation=value_type)
+            key_finfo = field_info_from_annotation(key_type)
+            value_finfo = field_info_from_annotation(value_type)
             for raw_key, raw_value in seed.items():
+                raw_key = parse_existing_if_transforming(key_finfo, raw_key)
+                raw_value = parse_existing_if_transforming(value_finfo, raw_value)
                 k_node = key_builder.build(key_type, key_finfo, raw_key)
                 v_node = value_builder.build(value_type, value_finfo, raw_value)
                 k_node.name = "key"

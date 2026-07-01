@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, get_args
+from typing import TYPE_CHECKING, Any, get_args
 
 from pydantic import (
     BaseModel,
-    BeforeValidator,
-    PlainValidator,
-    TypeAdapter,
-    ValidationError,
-    WrapValidator,
 )
 
 from pydantic_studio.tree.nodes import GroupNode, MappingNode, SequenceNode
@@ -19,44 +14,15 @@ from pydantic_studio.types.aliases import (
     is_missing_input_value,
 )
 from pydantic_studio.types.annotated import is_literal_type, is_optional_type, strip_annotated
+from pydantic_studio.types.transforms import (
+    has_transforming_validator,
+    parse_existing_if_transforming,
+)
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
     from pydantic_studio.types.registry import Registry
-
-_TRANSFORMING_VALIDATORS = (PlainValidator, BeforeValidator, WrapValidator)
-
-
-def _has_transforming_validator(field_info: FieldInfo) -> bool:
-    """True iff the field's metadata can rewrite the wire value into a
-    different runtime representation (decrypt, normalize, …)."""
-    return any(
-        isinstance(meta, _TRANSFORMING_VALIDATORS) for meta in field_info.metadata
-    )
-
-
-def _parse_existing(field_info: FieldInfo, raw: Any) -> Any:
-    """Run a raw on-disk value through the field's own validators.
-
-    Loading must be symmetric with saving: ``model_dump`` applies
-    serializers, so the tree has to hold *post-validator* (runtime)
-    values or every transform gets re-applied on save (the
-    double-encryption bug for encrypt/decrypt secret fields).
-
-    ``ValidationError`` falls back to the raw value — the user may be
-    repairing a broken file and needs to see what's on disk. Any other
-    exception (e.g. a wrong decryption key) propagates: corrupting
-    silently is worse than failing loudly.
-    """
-    annotation: Any = field_info.annotation
-    if field_info.metadata:
-        annotation = Annotated[tuple([annotation, *field_info.metadata])]
-    try:
-        return TypeAdapter(annotation).validate_python(raw)
-    except ValidationError:
-        return raw
-
 
 def _field_allows_none(field_info: FieldInfo) -> bool:
     annotation = strip_annotated(field_info.annotation)
@@ -116,7 +82,7 @@ class GroupBuilder:
             # re-serializes the runtime value back into wire form. Pull
             # those straight off the instance instead.
             for fname, finfo in type(existing).model_fields.items():
-                if fname in existing_dict and _has_transforming_validator(finfo):
+                if fname in existing_dict and has_transforming_validator(finfo):
                     existing_dict[fname] = getattr(existing, fname)
         elif isinstance(existing, dict):
             existing_dict = existing
@@ -133,8 +99,7 @@ class GroupBuilder:
             explicit_null = child_existing is None
             if is_missing_input_value(child_existing):
                 child_existing = None
-            if child_existing is not None and _has_transforming_validator(finfo):
-                child_existing = _parse_existing(finfo, child_existing)
+            child_existing = parse_existing_if_transforming(finfo, child_existing)
             child = child_builder.build(child_type, finfo, child_existing)
             child.nullable = _field_allows_none(finfo)
             if explicit_null:

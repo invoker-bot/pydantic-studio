@@ -66,6 +66,16 @@ class _Outer(BaseModel):
     note: str = ""
 
 
+class _VaultList(BaseModel):
+    api_keys: list[_EncryptedSecret]
+    leverage: int = 1
+
+
+class _VaultMap(BaseModel):
+    api_keys: dict[str, _EncryptedSecret]
+    leverage: int = 1
+
+
 def _normalize(value: Any) -> str:
     return f"<{value}>" if not str(value).startswith("<") else str(value)
 
@@ -99,6 +109,29 @@ def test_nested_group_fields_are_parsed_too() -> None:
     assert tree._resolve_path("vault.api_key").value == "nested"
     dumped = tree.to_instance().model_dump(mode="json")
     assert dumped["vault"]["api_key"] == "ENC[nested]"
+
+
+def test_sequence_items_with_transforming_validators_are_parsed_too() -> None:
+    tree = build_form_tree(
+        _VaultList, existing={"api_keys": ["ENC[first]"], "leverage": 2}
+    )
+
+    assert tree._resolve_path("api_keys[0]").value == "first"
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["api_keys"] == ["ENC[first]"]
+
+
+def test_mapping_values_with_transforming_validators_are_parsed_too() -> None:
+    tree = build_form_tree(
+        _VaultMap, existing={"api_keys": {"primary": "ENC[first]"}, "leverage": 2}
+    )
+    api_keys = tree._resolve_path("api_keys")
+
+    assert api_keys.entries[0][1].value == "first"
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["api_keys"] == {"primary": "ENC[first]"}
 
 
 def test_plain_validator_transform_applies_to_non_secret_types() -> None:

@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from pydantic_studio.tree.nodes import SequenceNode
 from pydantic_studio.types.annotated import strip_annotated
 from pydantic_studio.types.metadata import extract_constraints
+from pydantic_studio.types.transforms import (
+    field_info_from_annotation,
+    parse_existing_if_transforming,
+)
 from pydantic_studio.types.utils import _fq, field_default
 
 if TYPE_CHECKING:
@@ -26,8 +30,6 @@ def _build_items(
     Each child gets a synthetic FieldInfo carrying the item annotation —
     the parent's FieldInfo describes the *container*, not the items.
     """
-    from pydantic.fields import FieldInfo
-
     if existing is None:
         return []
     if not isinstance(existing, (list, tuple, set, frozenset)):
@@ -36,10 +38,11 @@ def _build_items(
             f"{type(existing).__name__}"
         )
         raise TypeError(msg)
-    item_finfo = FieldInfo(annotation=item_type)
+    item_finfo = field_info_from_annotation(item_type)
     item_builder = registry.find(item_type)
     items: list[Any] = []
     for i, v in enumerate(existing):
+        v = parse_existing_if_transforming(item_finfo, v)
         child = item_builder.build(item_type, item_finfo, v)
         child.name = str(i)
         items.append(child)
@@ -112,8 +115,6 @@ class TupleBuilder:
         return unwrapped is tuple or get_origin(unwrapped) is tuple
 
     def build(self, type_: type, field_info: FieldInfo, existing: Any) -> SequenceNode:
-        from pydantic.fields import FieldInfo as _FI
-
         unwrapped = strip_annotated(type_)
         args = get_args(unwrapped)
         c = extract_constraints(field_info)
@@ -154,9 +155,10 @@ class TupleBuilder:
         while len(existing_seq) < len(args):
             existing_seq.append(None)
         for i, slot_type in enumerate(args):
-            slot_finfo = _FI(annotation=slot_type)
+            slot_finfo = field_info_from_annotation(slot_type)
             slot_builder = self._registry.find(slot_type)
-            child = slot_builder.build(slot_type, slot_finfo, existing_seq[i])
+            slot_existing = parse_existing_if_transforming(slot_finfo, existing_seq[i])
+            child = slot_builder.build(slot_type, slot_finfo, slot_existing)
             child.name = str(i)
             items.append(child)
         return SequenceNode(
