@@ -153,7 +153,7 @@ function MappingEntry({
           size="sm"
           disabled={removeDisabled}
           onClick={onRemove}
-          aria-label="remove entry"
+          aria-label={`remove entry ${entryKey}`}
         >
           x
         </Button>

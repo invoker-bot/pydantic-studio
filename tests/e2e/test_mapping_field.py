@@ -75,10 +75,14 @@ def test_add_entry_rename_key(page: Page, fastapi_url: str) -> None:
     # The key input has aria-label="entry key".
     key_input = page.get_by_label("entry key").first
     expect(key_input).to_have_value("key0", timeout=5000)
+    expect(page.get_by_role("button", name="remove entry key0")).to_be_visible()
 
     # Rename the key to "TZ"
     key_input.fill("TZ")
     key_input.blur()
+    expect(page.get_by_role("button", name="remove entry TZ")).to_be_visible(
+        timeout=5000
+    )
 
     # Server should reflect the new key after the rename_key round-trip.
     response = page.context.request.get(f"{fastapi_url}/api/tree")
@@ -143,5 +147,5 @@ def test_readonly_mapping_descendant_disables_structural_controls(
     expect(key_input).to_have_value("LOCKED", timeout=5000)
     expect(key_input).to_be_disabled()
 
-    expect(page.get_by_role("button", name="remove entry").first).to_be_disabled()
+    expect(page.get_by_role("button", name="remove entry LOCKED")).to_be_disabled()
     expect(page.get_by_role("button", name="+ Add Entry").first).to_be_disabled()
