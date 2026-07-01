@@ -4,6 +4,10 @@ import { Trash2 } from "lucide-react";
 import { useApplyMutation } from "@/api/mutations";
 import type { GroupNodeData } from "@/api/schemas";
 import {
+  FieldError,
+  fieldErrorControlProps,
+} from "@/components/form/chrome/FieldError";
+import {
   hasErrorUnder,
   hasReadonlyUnder,
   useFormFlags,
@@ -51,6 +55,8 @@ function NestedGroup({
   const mutation = useApplyMutation();
   const errored = hasErrorUnder(flags, path);
   const readonlyStructure = hasReadonlyUnder(flags, path);
+  const [clearError, setClearError] = useState<string | null>(null);
+  const clearErrorPath = `${path}.clear`;
 
   useEffect(() => {
     if (errored) setExpanded(true);
@@ -91,10 +97,24 @@ function NestedGroup({
             aria-label={`Clear ${node.name}`}
             title={`Clear ${node.name}`}
             disabled={unset || readonlyStructure || mutation.isPending}
+            {...fieldErrorControlProps(clearError, clearErrorPath)}
             onClick={() => {
+              setClearError(null);
               mutation.mutate(
                 { op: "set_value", path, value: null },
-                { onSuccess: () => setExpanded(false) },
+                {
+                  onSuccess: () => {
+                    setClearError(null);
+                    setExpanded(false);
+                  },
+                  onError: (err) => {
+                    setClearError(
+                      `Clear failed: ${
+                        err instanceof Error ? err.message : String(err)
+                      }`,
+                    );
+                  },
+                },
               );
             }}
           >
@@ -102,6 +122,11 @@ function NestedGroup({
           </Button>
         )}
       </div>
+      {clearError && (
+        <div className="px-3 pb-2">
+          <FieldError message={clearError} path={clearErrorPath} />
+        </div>
+      )}
       {expanded && (
         <div className="space-y-4 border-t border-zinc-200 p-4 bg-white">
           {node.fields.map((child) => (

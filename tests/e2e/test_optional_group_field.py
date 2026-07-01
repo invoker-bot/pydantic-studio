@@ -98,3 +98,30 @@ def test_clear_optional_group_removes_existing_nested_model(page: Page) -> None:
         port = next(f for f in primary["fields"] if f["name"] == "port")
         assert host["value"] is None
         assert port["value"] == 5432
+
+
+def test_clear_optional_group_transport_failure_is_announced(page: Page) -> None:
+    with _serve_optional_group_tree() as base_url:
+        page.route(
+            "**/api/mutations",
+            lambda route: route.fulfill(status=500, body="mutation unavailable"),
+        )
+        page.goto(f"{base_url}/")
+        expect(page.get_by_role("heading", name="_OptionalGroupSchema")).to_be_visible(
+            timeout=5000
+        )
+        preview = page.get_by_test_id("tree-preview")
+        expect(preview).to_contain_text("db.internal", timeout=5000)
+
+        clear = page.get_by_role("button", name="Clear primary")
+        expect(clear).to_be_enabled()
+        clear.click()
+
+        alert = page.get_by_role("alert")
+        expect(alert).to_contain_text("Clear failed:", timeout=5000)
+        expect(alert).to_contain_text("HTTP 500")
+        describedby = clear.get_attribute("aria-describedby")
+        assert describedby is not None
+        expect(page.locator(f'[id="{describedby}"]')).to_have_attribute("role", "alert")
+        expect(preview).to_contain_text("db.internal")
+        expect(clear).to_be_enabled()
