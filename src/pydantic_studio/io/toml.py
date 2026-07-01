@@ -82,7 +82,7 @@ def _build_document(data: dict[str, Any], schema: type[BaseModel]) -> Any:
             continue
         if output_key in field_output_keys:
             continue
-        doc.add(output_key, value)
+        doc.add(output_key, _omit_toml_none_mapping_values(value))
     for field_name, field_info in schema.model_fields.items():
         output_key = _output_key_for_field(field_name, field_info)
         if output_key not in data:
@@ -96,8 +96,20 @@ def _build_document(data: dict[str, Any], schema: type[BaseModel]) -> Any:
         else:
             if field_info.description:
                 doc.add(comment(field_info.description))
-            doc.add(output_key, value)
+            doc.add(output_key, _omit_toml_none_mapping_values(value))
     return doc
+
+
+def _omit_toml_none_mapping_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _omit_toml_none_mapping_values(item)
+            for key, item in value.items()
+            if item is not None
+        }
+    if isinstance(value, list):
+        return [_omit_toml_none_mapping_values(item) for item in value]
+    return value
 
 
 def _output_key_for_field(field_name: str, field_info: FieldInfo) -> str:

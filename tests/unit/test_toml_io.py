@@ -149,3 +149,47 @@ class TestSaveToml:
         assert "enabled = true" in content
         assert "note" not in content
         assert load_toml(out, OptionalOuter).to_instance().inner == OptionalInner()
+
+    def test_save_omits_none_values_inside_model_list_items(
+        self, tmp_path: Path
+    ) -> None:
+        from pydantic_studio.io.toml import load_toml, save_toml
+
+        class Item(BaseModel):
+            enabled: bool = True
+            note: str | None = None
+
+        class ListHost(BaseModel):
+            items: list[Item] = Field(default_factory=lambda: [Item()])
+
+        out = tmp_path / "model-list.toml"
+        tree = build_form_tree(ListHost)
+
+        save_toml(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert "enabled = true" in content
+        assert "note" not in content
+        assert load_toml(out, ListHost).to_instance().items == [Item()]
+
+    def test_save_omits_none_values_inside_model_mapping_values(
+        self, tmp_path: Path
+    ) -> None:
+        from pydantic_studio.io.toml import load_toml, save_toml
+
+        class Item(BaseModel):
+            enabled: bool = True
+            note: str | None = None
+
+        class MappingHost(BaseModel):
+            items: dict[str, Item] = Field(default_factory=lambda: {"one": Item()})
+
+        out = tmp_path / "model-map.toml"
+        tree = build_form_tree(MappingHost)
+
+        save_toml(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert "enabled = true" in content
+        assert "note" not in content
+        assert load_toml(out, MappingHost).to_instance().items == {"one": Item()}
