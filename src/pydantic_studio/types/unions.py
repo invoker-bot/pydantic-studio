@@ -86,6 +86,7 @@ class UnionBuilder:
             required=field_info.is_required(),
             nullable=is_optional_type(unwrapped),
             variant_type_names=[_fq(v) for v in variants],
+            variant_annotations=variants,
             selected_index=selected_index,
             selected=selected,
         )

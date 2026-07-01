@@ -65,6 +65,10 @@ class _RequiredUnionHolder(BaseModel):
     value: int | str
 
 
+class _AnnotatedUnionHolder(BaseModel):
+    value: Annotated[int, Field(gt=0)] | Annotated[str, Field(min_length=2)]
+
+
 def test_optional_demotes_to_inner_type_node() -> None:
     """``str | None`` becomes a StringNode with required=False, NOT a UnionNode."""
     tree = build_form_tree(WithOptional)
@@ -256,6 +260,24 @@ def test_set_value_rejects_unmatched_unselected_union_without_mutating() -> None
     assert tree.snapshots == []
 
 
+def test_set_value_rejects_annotated_unselected_union_variant_without_mutating() -> None:
+    tree = build_form_tree(_AnnotatedUnionHolder)
+
+    result = tree.set_value("value", -1)
+
+    assert result.ok is False
+    assert result.errors == (
+        "no union variant accepted value: "
+        "variant 0 (builtins.int): must be > 0; "
+        "variant 1 (builtins.str): expected str, got int",
+    )
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index is None
+    assert val.selected is None
+    assert tree.snapshots == []
+
+
 def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     tree = build_form_tree(WithUnion, existing={"value": "keep-me"})
 
@@ -268,6 +290,20 @@ def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     assert val.selected_index == 1
     assert isinstance(val.selected, StringNode)
     assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
+def test_select_variant_rejects_annotated_seed_without_mutating() -> None:
+    tree = build_form_tree(_AnnotatedUnionHolder)
+
+    result = tree.select_variant("value", 1, seed="x")
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 2",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index is None
+    assert val.selected is None
     assert tree.snapshots == []
 
 

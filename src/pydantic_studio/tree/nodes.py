@@ -1139,6 +1139,7 @@ class UnionNode(FormNode):
 
     kind: Literal["union"] = "union"
     variant_type_names: list[str]
+    variant_annotations: list[Any] | None = Field(default=None, exclude=True, repr=False)
     selected_index: int | None = None
     selected: "AnyNode | None" = None
 
@@ -1512,9 +1513,14 @@ def _attach_runtime_annotations_to_node(node: Any, annotation: Any) -> None:
                 _attach_runtime_annotations_to_node(key_node, key_annotation)
                 _attach_runtime_annotations_to_node(value_node, value_annotation)
         return
-    if isinstance(node, UnionNode) and node.selected is not None:
+    if isinstance(node, UnionNode):
         args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
-        if node.selected_index is not None and node.selected_index < len(args):
+        node.variant_annotations = list(args)
+        if (
+            node.selected is not None
+            and node.selected_index is not None
+            and node.selected_index < len(args)
+        ):
             _attach_runtime_annotations_to_node(node.selected, args[node.selected_index])
 
 
@@ -1546,6 +1552,13 @@ def _mapping_value_annotation(mp: MappingNode) -> Any:
     resolved_type = _resolve_type_name(mp.value_type_name)
     if mp.value_annotation is not None:
         return mp.value_annotation
+    return resolved_type
+
+
+def _union_variant_annotation(union: UnionNode, index: int) -> Any:
+    resolved_type = _resolve_type_name(union.variant_type_names[index])
+    if union.variant_annotations is not None and index < len(union.variant_annotations):
+        return union.variant_annotations[index]
     return resolved_type
 
 
@@ -2373,19 +2386,18 @@ class FormTree(BaseModel):
         union: UnionNode,
         value: Any,
     ) -> tuple[ValidationResult, int | None, AnyNode | None]:
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         reg = default_registry()
         errors_by_variant: list[str] = []
         for index, type_name in enumerate(union.variant_type_names):
-            variant_type = _resolve_type_name(type_name)
+            variant_type = _union_variant_annotation(union, index)
             builder = reg.find(variant_type)
             selected, errors = _build_seeded_node(
                 builder,
                 variant_type,
-                FieldInfo(annotation=variant_type),
+                field_info_from_annotation(variant_type),
                 value,
             )
             if not errors and selected is not None:
@@ -2915,10 +2927,9 @@ class FormTree(BaseModel):
         If ``seed`` is provided, the freshly-built variant is initialized
         with that value (otherwise its value is None / default).
         """
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         union = self._walk_to_union(path)
         index_result = self._validate_index_argument("variant_index", variant_index)
@@ -2931,12 +2942,12 @@ class FormTree(BaseModel):
                     f"(0..{len(union.variant_type_names) - 1})"
                 ]
             )
-        v_type = _resolve_type_name(union.variant_type_names[variant_index])
+        v_type = _union_variant_annotation(union, variant_index)
         if variant_index == union.selected_index and seed is _UNSET_VALUE:
             return ValidationResult.ok()
         builder = default_registry().find(v_type)
         new_selected, errors = _build_seeded_node(
-            builder, v_type, FieldInfo(annotation=v_type), seed
+            builder, v_type, field_info_from_annotation(v_type), seed
         )
         if errors:
             return ValidationResult.fail(errors)
