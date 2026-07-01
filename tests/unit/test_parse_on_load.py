@@ -25,6 +25,7 @@ from pydantic import (
 )
 
 from pydantic_studio import build_form_tree, load_yaml, save_yaml
+from pydantic_studio.tree.nodes import UnionNode
 
 
 class _CodecError(RuntimeError):
@@ -93,6 +94,20 @@ class _OptionalVaultMap(BaseModel):
 
 class _OptionalVaultTuple(BaseModel):
     api_keys: tuple[_EncryptedSecret | None, ...]
+    leverage: int = 1
+
+
+class _CredentialRef(BaseModel):
+    name: str
+
+
+class _UnionVault(BaseModel):
+    credential: _EncryptedSecret | _CredentialRef
+    leverage: int = 1
+
+
+class _UnionVaultList(BaseModel):
+    credentials: list[_EncryptedSecret | _CredentialRef]
     leverage: int = 1
 
 
@@ -203,6 +218,38 @@ def test_optional_tuple_items_with_transforming_validators_are_parsed_too() -> N
     tree.set_value("leverage", 5)
     dumped = tree.to_instance().model_dump(mode="json")
     assert dumped["api_keys"] == ["ENC[first]", None]
+
+
+def test_true_union_transforming_variant_is_preselected_from_wire_value() -> None:
+    tree = build_form_tree(
+        _UnionVault,
+        existing={"credential": "ENC[union]", "leverage": 2},
+    )
+    credential = tree._resolve_path("credential")
+
+    assert isinstance(credential, UnionNode)
+    assert credential.selected_index == 0
+    assert credential.selected is not None
+    assert credential.selected.value == "union"
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["credential"] == "ENC[union]"
+
+
+def test_sequence_true_union_transforming_variant_is_preselected() -> None:
+    tree = build_form_tree(
+        _UnionVaultList,
+        existing={"credentials": ["ENC[first]"], "leverage": 2},
+    )
+    credential = tree._resolve_path("credentials[0]")
+
+    assert isinstance(credential, UnionNode)
+    assert credential.selected_index == 0
+    assert credential.selected is not None
+    assert credential.selected.value == "first"
+    tree.set_value("leverage", 5)
+    dumped = tree.to_instance().model_dump(mode="json")
+    assert dumped["credentials"] == ["ENC[first]"]
 
 
 def test_plain_validator_transform_applies_to_non_secret_types() -> None:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from pydantic_studio.tree.nodes import GroupNode, MappingNode, SequenceNode, UnionNode
 from pydantic_studio.types.annotated import (
@@ -20,7 +20,9 @@ from pydantic_studio.types.annotated import (
 )
 from pydantic_studio.types.transforms import (
     field_info_from_annotation,
+    has_transforming_validator,
     parse_existing_if_transforming,
+    validate_existing,
 )
 from pydantic_studio.types.utils import _fq, field_default
 
@@ -97,16 +99,23 @@ class UnionBuilder:
         for BaseModel variants where isinstance fails, try model_validate
         (covers dict→model coercion). Build the variant node on success.
         """
-        from pydantic.fields import FieldInfo as _FI
-
         if candidate is None:
             return None, None
         for i, v_type in enumerate(variants):
+            variant_field_info = field_info_from_annotation(v_type)
+            if has_transforming_validator(variant_field_info):
+                try:
+                    parsed = validate_existing(variant_field_info, candidate)
+                except ValidationError:
+                    continue
+                v_builder = self._registry.find(v_type)
+                selected = v_builder.build(v_type, variant_field_info, parsed)
+                return i, selected
             try:
                 if isinstance(candidate, v_type):
                     v_builder = self._registry.find(v_type)
                     selected = v_builder.build(
-                        v_type, _FI(annotation=v_type), candidate
+                        v_type, variant_field_info, candidate
                     )
                     return i, selected
             except TypeError:
@@ -125,7 +134,7 @@ class UnionBuilder:
                     continue
                 v_builder = self._registry.find(v_type)
                 selected = v_builder.build(
-                    v_type, _FI(annotation=v_type), validated
+                    v_type, variant_field_info, validated
                 )
                 return i, selected
         return None, None

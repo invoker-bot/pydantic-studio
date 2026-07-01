@@ -22,6 +22,17 @@ def has_transforming_validator(field_info: FieldInfo) -> bool:
     )
 
 
+def _annotation_with_metadata(field_info: FieldInfo) -> Any:
+    annotation: Any = field_info.annotation
+    if field_info.metadata:
+        annotation = Annotated[tuple([annotation, *field_info.metadata])]
+    return annotation
+
+
+def validate_existing(field_info: FieldInfo, raw: Any) -> Any:
+    return TypeAdapter(_annotation_with_metadata(field_info)).validate_python(raw)
+
+
 def parse_existing(field_info: FieldInfo, raw: Any) -> Any:
     """Run a raw on-disk value through the field's own validators.
 
@@ -34,11 +45,8 @@ def parse_existing(field_info: FieldInfo, raw: Any) -> Any:
     exception (e.g. a wrong decryption key) propagates: corrupting
     silently is worse than failing loudly.
     """
-    annotation: Any = field_info.annotation
-    if field_info.metadata:
-        annotation = Annotated[tuple([annotation, *field_info.metadata])]
     try:
-        return TypeAdapter(annotation).validate_python(raw)
+        return validate_existing(field_info, raw)
     except ValidationError:
         return raw
 
