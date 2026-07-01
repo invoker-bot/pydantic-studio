@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { AnyValueNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -69,7 +69,10 @@ export function AnyField({
         {...fieldErrorControlProps(error, path)}
         name={node.name}
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
         onBlur={() => {
           const original = stringifyAny(node.value);
           if (local === original) return;

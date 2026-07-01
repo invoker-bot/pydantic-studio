@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { UUIDNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -68,13 +68,16 @@ export function UUIDField({ node, path }: { node: UUIDNode; path: string }) {
       <div className="flex gap-2">
         <Input
           id={`field-${path}`}
-        {...fieldErrorControlProps(error, path)}
+          {...fieldErrorControlProps(error, path)}
           name={node.name}
           type="text"
           className="font-mono text-sm"
           placeholder="00000000-0000-0000-0000-000000000000"
           value={local}
-          onChange={(e) => setLocal(e.target.value)}
+          onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
           onBlur={() => commit(local)}
         />
         <Button
@@ -85,6 +88,7 @@ export function UUIDField({ node, path }: { node: UUIDNode; path: string }) {
           onClick={() => {
             const next = generateUuid();
             setLocal(next);
+            clearFieldError(error, setError);
             commit(next);
           }}
         >

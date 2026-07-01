@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { DecimalNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { NumericConstraintChips } from "@/components/form/chrome/NumericConstraintChips";
@@ -47,7 +47,10 @@ export function DecimalField({ node, path }: { node: DecimalNode; path: string }
         type="text"
         inputMode="decimal"
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
         onBlur={() => {
           if (local === (node.value ?? "")) return;
           // Wire format is a string; backend coerces via Decimal(value).

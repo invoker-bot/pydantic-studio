@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { IntNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { NumericConstraintChips } from "@/components/form/chrome/NumericConstraintChips";
@@ -43,7 +43,10 @@ export function IntField({ node, path }: { node: IntNode; path: string }) {
         name={node.name}
         type="number"
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
         onBlur={() => {
           if (local === initial) return;
           // Local parse for the obvious "not a number" case.

@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { LiteralNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -45,6 +45,7 @@ export function LiteralField({ node, path }: { node: LiteralNode; path: string }
         value={local}
         onValueChange={(picked) => {
           setLocal(picked);
+          clearFieldError(error, setError);
           // Send the raw choice value; the server matches against the
           // original literal choices via __eq__.
           const matchedChoice = node.choices.find((c) => String(c) === picked);

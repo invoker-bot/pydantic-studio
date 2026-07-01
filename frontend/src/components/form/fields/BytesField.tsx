@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { BytesNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -52,7 +52,10 @@ export function BytesField({ node, path }: { node: BytesNodeT; path: string }) {
         className="font-mono text-sm"
         placeholder="deadbeef (hex)"
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
         onBlur={() => {
           if (local === (node.value ?? "")) return;
           const stripped = local.replace(/\s+/g, "");

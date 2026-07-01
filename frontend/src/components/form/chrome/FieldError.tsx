@@ -17,6 +17,13 @@ export function fieldErrorControlProps(message: string | null, path: string) {
   };
 }
 
+export function clearFieldError(
+  message: string | null,
+  setMessage: (message: string | null) => void,
+) {
+  if (message) setMessage(null);
+}
+
 export function FieldError({
   message,
   path,

@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { PatternNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -63,7 +63,10 @@ export function PatternField({ node, path }: { node: PatternNodeT; path: string 
         className="font-mono text-sm"
         placeholder="regex source"
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
         onBlur={() => {
           if (local === (node.value ?? "")) return;
           mutation.mutate(

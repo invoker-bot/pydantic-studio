@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { TimeNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
+import { FieldError, clearFieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -55,7 +55,10 @@ export function TimeField({ node, path }: { node: TimeNodeT; path: string }) {
         type="time"
         step="1"
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          clearFieldError(error, setError);
+        }}
         onBlur={() => {
           if (local === initial) return;
           const wire = local.trim() === "" ? null : local;

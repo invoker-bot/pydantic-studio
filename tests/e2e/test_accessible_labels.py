@@ -56,3 +56,9 @@ def test_field_validation_errors_are_announced_as_alerts(
     describedby_target = page.locator(f'[id="{describedby}"]')
     expect(describedby_target).to_have_attribute("role", "alert")
     expect(describedby_target).to_contain_text("must be >= 1")
+
+    workers.fill("2")
+
+    expect(page.get_by_role("alert")).to_have_count(0)
+    expect(workers).not_to_have_attribute("aria-invalid", "true")
+    assert workers.get_attribute("aria-describedby") is None
