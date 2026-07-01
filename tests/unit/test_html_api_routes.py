@@ -318,6 +318,21 @@ def test_api_submit_marks_server_submitted_and_returns_ok() -> None:
     assert server.submitted is True
 
 
+def test_api_mutations_after_submit_are_rejected_without_mutating() -> None:
+    server, client = _server_and_client({"name": "alpha", "workers": 4})
+    assert client.post("/api/submit").status_code == 200
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "name", "value": "beta"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "session already submitted"}
+    assert server.tree.root.find("name").value == "alpha"
+    assert server.submitted is True
+
+
 def test_api_submit_validation_failure_returns_400_with_errors() -> None:
     # Required field 'name' deliberately unset
     server, client = _server_and_client()
@@ -392,6 +407,21 @@ def test_api_cancel_marks_server_cancelled() -> None:
     response = client.post("/api/cancel")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+    assert server.cancelled is True
+
+
+def test_api_mutations_after_cancel_are_rejected_without_mutating() -> None:
+    server, client = _server_and_client({"name": "alpha", "workers": 4})
+    assert client.post("/api/cancel").status_code == 200
+
+    response = client.post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "name", "value": "beta"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "session already cancelled"}
+    assert server.tree.root.find("name").value == "alpha"
     assert server.cancelled is True
 
 

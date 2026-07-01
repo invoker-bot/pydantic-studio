@@ -114,6 +114,13 @@ def _mutation_error_path(mutation: dict[str, Any]) -> str:
     return path if isinstance(path, str) else ""
 
 
+def _terminal_session_detail(server: StudioServer) -> str | None:
+    outcome = server.session.outcome
+    if outcome is None:
+        return None
+    return f"session already {outcome.status}"
+
+
 def register(app: FastAPI, server: StudioServer) -> None:
     """Wire the SPA shell and JSON API routes onto the FastAPI app."""
 
@@ -152,6 +159,9 @@ def register(app: FastAPI, server: StudioServer) -> None:
                 content={"detail": "mutation request must be a JSON object"},
             )
         mutation = cast("dict[str, Any]", raw_mutation)
+        terminal_detail = _terminal_session_detail(server)
+        if terminal_detail is not None:
+            return JSONResponse(status_code=409, content={"detail": terminal_detail})
         readonly_error = _readonly_mutation_error(server, mutation)
         if readonly_error is None:
             result = dispatch_mutation(server.tree, mutation)
