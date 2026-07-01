@@ -39,6 +39,17 @@ def test_cli_module_docstring_describes_current_command_surface() -> None:
     assert "only the ``show`` subcommand" not in docstring
 
 
+def test_config_command_help_names_supported_extensions() -> None:
+    from pydantic_studio import supported_extensions
+
+    for command in ("fill", "run", "check", "edit"):
+        result = runner.invoke(app, [command, "--help"])
+
+        assert result.exit_code == 0
+        for extension in supported_extensions():
+            assert extension in result.output
+
+
 class TestShow:
     def test_show_renders_simple_schema(self) -> None:
         result = runner.invoke(app, ["show", "tests.fixtures.schemas:Simple"])

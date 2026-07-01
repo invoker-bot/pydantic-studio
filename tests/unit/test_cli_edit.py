@@ -248,7 +248,10 @@ def test_edit_unknown_frontend_is_rejected_before_schema_import() -> None:
 
 
 def test_edit_help_names_supported_file_formats() -> None:
+    from pydantic_studio import supported_extensions
+
     result = runner.invoke(app, ["edit", "--help"])
 
     assert result.exit_code == 0
-    assert "YAML, TOML, or JSON" in result.output
+    for extension in supported_extensions():
+        assert extension in result.output

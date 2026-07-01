@@ -34,6 +34,15 @@ from pydantic_studio.tree.nodes import (
 
 _JSON_VALUE_ADAPTER = TypeAdapter(object)
 
+
+def _supported_extensions_help() -> str:
+    from pydantic_studio.io.dispatch import supported_extensions
+
+    return ", ".join(supported_extensions())
+
+
+_CONFIG_EXTENSIONS_HELP = _supported_extensions_help()
+
 app = typer.Typer(
     name="pydantic-studio",
     help="Interactive editor for Pydantic models. Run `pydantic-studio show` "
@@ -325,7 +334,8 @@ def fill(
         "--out",
         "-o",
         help=(
-            "Path to write the stub. Format inferred from extension. "
+            f"Path to write the stub. Format inferred from extension "
+            f"({_CONFIG_EXTENSIONS_HELP}). "
             "If omitted, writes YAML to stdout."
         ),
     ),
@@ -345,7 +355,10 @@ def fill(
 @app.command()
 def run(
     target: str = typer.Argument(..., help="module:Class identifier."),
-    file: Path = typer.Argument(..., help="Path to a config file (extension picks format)."),  # noqa: B008
+    file: Path = typer.Argument(  # noqa: B008
+        ...,
+        help=f"Path to a config file; extension picks format ({_CONFIG_EXTENSIONS_HELP}).",
+    ),
 ) -> None:
     """Load a config file, validate against the schema, print the model dump."""
     from pydantic import ValidationError
@@ -366,7 +379,10 @@ def run(
 @app.command()
 def check(
     target: str = typer.Argument(..., help="module:Class identifier."),
-    file: Path = typer.Argument(..., help="Path to a config file (extension picks format)."),  # noqa: B008
+    file: Path = typer.Argument(  # noqa: B008
+        ...,
+        help=f"Path to a config file; extension picks format ({_CONFIG_EXTENSIONS_HELP}).",
+    ),
 ) -> None:
     """Load + validate. Silent on success."""
     from pydantic import ValidationError
@@ -392,7 +408,7 @@ def edit(
     file: Path | None = typer.Argument(  # noqa: B008
         None,
         help=(
-            "Path to a YAML, TOML, or JSON file. If omitted, edits a fresh "
+            f"Path to a config file ({_CONFIG_EXTENSIONS_HELP}). If omitted, edits a fresh "
             "tree and saves to <Class>.yaml."
         ),
     ),
