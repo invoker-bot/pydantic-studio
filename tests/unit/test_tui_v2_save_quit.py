@@ -101,6 +101,25 @@ async def test_ctrl_s_with_validation_failure_does_not_write(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_ctrl_s_with_save_failure_reports_save_error(tmp_path):
+    """A write/format failure is a save error, not a validation error."""
+    save = tmp_path / "config.ini"
+    tree = build_form_tree(_Schema)
+    app = StudioApp(tree=tree, save_path=save)
+    notifications = _hook_notifications(app)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+s")
+        await pilot.pause()
+
+    assert not save.exists()
+    error_messages = [message for message, severity in notifications if severity == "error"]
+    assert any("save error" in message for message in error_messages), notifications
+    assert not any("validation error" in message for message in error_messages), notifications
+
+
+@pytest.mark.asyncio
 async def test_footer_save_and_quit_promises_have_real_bindings():
     """Static cross-check that advertised Ctrl+S/Ctrl+C have real bindings."""
     tree = build_form_tree(_Schema)

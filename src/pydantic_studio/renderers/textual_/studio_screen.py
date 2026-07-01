@@ -15,7 +15,15 @@ from pydantic_studio.renderers.textual_.screens import (
 
 if TYPE_CHECKING:
     from pydantic_studio.outcome import EditOutcome
-    from pydantic_studio.session import EditSession
+    from pydantic_studio.session import EditSession, SubmitResult
+
+
+def _submit_failure_message(result: SubmitResult) -> str:
+    if result.errors and all(error.startswith("could not save") for error in result.errors):
+        n = len(result.errors)
+        return f"{n} save error{'s' if n != 1 else ''} — fix before saving"
+    n = len(result.errors)
+    return f"{n} validation error{'s' if n != 1 else ''} — fix before saving"
 
 
 class StudioSessionEnded(Message):
@@ -98,9 +106,8 @@ class StudioScreen(ConfigScreen):
         if not result.ok:
             if isinstance(self.app.screen, ConfirmExitScreen):
                 self.app.pop_screen()
-            n = len(result.errors)
             self.app.notify(
-                f"{n} validation error{'s' if n != 1 else ''} — fix before saving",
+                _submit_failure_message(result),
                 severity="error",
                 title="Save failed",
             )
