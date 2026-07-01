@@ -195,12 +195,14 @@ def _fill_json_payload(tree: Any) -> str:
 
 
 def _fill_payload_for_path(tree: Any, path: Path) -> str | None:
-    suffix = path.suffix.lower()
-    if suffix in {".yaml", ".yml"}:
+    from pydantic_studio.io.dispatch import format_for_path
+
+    format_ = format_for_path(path)
+    if format_ == "yaml":
         return _fill_yaml_payload(tree)
-    if suffix == ".toml":
+    if format_ == "toml":
         return _fill_toml_payload(tree)
-    if suffix == ".json":
+    if format_ == "json":
         return _fill_json_payload(tree)
     return None
 

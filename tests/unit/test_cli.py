@@ -153,6 +153,17 @@ class TestFill:
         assert "config.ini" in result.output
         assert "nosuch" not in result.output.lower()
 
+    def test_fill_payload_format_follows_dispatch_map(self, tmp_path, monkeypatch) -> None:
+        from pydantic_studio.io import dispatch as dispatch_module
+
+        monkeypatch.setitem(dispatch_module._EXT_MAP, ".cfg", "yaml")
+        out = tmp_path / "config.cfg"
+
+        result = runner.invoke(app, ["fill", "tests.fixtures.schemas:Simple", "--out", str(out)])
+
+        assert result.exit_code == 0
+        assert yaml.load(out.read_text(encoding="utf-8"))["name"] == "?"
+
     def test_fill_output_directory_reports_file_path(self, tmp_path) -> None:
         out = tmp_path / "config.yaml"
         out.mkdir()

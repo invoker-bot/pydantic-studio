@@ -26,7 +26,9 @@ def supported_extensions() -> tuple[str, ...]:
     return tuple(sorted(_EXT_MAP))
 
 
-def _format_for_path(path: Path) -> _Format:
+def format_for_path(path: str | Path) -> _Format:
+    """Infer a supported config format from a path extension."""
+    path = Path(path)
     ext = path.suffix.lower()
     fmt = _EXT_MAP.get(ext)
     if fmt is None:
@@ -36,6 +38,10 @@ def _format_for_path(path: Path) -> _Format:
         )
         raise ValueError(msg)
     return fmt
+
+
+def _format_for_path(path: Path) -> _Format:
+    return format_for_path(path)
 
 
 def _validate_format(format: str) -> _Format:
@@ -60,7 +66,7 @@ def load_config(
         format: optional explicit format override ("yaml"/"toml"/"json")
     """
     path = Path(path)
-    fmt = _format_for_path(path) if format is None else _validate_format(format)
+    fmt = format_for_path(path) if format is None else _validate_format(format)
     if fmt == "yaml":
         from pydantic_studio.io.yaml import load_yaml
 
@@ -82,7 +88,7 @@ def save_config(
 ) -> None:
     """Save a FormTree to a config file, picking writer by extension."""
     path = Path(path)
-    fmt = _format_for_path(path) if format is None else _validate_format(format)
+    fmt = format_for_path(path) if format is None else _validate_format(format)
     if fmt == "yaml":
         from pydantic_studio.io.yaml import save_yaml
 
