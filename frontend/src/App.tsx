@@ -35,6 +35,7 @@ export default function App() {
   const history = useApplyMutation();
   const [status, setStatus] = useState<Status>("editing");
   const [submitErrors, setSubmitErrors] = useState<SubmitError[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [requiredCursor, setRequiredCursor] = useState(0);
   const appliedMutationTimes = useMutationState({
     filters: { mutationKey: APPLY_MUTATION_KEY },
@@ -126,6 +127,7 @@ export default function App() {
 
   const handleSave = () => {
     setSubmitErrors([]);
+    setActionError(null);
     submit.mutate(undefined, {
       onSuccess: (response) => {
         if (response.ok) {
@@ -133,6 +135,11 @@ export default function App() {
         } else {
           setSubmitErrors(response.errors);
         }
+      },
+      onError: (err) => {
+        setActionError(
+          `Save failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       },
     });
   };
@@ -208,6 +215,16 @@ export default function App() {
         </header>
         <FormFlagsContext.Provider value={flags}>
           {data.variant && <VariantSelector variant={data.variant} />}
+          {actionError && (
+            <div
+              data-testid="action-error"
+              role="alert"
+              aria-atomic="true"
+              className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"
+            >
+              {actionError}
+            </div>
+          )}
           {submitErrors.length > 0 && (
             <div
               data-testid="submit-errors"
