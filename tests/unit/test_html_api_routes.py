@@ -344,6 +344,18 @@ def test_api_submit_validation_failure_returns_400_with_errors() -> None:
     assert server.submitted is False
 
 
+def test_api_submit_after_cancel_returns_conflict_without_changing_outcome() -> None:
+    server, client = _server_and_client({"name": "alpha", "workers": 4})
+    assert client.post("/api/cancel").status_code == 200
+
+    response = client.post("/api/submit")
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "session already cancelled"}
+    assert server.cancelled is True
+    assert server.submitted is False
+
+
 def test_api_submit_preserves_errors_without_paths() -> None:
     tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
     server = StudioServer(tree=tree, save_path=None)

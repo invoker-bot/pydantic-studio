@@ -210,6 +210,11 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.post("/api/submit", response_class=JSONResponse)
     async def api_submit() -> JSONResponse:
+        if server.session.cancelled:
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "session already cancelled"},
+            )
         try:
             result = server.session.submit()
         except Exception as exc:
