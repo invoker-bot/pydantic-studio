@@ -68,6 +68,7 @@ function NestedGroup({
           onClick={() => setExpanded((v) => !v)}
           className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100"
           aria-expanded={expanded}
+          aria-label={`toggle group ${node.name}`}
         >
           <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-xs font-mono uppercase text-zinc-500">group</span>

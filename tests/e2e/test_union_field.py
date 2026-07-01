@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import re
-
 from playwright.sync_api import Page, expect
 
 
@@ -50,7 +48,7 @@ def test_switch_union_variant(page: Page, fastapi_url: str) -> None:
     # The selected GroupNode's schema_class short name should be SlackNotifier
     assert "Slack" in selected["schema_class"]
 
-    group_toggle = page.get_by_role("button", name=re.compile(r"^group\s+_SlackNotifier\b"))
+    group_toggle = page.get_by_role("button", name="toggle group _SlackNotifier")
     expect(group_toggle).to_be_visible(timeout=5000)
     group_toggle.click()
 
