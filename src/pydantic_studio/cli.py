@@ -261,6 +261,14 @@ def _validate_edit_save_path_for_cli(path: Path) -> None:
         raise ValueError(msg)
 
 
+def _validate_edit_save_path_or_exit(path: Path) -> None:
+    try:
+        _validate_edit_save_path_for_cli(path)
+    except ValueError as e:
+        typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+
 def _exit_if_cancelled_outcome(outcome: object) -> None:
     from pydantic_studio.outcome import EditOutcome
 
@@ -378,13 +386,12 @@ def edit(
     from pydantic_studio import build_form_tree
     from pydantic_studio.exceptions import CancelledByUser, ValidationFailedError
 
+    if file is not None:
+        _validate_edit_save_path_or_exit(file)
     schema = _load_schema(target)
     save_path = file if file is not None else Path(f"{schema.__name__}.yaml")
-    try:
-        _validate_edit_save_path_for_cli(save_path)
-    except ValueError as e:
-        typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1) from e
+    if file is None:
+        _validate_edit_save_path_or_exit(save_path)
 
     if file is not None and file.exists():
         tree = _load_config_for_cli(file, schema)

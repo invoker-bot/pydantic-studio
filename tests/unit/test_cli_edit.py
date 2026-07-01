@@ -107,6 +107,14 @@ def test_edit_existing_file_with_unknown_extension_uses_edit_extension_error(
     assert "could not load" not in result.output
 
 
+def test_edit_file_extension_is_rejected_before_schema_import(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["edit", "nosuch:Foo", str(tmp_path / "config.ini")])
+
+    assert result.exit_code == 1
+    assert "unsupported config file extension" in result.output
+    assert "nosuch" not in result.output.lower()
+
+
 def test_edit_console_failure_reports_clean_error(monkeypatch) -> None:
     def fake_run(tree, save_path=None) -> None:
         raise OSError("disk full")
