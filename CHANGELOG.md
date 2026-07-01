@@ -2,6 +2,18 @@
 
 All notable user-facing changes are recorded here.
 
+## 0.5.1 - Alpha
+
+- Migrates the frontend to React 19.2.7 (with `react-dom` and the React type
+  packages). The production bundle is regenerated; there are no API changes.
+- Fixes a rejected history action (undo/redo) being silently swallowed when a
+  sibling history mutation succeeds in the same commit: the rejection now
+  reliably keeps its `role="alert"` announcement. React 19's more aggressive
+  update batching exposed the latent race.
+- Hardens releases: the publish workflow now refuses any tag whose commit is
+  not on `main`. Routine CI, tooling, and frontend dependency bumps are folded
+  in.
+
 ## 0.5.0 - Alpha
 
 - Adds `StudioEmbedManager` / `mount_embed_app`, a multi-session layer on top
