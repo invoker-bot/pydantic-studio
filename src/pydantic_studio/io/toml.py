@@ -17,6 +17,7 @@ import tomlkit
 from tomlkit import comment, document
 
 from pydantic_studio.tree.builder import build_form_tree
+from pydantic_studio.types.annotated import get_union_args, is_optional_type, strip_annotated
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -111,9 +112,17 @@ def _output_key_for_field(field_name: str, field_info: FieldInfo) -> str:
 def _nested_schema_class(field_info: FieldInfo) -> type[BaseModel] | None:
     from pydantic import BaseModel
 
-    annotation = field_info.annotation
+    annotation = strip_annotated(field_info.annotation)
     if annotation is None:
         return None
+    if is_optional_type(annotation):
+        nested_args = [
+            strip_annotated(arg)
+            for arg in get_union_args(annotation)
+            if arg is not type(None)
+        ]
+        if len(nested_args) == 1:
+            annotation = nested_args[0]
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         return annotation
     return None

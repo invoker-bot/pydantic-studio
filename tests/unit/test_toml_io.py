@@ -127,3 +127,25 @@ class TestSaveToml:
         reloaded = load_toml(out, WithOptional).to_instance()
         assert reloaded.nickname is None
         assert reloaded.age is None
+
+    def test_save_omits_none_values_inside_optional_nested_model(
+        self, tmp_path: Path
+    ) -> None:
+        from pydantic_studio.io.toml import load_toml, save_toml
+
+        class OptionalInner(BaseModel):
+            enabled: bool = True
+            note: str | None = None
+
+        class OptionalOuter(BaseModel):
+            inner: OptionalInner | None = Field(default_factory=OptionalInner)
+
+        out = tmp_path / "optional-nested.toml"
+        tree = build_form_tree(OptionalOuter)
+
+        save_toml(tree, out)
+
+        content = out.read_text(encoding="utf-8")
+        assert "enabled = true" in content
+        assert "note" not in content
+        assert load_toml(out, OptionalOuter).to_instance().inner == OptionalInner()
