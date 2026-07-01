@@ -28,6 +28,7 @@ def test_mkdocs_strict_build(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        timeout=60,
     )
     if result.returncode != 0:
         raise AssertionError(

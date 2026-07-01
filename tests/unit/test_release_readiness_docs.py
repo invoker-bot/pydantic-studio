@@ -9,7 +9,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_TEST_COUNT = 1235
+DEFAULT_TEST_COUNT = 1236
 
 
 def _count_e2e_tests() -> int:
@@ -67,6 +67,12 @@ def test_docs_build_smoke_uses_current_python_environment() -> None:
     assert '"-m",' in source
     assert '"mkdocs",' in source
     assert "shutil.which" not in source
+
+
+def test_docs_build_smoke_has_subprocess_timeout() -> None:
+    source = (ROOT / "tests" / "unit" / "test_docs_build.py").read_text(encoding="utf-8")
+
+    assert "timeout=" in source
 
 
 def test_workflow_jobs_have_timeout_limits() -> None:
