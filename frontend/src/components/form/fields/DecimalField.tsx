@@ -34,6 +34,7 @@ export function DecimalField({ node, path }: { node: DecimalNode; path: string }
         <TypeBadge node={node} />
         {node.required && <RequiredBadge />}
         {node.max_digits !== null && <Chip>{node.max_digits} digits</Chip>}
+        {node.decimal_places !== null && <Chip>{node.decimal_places} places</Chip>}
         {!node.allow_inf_nan && <Chip>finite</Chip>}
       </FieldHeader>
       {node.description && <Description>{node.description}</Description>}

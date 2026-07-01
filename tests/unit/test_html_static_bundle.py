@@ -184,7 +184,7 @@ def test_frontend_float_schema_accepts_non_finite_wire_strings() -> None:
     assert 'value: trimmed' in float_field
 
 
-def test_frontend_decimal_schema_tracks_non_finite_constraint_flag() -> None:
+def test_frontend_decimal_field_surfaces_precision_and_finite_constraints() -> None:
     schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
         encoding="utf-8"
     )
@@ -199,6 +199,9 @@ def test_frontend_decimal_schema_tracks_non_finite_constraint_flag() -> None:
 
     assert decimal_schema is not None
     assert "allow_inf_nan: z.boolean()" in decimal_schema.group("body")
+    assert "decimal_places: z.number().nullable()" in decimal_schema.group("body")
+    assert "node.max_digits !== null" in decimal_field
+    assert "node.decimal_places !== null" in decimal_field
     assert "!node.allow_inf_nan" in decimal_field
 
 
