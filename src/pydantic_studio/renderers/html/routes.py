@@ -172,20 +172,27 @@ def register(app: FastAPI, server: StudioServer) -> None:
         # A rejected mutation leaves the prior tree intact. Fold the
         # mutation errors back into the validation envelope so the SPA can
         # render the rejection without needing a second request.
-        validation = validation_envelope(server.tree)
-        if not result.ok:
-            mutation_path = _mutation_error_path(mutation)
-            validation = {
-                "ok": False,
-                "errors": [
-                    {"path": mutation_path, "message": err}
-                    for err in result.errors
-                ]
-                + list(validation["errors"]),
-            }
+        try:
+            validation = validation_envelope(server.tree)
+            if not result.ok:
+                mutation_path = _mutation_error_path(mutation)
+                validation = {
+                    "ok": False,
+                    "errors": [
+                        {"path": mutation_path, "message": err}
+                        for err in result.errors
+                    ]
+                    + list(validation["errors"]),
+                }
+            tree_payload = _tree_payload(server)
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"mutation response failed: {exc}"},
+            )
         return JSONResponse(
             content={
-                "tree": _tree_payload(server),
+                "tree": tree_payload,
                 "validation": validation,
                 "mutation_result": {"ok": result.ok, "errors": list(result.errors)},
             }

@@ -151,6 +151,30 @@ def test_api_mutations_set_value_returns_updated_tree() -> None:
     assert name_field["value"] == "after"
 
 
+def test_api_mutations_tree_payload_exception_returns_json_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic_studio.renderers.html import routes
+
+    tree = build_form_tree(_Demo, existing={"name": "before", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+
+    def broken_tree_payload(_server: StudioServer) -> dict[str, object]:
+        raise RuntimeError("tree backend unavailable")
+
+    monkeypatch.setattr(routes, "_tree_payload", broken_tree_payload)
+    response = TestClient(server.app, raise_server_exceptions=False).post(
+        "/api/mutations",
+        json={"op": "set_value", "path": "name", "value": "after"},
+    )
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {
+        "detail": "mutation response failed: tree backend unavailable"
+    }
+
+
 def test_api_mutations_validation_failure_returns_unchanged_tree() -> None:
     client = _client({"name": "alpha", "workers": 4})
     response = client.post(
