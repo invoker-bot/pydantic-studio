@@ -80,3 +80,13 @@ def test_source_docs_do_not_reference_retired_phase_markers():
     }
 
     assert offenders == {}
+
+
+def test_renderer_source_docs_describe_format_dispatch_submit_path():
+    offenders = {
+        str(path.relative_to(ROOT))
+        for path in ROOT.joinpath("src", "pydantic_studio", "renderers").rglob("*.py")
+        if "save_yaml" in path.read_text(encoding="utf-8")
+    }
+
+    assert offenders == set()

@@ -192,8 +192,9 @@ class StudioApp(App):
         validation failure the ErrorsScreen lists every problem and,
         once dismissed, the cursor jumps to the first offending field.
 
-        ``save_yaml`` stays strict (core invariant §5): a partial tree
-        never reaches the disk.
+        Session submit stays strict (core invariant §5): a partial tree
+        never reaches the disk, and configured save paths dispatch to
+        the writer selected by file extension.
         """
         screen = self._studio_screen()
         if screen is not None:

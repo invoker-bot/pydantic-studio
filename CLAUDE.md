@@ -11,8 +11,8 @@ immediately.
   YAML / TOML / JSON config files against a strongly-typed schema.
 - **Status**: v0.4.0 alpha — all 9 implementation phases, the
   task-oriented overhaul, TUI form mode, the React-backed web app, and
-  root model variants are merged on master. Current local gate: 1301
-  tests: 1249 default tests plus 52 explicit Playwright browser e2e tests, ruff
+  root model variants are merged on master. Current local gate: 1302
+  tests: 1250 default tests plus 52 explicit Playwright browser e2e tests, ruff
   clean, pyright clean for production code, `mkdocs build --strict`
   clean, frontend bundle build clean, `uv build` clean, `twine check`
   clean, and wheel/sdist install smoke clean. CI runs the default suite
@@ -180,17 +180,18 @@ persist on ``submitted`` and abort otherwise. The TUI never exits with
 unsaved dirty state without explicit user choice (ConfirmExitScreen).
 Don't add exit paths that bypass ``StudioApp._finish``.
 
-### 5. `save_yaml` requires a valid tree
+### 5. `save_config` requires a valid tree
 
-`save_yaml(tree, path)` calls `tree.to_instance()` first, which raises
+`save_config(tree, path)` dispatches to the format-specific writer, and
+each regular writer calls `tree.to_instance()` first. That raises
 `ValidationFailedError` if required fields are unset. **This is the
-contract** — partial trees can't go through `save_yaml`. For mid-edit
+contract** — partial trees can't go through normal saves. For mid-edit
 saves, use `save_draft_yaml(tree, path)` which skips validation and
 emits whatever `to_python()` returns.
 
-This bites people writing renderer code who expect `save_yaml` to
-always work. The TUI's Ctrl+S handler uses `notify("Save failed: …")`
-to surface the validation error to the user.
+This bites people writing renderer code who expect submit to always
+persist. The shared `EditSession.submit()` path reports save and
+validation failures without ending the session.
 
 ## Conventions
 
@@ -249,7 +250,7 @@ ruff knows the rule and won't complain.
 
 ## Test patterns
 
-- **`uv run pytest -q`** runs the default suite (1249 tests currently).
+- **`uv run pytest -q`** runs the default suite (1250 tests currently).
   This intentionally skips `tests/e2e/` and disables the pytest-playwright
   plugin because plugin registration interferes with Textual
   `App.run_test()` under `asyncio_mode="auto"`.

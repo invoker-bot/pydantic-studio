@@ -363,11 +363,11 @@ class ConfirmExitScreen(Screen):
 class ErrorsScreen(Screen):
     """Modal listing validation errors after a failed save.
 
-    Pushed by :meth:`StudioApp.action_save` when ``save_yaml`` raises
-    :exc:`ValidationFailedError`. The body shows one line per error;
-    Esc dismisses, returns control to the underlying ConfigScreen, and
-    jumps the cursor to the first offending field so the fix is one
-    keystroke away instead of a memory exercise.
+    Pushed by :meth:`StudioApp.action_save` when session submit returns
+    errors. The body shows one line per error; Esc dismisses, returns
+    control to the underlying ConfigScreen, and jumps the cursor to the
+    first offending field so the fix is one keystroke away instead of a
+    memory exercise.
     """
 
     CSS_PATH = "theme.tcss"
