@@ -74,7 +74,7 @@ publish, `publish-result` reads their outcomes and fails the workflow with
 Run the same gates before tagging:
 
 ```bash
-uv sync --locked --all-extras --python 3.13
+uv sync --all-extras --python 3.13
 uv run python - <<'PY'
 import sys
 

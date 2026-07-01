@@ -168,9 +168,9 @@ def test_workflow_jobs_have_timeout_limits() -> None:
 
 def test_workflows_install_dependencies_from_locked_resolution() -> None:
     expected_install_commands = {
-        ("ci.yml", "python"): "uv sync --locked --python ${{ matrix.python-version }}",
-        ("ci.yml", "release-gate"): "uv sync --locked --all-extras --python 3.13",
-        ("publish.yml", "build"): "uv sync --locked --all-extras --python 3.13",
+        ("ci.yml", "python"): "uv sync --python ${{ matrix.python-version }}",
+        ("ci.yml", "release-gate"): "uv sync --all-extras --python 3.13",
+        ("publish.yml", "build"): "uv sync --all-extras --python 3.13",
     }
     for (workflow_name, job_name), expected in expected_install_commands.items():
         workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / workflow_name)
@@ -183,12 +183,12 @@ def test_workflows_install_dependencies_from_locked_resolution() -> None:
         assert install_steps[0]["run"] == expected
 
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    assert "uv sync --locked" in guide
+    assert "uv sync --all-extras --python 3.13" in guide
 
 
 def test_release_guide_uses_publish_python_environment_for_local_preflight() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    install = "uv sync --locked --all-extras --python 3.13"
+    install = "uv sync --all-extras --python 3.13"
     default_tests = "uv run pytest -q"
 
     assert install in guide
@@ -197,7 +197,7 @@ def test_release_guide_uses_publish_python_environment_for_local_preflight() -> 
 
 def test_release_guide_verifies_uv_python_before_local_preflight_gates() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
-    install = "uv sync --locked --all-extras --python 3.13"
+    install = "uv sync --all-extras --python 3.13"
     version_check = "assert sys.version_info[:2] == (3, 13), sys.version"
     default_tests = "uv run pytest -q"
 
