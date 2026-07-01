@@ -22,6 +22,7 @@ from pydantic_studio.io import (
     save_toml,
     save_yaml,
     supported_extensions,
+    supported_formats,
 )
 from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.renderers.console import run_console_app
@@ -155,4 +156,5 @@ __all__ = [
     "save_toml",
     "save_yaml",
     "supported_extensions",
+    "supported_formats",
 ]

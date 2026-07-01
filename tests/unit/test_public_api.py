@@ -27,6 +27,7 @@ def test_top_level_imports():
 def test_top_level_io_format_helpers():
     assert ps.format_for_path("config.yaml") == "yaml"
     assert ps.supported_extensions() == (".json", ".toml", ".yaml", ".yml")
+    assert ps.supported_formats() == ("json", "toml", "yaml")
 
 
 def test_documented_top_level_api_is_in_all():

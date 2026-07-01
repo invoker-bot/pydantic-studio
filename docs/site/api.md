@@ -24,6 +24,7 @@
 
 ::: pydantic_studio.format_for_path
 ::: pydantic_studio.supported_extensions
+::: pydantic_studio.supported_formats
 ::: pydantic_studio.load_config
 ::: pydantic_studio.save_config
 ::: pydantic_studio.load_yaml

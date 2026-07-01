@@ -26,6 +26,11 @@ def supported_extensions() -> tuple[str, ...]:
     return tuple(sorted(_EXT_MAP))
 
 
+def supported_formats() -> tuple[_Format, ...]:
+    """Return explicit format names accepted by load/save dispatch."""
+    return _SUPPORTED_FORMATS
+
+
 def format_for_path(path: str | Path) -> _Format:
     """Infer a supported config format from a path extension."""
     path = Path(path)
@@ -41,8 +46,8 @@ def format_for_path(path: str | Path) -> _Format:
 
 
 def _validate_format(format: str) -> _Format:
-    if format not in _SUPPORTED_FORMATS:
-        expected = ", ".join(_SUPPORTED_FORMATS)
+    if format not in supported_formats():
+        expected = ", ".join(supported_formats())
         msg = f"unsupported format {format!r}; expected one of {expected}"
         raise ValueError(msg)
     return cast("_Format", format)

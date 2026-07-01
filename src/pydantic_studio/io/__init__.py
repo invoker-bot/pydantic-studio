@@ -7,6 +7,7 @@ from pydantic_studio.io.dispatch import (
     load_config,
     save_config,
     supported_extensions,
+    supported_formats,
 )
 from pydantic_studio.io.json_ import load_json, save_json
 from pydantic_studio.io.toml import load_toml, save_toml
@@ -25,4 +26,5 @@ __all__ = [
     "save_toml",
     "save_yaml",
     "supported_extensions",
+    "supported_formats",
 ]

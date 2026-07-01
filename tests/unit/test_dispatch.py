@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pydantic_studio import build_form_tree
-from pydantic_studio.io.dispatch import format_for_path, load_config, save_config
+from pydantic_studio.io.dispatch import (
+    format_for_path,
+    load_config,
+    save_config,
+)
 from tests.fixtures.schemas import Server
 
 if TYPE_CHECKING:
@@ -22,6 +26,12 @@ class TestFormatForPath:
 
         assert io_api.format_for_path(Path("x.yaml")) == "yaml"
         assert io_api.supported_extensions() == (".json", ".toml", ".yaml", ".yml")
+        assert io_api.supported_formats() == ("json", "toml", "yaml")
+
+    def test_supported_formats(self) -> None:
+        import pydantic_studio.io.dispatch as dispatch_module
+
+        assert dispatch_module.supported_formats() == ("json", "toml", "yaml")
 
     def test_uses_public_format_helper_only(self) -> None:
         import pydantic_studio.io.dispatch as dispatch_module
