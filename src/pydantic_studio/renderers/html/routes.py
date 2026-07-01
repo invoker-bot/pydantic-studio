@@ -186,7 +186,13 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.post("/api/submit", response_class=JSONResponse)
     async def api_submit() -> JSONResponse:
-        result = server.session.submit()
+        try:
+            result = server.session.submit()
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"submit failed: {exc}"},
+            )
         if not result.ok:
             errors = [
                 {
@@ -208,7 +214,13 @@ def register(app: FastAPI, server: StudioServer) -> None:
 
     @app.post("/api/cancel", response_class=JSONResponse)
     async def api_cancel() -> JSONResponse:
-        server.session.cancel()
+        try:
+            server.session.cancel()
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"cancel failed: {exc}"},
+            )
         return JSONResponse(content={"ok": True})
 
     @app.get("/api/heartbeat", response_class=JSONResponse)

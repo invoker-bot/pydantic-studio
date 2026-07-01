@@ -121,6 +121,7 @@ def test_save_transport_failure_is_announced(page: Page) -> None:
         alert = page.get_by_role("alert")
         expect(alert).to_contain_text("Save failed", timeout=5000)
         expect(alert).to_contain_text("HTTP 500")
+        expect(alert).to_contain_text("submit backend unavailable")
         expect(page.get_by_role("button", name="Save")).to_be_enabled()
 
 
@@ -153,4 +154,5 @@ def test_cancel_transport_failure_is_announced(page: Page) -> None:
         alert = page.get_by_role("alert")
         expect(alert).to_contain_text("Cancel failed", timeout=5000)
         expect(alert).to_contain_text("HTTP 500")
+        expect(alert).to_contain_text("cancel backend unavailable")
         expect(page.get_by_role("button", name="Cancel")).to_be_enabled()

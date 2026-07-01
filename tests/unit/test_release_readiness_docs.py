@@ -9,7 +9,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_TEST_COUNT = 1212
+DEFAULT_TEST_COUNT = 1214
 
 
 def _count_e2e_tests() -> int:

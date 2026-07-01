@@ -299,12 +299,44 @@ def test_api_submit_preserves_errors_without_paths() -> None:
     }
 
 
+def test_api_submit_exception_returns_json_detail() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+
+    def broken_submit() -> SubmitResult:
+        raise RuntimeError("submit backend unavailable")
+
+    server.session.submit = broken_submit
+    response = TestClient(server.app, raise_server_exceptions=False).post("/api/submit")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {"detail": "submit failed: submit backend unavailable"}
+    assert server.submitted is False
+
+
 def test_api_cancel_marks_server_cancelled() -> None:
     server, client = _server_and_client({"name": "x"})
     response = client.post("/api/cancel")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
     assert server.cancelled is True
+
+
+def test_api_cancel_exception_returns_json_detail() -> None:
+    tree = build_form_tree(_Demo, existing={"name": "alpha", "workers": 4})
+    server = StudioServer(tree=tree, save_path=None)
+
+    def broken_cancel() -> None:
+        raise RuntimeError("cancel backend unavailable")
+
+    server.session.cancel = broken_cancel
+    response = TestClient(server.app, raise_server_exceptions=False).post("/api/cancel")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {"detail": "cancel failed: cancel backend unavailable"}
+    assert server.cancelled is False
 
 
 def test_api_heartbeat_returns_ok_and_records_timestamp() -> None:

@@ -33,6 +33,10 @@ const CancelResponseSchema = z.object({
   ok: z.literal(true),
 }).strict();
 
+const ErrorDetailSchema = z.object({
+  detail: z.string(),
+}).strict();
+
 export type SubmitError = z.infer<typeof SubmitErrorSchema>;
 
 export type SubmitResponse =
@@ -51,7 +55,7 @@ export async function submitTree(): Promise<SubmitResponse> {
     return SubmitFailureResponseSchema.parse(await response.json());
   }
   if (!response.ok) {
-    throw new Error(`POST /api/submit failed: HTTP ${response.status}`);
+    throw new Error(await responseErrorMessage(response, "POST /api/submit"));
   }
   SubmitSuccessResponseSchema.parse(await response.json());
   return { ok: true, errors: [] };
@@ -60,9 +64,22 @@ export async function submitTree(): Promise<SubmitResponse> {
 export async function cancelEdit(): Promise<void> {
   const response = await fetch(studioUrl("/api/cancel"), { method: "POST" });
   if (!response.ok) {
-    throw new Error(`POST /api/cancel failed: HTTP ${response.status}`);
+    throw new Error(await responseErrorMessage(response, "POST /api/cancel"));
   }
   CancelResponseSchema.parse(await response.json());
+}
+
+async function responseErrorMessage(
+  response: Response,
+  requestLabel: string,
+): Promise<string> {
+  const fallback = `${requestLabel} failed: HTTP ${response.status}`;
+  try {
+    const body = ErrorDetailSchema.parse(await response.json());
+    return `${fallback}: ${body.detail}`;
+  } catch {
+    return fallback;
+  }
 }
 
 export function useSubmitTree() {
