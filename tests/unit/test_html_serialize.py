@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pydantic_studio import build_form_tree, load_yaml
 from pydantic_studio.renderers.html.serialize import (
@@ -100,6 +100,16 @@ class _StructuredUnionHolder(BaseModel):
     value: str | _StructuredSeed
 
 
+class _ForbidExtraStructuredSeed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    count: int
+
+
+class _ForbidExtraStructuredUnionHolder(BaseModel):
+    value: str | _ForbidExtraStructuredSeed
+
+
 class _WithStructuredSeedList(BaseModel):
     items: list[_StructuredSeed] = Field(default_factory=list)
 
@@ -136,6 +146,12 @@ class _VariantSlack(BaseModel):
 class _VariantPort(BaseModel):
     port: int = 443
     replicas: list[int] = Field(default_factory=list)
+
+
+class _ForbidExtraVariantPort(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    port: int = 443
 
 
 def test_tree_to_json_returns_schema_name_and_root() -> None:
@@ -1183,6 +1199,27 @@ def test_dispatch_select_variant_rejects_duplicate_coerced_seed_mapping_keys() -
     assert val.selected.value == "seeded"
 
 
+def test_dispatch_select_variant_preserves_extra_seed_fields_for_validation() -> None:
+    tree = build_form_tree(_ForbidExtraStructuredUnionHolder, existing={"value": "seeded"})
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "select_variant",
+            "path": "value",
+            "variant_index": 1,
+            "seed": {"count": "2", "stale": True},
+        },
+    )
+
+    assert result.ok is False
+    assert any("extra seed field 'stale'" in error for error in result.errors)
+    val = tree.root.find("value")
+    assert val.selected_index == 0
+    assert val.selected.kind == "string"
+    assert val.selected.value == "seeded"
+
+
 def test_dispatch_select_variant_rejects_string_index_without_mutating() -> None:
     tree = build_form_tree(_UnionHolder, existing={"value": 42})
     result = dispatch_mutation(
@@ -1290,6 +1327,33 @@ def test_dispatch_select_root_variant_coerces_structured_seed_values() -> None:
     assert tree.schema_class is _VariantPort
     assert tree.root.find("port").value == 8443
     assert [item.value for item in tree.root.find("replicas").items] == [1, 2]
+
+
+def test_dispatch_select_root_variant_preserves_extra_seed_fields_for_validation() -> None:
+    tree = build_variant_form_tree(
+        VariantRegistry(
+            [
+                VariantSpec(id="email", model=_VariantEmail),
+                VariantSpec(id="port", model=_ForbidExtraVariantPort),
+            ]
+        ),
+        selected_id="email",
+    )
+
+    result = dispatch_mutation(
+        tree,
+        {
+            "op": "select_root_variant",
+            "variant_id": "port",
+            "seed": {"port": "8443", "stale": True},
+        },
+    )
+
+    assert result.ok is False
+    assert any("extra seed field 'stale'" in error for error in result.errors)
+    assert tree.schema_class is _VariantEmail
+    assert tree.root.find("address") is not None
+    assert tree.root.find("port") is None
 
 
 def test_dispatch_select_root_variant_does_not_require_path() -> None:

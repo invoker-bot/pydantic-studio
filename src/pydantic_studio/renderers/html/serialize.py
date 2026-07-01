@@ -336,9 +336,17 @@ def _maybe_coerce_wire_seed_for_node(node: Any, seed: Any) -> Any:
         from pydantic_studio.types.aliases import (
             input_value_or_missing_for_field,
             is_missing_input_value,
+            top_level_input_keys,
         )
 
-        coerced_fields: dict[str, Any] = {}
+        accepted_keys = {
+            key
+            for field_name, field_info in node.schema_class.model_fields.items()
+            for key in top_level_input_keys(field_name, field_info)
+        }
+        coerced_fields: dict[str, Any] = {
+            key: value for key, value in seed.items() if key not in accepted_keys
+        }
         for child in node.fields:
             field_info = node.schema_class.model_fields.get(child.name)
             if field_info is None:
