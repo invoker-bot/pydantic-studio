@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import pytest
 from pydantic import BaseModel, Field
@@ -29,6 +30,13 @@ class ConstrainedDict(BaseModel):
 class OptionalDictHost(BaseModel):
     labels: dict[str, int] | None = None
     seeded: dict[str, int] | None = Field(default_factory=lambda: {"default": 1})
+
+
+class AnnotatedMappingHost(BaseModel):
+    limits: dict[
+        Annotated[str, Field(min_length=2)],
+        Annotated[int, Field(gt=0)],
+    ] = Field(default_factory=dict)
 
 
 def test_dict_builder_constructs_mapping_node() -> None:
@@ -153,6 +161,32 @@ def test_add_entry_rejects_invalid_typed_value_without_mutating() -> None:
     settings = tree.root.find("settings")
     assert isinstance(settings, MappingNode)
     assert settings.entries == []
+    assert tree.snapshots == []
+
+
+def test_add_entry_rejects_annotated_key_constraint_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedMappingHost)
+
+    result = tree.add_entry("limits", "x", 1)
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 2",)
+    limits = tree.root.find("limits")
+    assert isinstance(limits, MappingNode)
+    assert limits.entries == []
+    assert tree.snapshots == []
+
+
+def test_add_entry_rejects_annotated_value_constraint_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedMappingHost)
+
+    result = tree.add_entry("limits", "ok", -1)
+
+    assert result.ok is False
+    assert result.errors == ("must be > 0",)
+    limits = tree.root.find("limits")
+    assert isinstance(limits, MappingNode)
+    assert limits.entries == []
     assert tree.snapshots == []
 
 
@@ -310,6 +344,19 @@ def test_rename_key_rejects_duplicate_key_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_rename_key_rejects_annotated_key_constraint_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedMappingHost, existing={"limits": {"ok": 1}})
+    limits = tree.root.find("limits")
+    assert isinstance(limits, MappingNode)
+
+    result = tree.rename_key("limits", 0, "x")
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 2",)
+    assert limits.to_python() == {"ok": 1}
+    assert tree.snapshots == []
+
+
 def test_rename_key_rejects_normalized_duplicate_key_without_mutating() -> None:
     tree = build_form_tree(
         WithPathDict,
@@ -354,6 +401,32 @@ def test_set_value_rejects_invalid_mapping_value_without_mutating() -> None:
     assert result.ok is False
     assert result.errors == ("['timeout']: expected int, got str",)
     assert settings.to_python() == {"old": 1}
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_annotated_mapping_key_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedMappingHost, existing={"limits": {"ok": 1}})
+    limits = tree.root.find("limits")
+    assert isinstance(limits, MappingNode)
+
+    result = tree.set_value("limits", {"x": 1})
+
+    assert result.ok is False
+    assert result.errors == ("key 'x': length must be >= 2",)
+    assert limits.to_python() == {"ok": 1}
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_annotated_mapping_value_without_mutating() -> None:
+    tree = build_form_tree(AnnotatedMappingHost, existing={"limits": {"ok": 1}})
+    limits = tree.root.find("limits")
+    assert isinstance(limits, MappingNode)
+
+    result = tree.set_value("limits", {"ok": -1})
+
+    assert result.ok is False
+    assert result.errors == ("['ok']: must be > 0",)
+    assert limits.to_python() == {"ok": 1}
     assert tree.snapshots == []
 
 

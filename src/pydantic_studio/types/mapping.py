@@ -58,6 +58,8 @@ class DictBuilder:
             entries=entries,
             key_type_name=_fq(key_type),
             value_type_name=_fq(value_type),
+            key_annotation=key_type,
+            value_annotation=value_type,
             min_length=c.get("min_length"),
             max_length=c.get("max_length"),
         )

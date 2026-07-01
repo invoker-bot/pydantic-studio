@@ -1108,6 +1108,8 @@ class MappingNode(FormNode):
     entries: "list[tuple[AnyNode, AnyNode]]" = []
     key_type_name: str
     value_type_name: str
+    key_annotation: Any | None = Field(default=None, exclude=True, repr=False)
+    value_annotation: Any | None = Field(default=None, exclude=True, repr=False)
     min_length: int | None = None
     max_length: int | None = None
     # Optional containers defaulting to None keep their display entries
@@ -1499,6 +1501,17 @@ def _attach_runtime_annotations_to_node(node: Any, annotation: Any) -> None:
                 for item, item_annotation in zip(node.items, args, strict=False):
                     _attach_runtime_annotations_to_node(item, item_annotation)
         return
+    if isinstance(node, MappingNode):
+        args = get_args(annotation)
+        if get_origin(annotation) is dict:
+            key_annotation = args[0] if len(args) >= 1 else str
+            value_annotation = args[1] if len(args) >= 2 else str
+            node.key_annotation = key_annotation
+            node.value_annotation = value_annotation
+            for key_node, value_node in node.entries:
+                _attach_runtime_annotations_to_node(key_node, key_annotation)
+                _attach_runtime_annotations_to_node(value_node, value_annotation)
+        return
     if isinstance(node, UnionNode) and node.selected is not None:
         args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
         if node.selected_index is not None and node.selected_index < len(args):
@@ -1519,6 +1532,20 @@ def _sequence_item_annotation(seq: SequenceNode, index: int) -> Any | None:
         resolved_type = _resolve_type_name(seq.item_type_name)
     if seq.item_annotation is not None:
         return seq.item_annotation
+    return resolved_type
+
+
+def _mapping_key_annotation(mp: MappingNode) -> Any:
+    resolved_type = _resolve_type_name(mp.key_type_name)
+    if mp.key_annotation is not None:
+        return mp.key_annotation
+    return resolved_type
+
+
+def _mapping_value_annotation(mp: MappingNode) -> Any:
+    resolved_type = _resolve_type_name(mp.value_type_name)
+    if mp.value_annotation is not None:
+        return mp.value_annotation
     return resolved_type
 
 
@@ -1633,17 +1660,16 @@ def _validate_seed_against_node(
             errors.append(f"length must be >= {node.min_length}")
         if node.max_length is not None and length > node.max_length:
             errors.append(f"length must be <= {node.max_length}")
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         registry = default_registry()
-        key_type = _resolve_type_name(node.key_type_name)
-        value_type = _resolve_type_name(node.value_type_name)
+        key_type = _mapping_key_annotation(node)
+        value_type = _mapping_value_annotation(node)
         key_builder = registry.find(key_type)
         value_builder = registry.find(value_type)
-        key_field = FieldInfo(annotation=key_type)
-        value_field = FieldInfo(annotation=value_type)
+        key_field = field_info_from_annotation(key_type)
+        value_field = field_info_from_annotation(value_type)
         for raw_key, raw_value in seed.items():
             try:
                 key_node = key_builder.build(key_type, key_field, raw_key)
@@ -2640,9 +2666,8 @@ class FormTree(BaseModel):
     def _build_mapping_entries(
         self, mp: MappingNode, value: Any
     ) -> tuple[ValidationResult, list[tuple[AnyNode, AnyNode]]]:
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         errors = list(mp.validate_value(value))
         if errors:
@@ -2653,12 +2678,12 @@ class FormTree(BaseModel):
             return length_result, []
 
         reg = default_registry()
-        key_type = _resolve_type_name(mp.key_type_name)
-        value_type = _resolve_type_name(mp.value_type_name)
+        key_type = _mapping_key_annotation(mp)
+        value_type = _mapping_value_annotation(mp)
         key_builder = reg.find(key_type)
         value_builder = reg.find(value_type)
-        key_field = FieldInfo(annotation=key_type)
-        value_field = FieldInfo(annotation=value_type)
+        key_field = field_info_from_annotation(key_type)
+        value_field = field_info_from_annotation(value_type)
 
         entries: list[tuple[AnyNode, AnyNode]] = []
         normalized_keys: list[Any] = []
@@ -2717,21 +2742,20 @@ class FormTree(BaseModel):
         self, path: str, key: Any, value: Any = _UNSET_VALUE
     ) -> ValidationResult:
         """Append a (key, value) entry to the MappingNode at ``path``."""
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         mp = self._walk_to_mapping(path)
         length_result = self._validate_mapping_length(mp, len(mp.entries) + 1)
         if not length_result.ok:
             return length_result
-        key_type = _resolve_type_name(mp.key_type_name)
-        value_type = _resolve_type_name(mp.value_type_name)
+        key_type = _mapping_key_annotation(mp)
+        value_type = _mapping_value_annotation(mp)
         reg = default_registry()
         k_builder = reg.find(key_type)
         v_builder = reg.find(value_type)
-        key_field = FieldInfo(annotation=key_type)
+        key_field = field_info_from_annotation(key_type)
         k_node, key_errors = _build_seeded_node(k_builder, key_type, key_field, key)
         if key_errors:
             return ValidationResult.fail(key_errors)
@@ -2740,7 +2764,7 @@ class FormTree(BaseModel):
         unique_result = self._validate_mapping_unique_key(mp, k_node.to_python())
         if not unique_result.ok:
             return unique_result
-        value_field = FieldInfo(annotation=value_type)
+        value_field = field_info_from_annotation(value_type)
         v_node, value_errors = _build_seeded_node(
             v_builder, value_type, value_field, value
         )
@@ -2785,10 +2809,9 @@ class FormTree(BaseModel):
         self, path: str, index: int, new_key: Any
     ) -> ValidationResult:
         """Rename the key at ``index`` in the MappingNode at ``path``."""
-        from pydantic.fields import FieldInfo
-
         from pydantic_studio.tree import snapshots as _snap
         from pydantic_studio.tree.builder import default_registry
+        from pydantic_studio.types.transforms import field_info_from_annotation
 
         mp = self._walk_to_mapping(path)
         index_result = self._validate_index_argument("index", index)
@@ -2797,8 +2820,8 @@ class FormTree(BaseModel):
         if not (0 <= index < len(mp.entries)):
             return ValidationResult.fail([f"index {index} out of range"])
         _old_key_node, value_node = mp.entries[index]
-        key_type = _resolve_type_name(mp.key_type_name)
-        key_field = FieldInfo(annotation=key_type)
+        key_type = _mapping_key_annotation(mp)
+        key_field = field_info_from_annotation(key_type)
         key_builder = default_registry().find(key_type)
         candidate_key, errors = _build_seeded_node(
             key_builder, key_type, key_field, new_key
