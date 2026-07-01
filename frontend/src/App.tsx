@@ -211,6 +211,8 @@ export default function App() {
           {submitErrors.length > 0 && (
             <div
               data-testid="submit-errors"
+              role="alert"
+              aria-atomic="true"
               className="rounded border border-red-300 bg-red-50 p-3 text-sm"
             >
               <p className="font-semibold text-red-900 mb-1">

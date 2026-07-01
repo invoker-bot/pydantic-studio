@@ -163,10 +163,13 @@ def test_bracket_submit_error_expands_and_highlights_sequence_item(
 
         page.get_by_role("button", name="Save").click()
 
-        expect(page.get_by_test_id("submit-errors")).to_contain_text(
+        submit_errors = page.get_by_test_id("submit-errors")
+        expect(submit_errors).to_contain_text(
             "items[0].network",
             timeout=5000,
         )
+        expect(submit_errors).to_have_attribute("role", "alert")
+        expect(submit_errors).to_have_attribute("aria-atomic", "true")
         network_input = page.get_by_label("network", exact=True)
         expect(network_input).to_be_visible(timeout=5000)
         field = page.locator('[data-field-path="items.0.network"]')
