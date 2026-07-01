@@ -324,6 +324,37 @@ def test_publish_workflow_uses_trusted_publishing_without_api_token_secret() -> 
     assert publish_steps[0]["continue-on-error"] is True
 
 
+def test_publish_workflow_refuses_release_tags_not_on_main() -> None:
+    workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
+    build_steps = workflow["jobs"]["build"]["steps"]
+
+    checkout = next(
+        step
+        for step in build_steps
+        if str(step.get("uses", "")).startswith("actions/checkout@")
+    )
+    # Full history is required for the ancestry check below.
+    assert checkout["with"]["fetch-depth"] == 0
+
+    guard = next(
+        step
+        for step in build_steps
+        if step.get("name") == "Ensure the release tag is on main"
+    )
+    run = guard["run"]
+    assert "git merge-base --is-ancestor" in run
+    assert "origin/main" in run
+    assert "refusing to publish" in run
+    # The guard must fail fast, before the expensive build/test steps.
+    guard_index = build_steps.index(guard)
+    install_index = next(
+        i
+        for i, step in enumerate(build_steps)
+        if step.get("name") == "Install Python dependencies"
+    )
+    assert guard_index < install_index
+
+
 def test_publish_workflow_pushes_to_piesource_independently() -> None:
     workflow = YAML(typ="safe").load(ROOT / ".github" / "workflows" / "publish.yml")
     publish_job = workflow["jobs"]["publish-piesource"]

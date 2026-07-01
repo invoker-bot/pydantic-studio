@@ -21,7 +21,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Full history so the tagged commit's ancestry vs main is computable.
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Ensure the release tag is on main
+        env:
+          TAG_SHA: ${{ github.sha }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if ! git merge-base --is-ancestor "$TAG_SHA" origin/main; then
+            echo "::error::Tag $TAG_NAME ($TAG_SHA) is not on origin/main; refusing to publish."
+            exit 1
+          fi
+          echo "Tag $TAG_NAME is on main; proceeding."
 
       - name: Set up Python
         uses: actions/setup-python@v6

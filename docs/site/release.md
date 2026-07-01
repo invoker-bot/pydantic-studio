@@ -200,7 +200,9 @@ git push origin "$RELEASE_TAG"
 ```
 
 Pushing `v0.4.0` starts `.github/workflows/publish.yml`. The `build` job
-aborts before publishing if the tag version differs from
-`pydantic_studio.__version__`; `publish-pypi` and `publish-piesource` only run
-after that build artifact exists, and `publish-result` reports the final
-registry publish state.
+first refuses to publish any tag whose commit is not an ancestor of
+`origin/main` (`git merge-base --is-ancestor`), so only tags on the main
+branch can release. It then aborts before publishing if the tag version
+differs from `pydantic_studio.__version__`; `publish-pypi` and
+`publish-piesource` only run after that build artifact exists, and
+`publish-result` reports the final registry publish state.

@@ -77,7 +77,7 @@ your hand-written comments.
 
 **v0.4.0 — Alpha.** All 9 implementation phases plus the task-oriented
 TUI overhaul are merged on master. Production code paths are exercised
-by 1382 tests: 1330 default unit/integration/TUI/web smoke tests plus 52
+by 1383 tests: 1331 default unit/integration/TUI/web smoke tests plus 52
 explicit Playwright browser e2e tests. The editing session now has an
 explicit submit/cancel contract (`run_app` returns `EditOutcome`), and
 loading is symmetric with saving (existing values run through field validators — see
@@ -411,7 +411,7 @@ cd pydantic-studio
 uv sync
 
 # Tests
-uv run pytest -q                          # 1330 default tests; skips tests/e2e/
+uv run pytest -q                          # 1331 default tests; skips tests/e2e/
 uv run pytest tests/unit/test_yaml_io.py  # focused
 
 # Lint
