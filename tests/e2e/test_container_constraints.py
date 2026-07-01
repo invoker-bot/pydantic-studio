@@ -80,7 +80,7 @@ def test_container_constraint_controls_disable_at_boundaries(page: Page) -> None
         expect(page.get_by_text("min 1")).to_have_count(2)
         expect(page.get_by_text("max 2")).to_have_count(2)
 
-        tag_add = page.get_by_role("button", name="+ Add str")
+        tag_add = page.get_by_role("button", name="add tags item")
         expect(tag_add).to_be_disabled()
         expect(page.get_by_role("button", name="remove tags[1]")).to_be_enabled()
 

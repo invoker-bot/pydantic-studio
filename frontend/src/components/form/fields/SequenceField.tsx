@@ -106,6 +106,7 @@ export function SequenceField({
           className="w-full border-dashed text-zinc-500"
           disabled={structureDisabled || atMaxLength}
           onClick={onAdd}
+          aria-label={`add ${node.name} item`}
         >
           + Add {itemLabel}
         </Button>

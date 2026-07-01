@@ -87,7 +87,7 @@ def test_add_remove_and_edit_sequence_item(
 
     # Sanity: tags starts empty. The "+ Add" button should be present
     # under the tags field.
-    add_button = page.get_by_role("button", name="+ Add str")
+    add_button = page.get_by_role("button", name="add tags item")
     expect(add_button).to_be_visible()
 
     # Click +Add. A new card appears at index 0 with a string input.
@@ -133,7 +133,7 @@ def test_readonly_sequence_descendant_disables_structural_controls(
 
     expect(page.get_by_role("button", name="move tags[0] down")).to_be_disabled()
     expect(page.get_by_role("button", name="remove tags[0]")).to_be_disabled()
-    expect(page.get_by_role("button", name="+ Add str")).to_be_disabled()
+    expect(page.get_by_role("button", name="add tags item")).to_be_disabled()
 
 
 def test_readonly_sequence_bracket_path_disables_structural_controls(
@@ -148,7 +148,7 @@ def test_readonly_sequence_bracket_path_disables_structural_controls(
 
     expect(page.get_by_role("button", name="move tags[0] down")).to_be_disabled()
     expect(page.get_by_role("button", name="remove tags[0]")).to_be_disabled()
-    expect(page.get_by_role("button", name="+ Add str")).to_be_disabled()
+    expect(page.get_by_role("button", name="add tags item")).to_be_disabled()
 
 
 def test_bracket_submit_error_expands_and_highlights_sequence_item(
