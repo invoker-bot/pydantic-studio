@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import re
 import subprocess
 import sys
@@ -14,34 +13,9 @@ from ruamel.yaml import YAML
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _count_tests_in_file(path: Path) -> int:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    count = 0
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith(
-            "test_"
-        ):
-            count += 1
-        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
-            count += sum(
-                isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
-                and child.name.startswith("test_")
-                for child in node.body
-            )
-    return count
-
-
-def _count_tests(paths: list[Path]) -> int:
-    return sum(_count_tests_in_file(path) for path in paths)
-
-
-def _count_e2e_tests() -> int:
-    return _count_tests(sorted((ROOT / "tests" / "e2e").glob("test_*.py")))
-
-
-def _count_default_tests() -> int:
+def _collect_pytest_count(args: list[str]) -> int:
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+        [sys.executable, "-m", "pytest", *args, "--collect-only", "-q"],
         check=False,
         capture_output=True,
         text=True,
@@ -50,13 +24,21 @@ def _count_default_tests() -> int:
     )
     if result.returncode != 0:
         raise AssertionError(
-            "pytest collection failed while counting default tests:\n"
+            "pytest collection failed while counting tests:\n"
             f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
         )
     match = re.search(r"(\d+) tests collected", result.stdout)
     if match is None:
         raise AssertionError(f"could not parse pytest collection count:\n{result.stdout}")
     return int(match.group(1))
+
+
+def _count_default_tests() -> int:
+    return _collect_pytest_count([])
+
+
+def _count_e2e_tests() -> int:
+    return _collect_pytest_count(["tests/e2e", "-p", "playwright", "-o", "addopts=-ra"])
 
 
 def test_release_gate_counts_default_tests_without_manual_constant() -> None:
@@ -67,6 +49,17 @@ def test_release_gate_counts_default_tests_without_manual_constant() -> None:
 
     assert manual_constant_name not in source
     assert "_count_default_tests()" in source
+
+
+def test_release_gate_counts_e2e_tests_with_pytest_collection() -> None:
+    source = (ROOT / "tests" / "unit" / "test_release_readiness_docs.py").read_text(
+        encoding="utf-8"
+    )
+    ast_parse_name = "ast" + ".parse"
+
+    assert ast_parse_name not in source
+    assert "_collect_pytest_count(" in source
+    assert "tests/e2e" in source
 
 
 def test_release_gate_docs_name_wheel_and_sdist_install_smokes() -> None:
