@@ -68,6 +68,46 @@ def test_index_injects_runtime_base_path_for_mounted_app() -> None:
     assert 'href="/studio/static/dist/assets/index-' in text
 
 
+def test_index_embeds_base_path_config_without_html_entity_mangling() -> None:
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(
+        tree=tree,
+        save_path=None,
+        base_path="/studio/<tenant>&region",
+    )
+    client = TestClient(studio_server.app)
+
+    text = client.get("/").text
+    script_start = text.index("window.__PYDANTIC_STUDIO__")
+    script_end = text.index("</script>", script_start)
+    config_script = text[script_start:script_end]
+
+    assert config_script == (
+        'window.__PYDANTIC_STUDIO__ = {"basePath": '
+        '"/studio/\\u003ctenant\\u003e\\u0026region"};'
+    )
+    assert "&lt;tenant&gt;" not in config_script
+
+
+def test_index_escapes_base_path_asset_attributes() -> None:
+    from pydantic_studio.renderers.html import StudioServer
+
+    tree = build_form_tree(Server)
+    studio_server = StudioServer(
+        tree=tree,
+        save_path=None,
+        base_path="/studio/<tenant>&region",
+    )
+    client = TestClient(studio_server.app)
+
+    text = client.get("/").text
+
+    assert 'src="/studio/&lt;tenant&gt;&amp;region/static/dist/assets/index-' in text
+    assert 'href="/studio/&lt;tenant&gt;&amp;region/static/dist/assets/index-' in text
+
+
 def test_base_path_normalization() -> None:
     from pydantic_studio.renderers.html.server import normalize_base_path
 

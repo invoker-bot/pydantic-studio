@@ -23,6 +23,18 @@ _STATIC_DIR = _HERE / "static"
 _SPA_INDEX = _STATIC_DIR / "dist" / "index.html"
 
 
+def _json_for_script(value: object) -> str:
+    """Serialize JSON for a raw script tag without changing runtime values."""
+    return (
+        json.dumps(value)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
 def normalize_base_path(base_path: str) -> str:
     stripped = base_path.strip()
     if stripped in {"", "/"}:
@@ -114,18 +126,19 @@ class StudioServer:
         """Serve the built SPA index with runtime mount-path config."""
         index = _SPA_INDEX.read_text(encoding="utf-8")
         if self.base_path:
+            escaped_base_path = html.escape(self.base_path, quote=True)
             index = index.replace(
                 'src="/static/dist/',
-                f'src="{self.base_path}/static/dist/',
+                f'src="{escaped_base_path}/static/dist/',
             )
             index = index.replace(
                 'href="/static/dist/',
-                f'href="{self.base_path}/static/dist/',
+                f'href="{escaped_base_path}/static/dist/',
             )
-        config = json.dumps({"basePath": self.base_path})
+        config = _json_for_script({"basePath": self.base_path})
         script = (
             "<script>"
-            f"window.__PYDANTIC_STUDIO__ = {html.escape(config, quote=False)};"
+            f"window.__PYDANTIC_STUDIO__ = {config};"
             "</script>"
         )
         index = index.replace("</head>", f"    {script}\n  </head>")
