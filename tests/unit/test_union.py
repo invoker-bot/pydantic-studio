@@ -69,6 +69,11 @@ class _AnnotatedUnionHolder(BaseModel):
     value: Annotated[int, Field(gt=0)] | Annotated[str, Field(min_length=2)]
 
 
+class _OptionalAnnotatedHolder(BaseModel):
+    maybe_count: Annotated[int, Field(gt=0)] | None = None
+    maybe_name: Annotated[str, Field(min_length=2)] | None = None
+
+
 def test_optional_demotes_to_inner_type_node() -> None:
     """``str | None`` becomes a StringNode with required=False, NOT a UnionNode."""
     tree = build_form_tree(WithOptional)
@@ -78,6 +83,32 @@ def test_optional_demotes_to_inner_type_node() -> None:
     age = tree.root.find("age")
     assert isinstance(age, IntNode)
     assert age.required is False
+
+
+def test_optional_annotated_int_preserves_constraints_without_mutating() -> None:
+    tree = build_form_tree(_OptionalAnnotatedHolder)
+    count = tree.root.find("maybe_count")
+    assert isinstance(count, IntNode)
+
+    result = tree.set_value("maybe_count", -1)
+
+    assert result.ok is False
+    assert result.errors == ("must be > 0",)
+    assert "maybe_count" not in tree.to_python()
+    assert tree.snapshots == []
+
+
+def test_optional_annotated_string_preserves_constraints_without_mutating() -> None:
+    tree = build_form_tree(_OptionalAnnotatedHolder)
+    name = tree.root.find("maybe_name")
+    assert isinstance(name, StringNode)
+
+    result = tree.set_value("maybe_name", "x")
+
+    assert result.ok is False
+    assert result.errors == ("length must be >= 2",)
+    assert "maybe_name" not in tree.to_python()
+    assert tree.snapshots == []
 
 
 def test_true_union_becomes_union_node() -> None:
