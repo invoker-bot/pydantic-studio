@@ -249,6 +249,18 @@ def _write_fill_output_for_cli(tree: Any, out: Path) -> None:
         raise typer.Exit(code=1) from e
 
 
+def _validate_edit_save_path_for_cli(path: Path) -> None:
+    supported = _YAML_SUFFIXES | _TOML_SUFFIXES | _JSON_SUFFIXES
+    suffix = path.suffix.lower()
+    if suffix not in supported:
+        expected = ", ".join(sorted(supported))
+        msg = (
+            f"unsupported config file extension {suffix!r} for {path}; "
+            f"expected one of {expected}"
+        )
+        raise ValueError(msg)
+
+
 def _exit_if_cancelled_outcome(outcome: object) -> None:
     from pydantic_studio.outcome import EditOutcome
 
@@ -351,8 +363,8 @@ def edit(
     file: Path | None = typer.Argument(  # noqa: B008
         None,
         help=(
-            "Path to a YAML file. If omitted, edits a fresh tree and saves "
-            "to <Class>.yaml."
+            "Path to a YAML, TOML, or JSON file. If omitted, edits a fresh "
+            "tree and saves to <Class>.yaml."
         ),
     ),
     frontend: Literal["console", "tui", "web"] = typer.Option(
@@ -375,6 +387,7 @@ def edit(
     save_path = file if file is not None else Path(f"{schema.__name__}.yaml")
 
     try:
+        _validate_edit_save_path_for_cli(save_path)
         if frontend == "console":
             from pydantic_studio.renderers.console import run_console_app
 

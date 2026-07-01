@@ -67,6 +67,30 @@ def test_edit_without_file_builds_fresh_tree(tmp_path: Path, monkeypatch) -> Non
     assert port_node.default == 8080
 
 
+def test_edit_new_file_with_unknown_extension_errors_before_renderer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    called = False
+    cfg = tmp_path / "config.ini"
+
+    def fake_run(tree, save_path=None) -> None:
+        nonlocal called
+        called = True
+
+    import pydantic_studio.renderers.console as console_module
+
+    monkeypatch.setattr(console_module, "run_console_app", fake_run)
+
+    result = runner.invoke(
+        app,
+        ["edit", "tests.fixtures.schemas:Server", str(cfg)],
+    )
+
+    assert result.exit_code == 1
+    assert "unsupported config file extension" in result.output
+    assert called is False
+
+
 def test_edit_console_failure_reports_clean_error(monkeypatch) -> None:
     def fake_run(tree, save_path=None) -> None:
         raise OSError("disk full")
@@ -197,3 +221,10 @@ def test_edit_unknown_frontend_is_rejected_before_schema_import() -> None:
     assert result.exit_code != 0
     assert "frontend" in result.output.lower()
     assert "nosuch" not in result.output.lower()
+
+
+def test_edit_help_names_supported_file_formats() -> None:
+    result = runner.invoke(app, ["edit", "--help"])
+
+    assert result.exit_code == 0
+    assert "YAML, TOML, or JSON" in result.output
