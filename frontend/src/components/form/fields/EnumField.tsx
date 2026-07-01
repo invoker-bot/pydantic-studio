@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { EnumNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -68,7 +68,11 @@ export function EnumField({ node, path }: { node: EnumNode; path: string }) {
           );
         }}
       >
-        <SelectTrigger id={`field-${path}`} name={node.name}>
+        <SelectTrigger
+          id={`field-${path}`}
+          {...fieldErrorControlProps(error, path)}
+          name={node.name}
+        >
           <SelectValue placeholder="Select..." />
         </SelectTrigger>
         <SelectContent>
@@ -77,7 +81,7 @@ export function EnumField({ node, path }: { node: EnumNode; path: string }) {
           ))}
         </SelectContent>
       </Select>
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }

@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { BytesNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -46,6 +46,7 @@ export function BytesField({ node, path }: { node: BytesNodeT; path: string }) {
       {node.description && <Description>{node.description}</Description>}
       <Input
         id={`field-${path}`}
+        {...fieldErrorControlProps(error, path)}
         name={node.name}
         type="text"
         className="font-mono text-sm"
@@ -73,7 +74,7 @@ export function BytesField({ node, path }: { node: BytesNodeT; path: string }) {
         }}
       />
       <p className="text-xs text-zinc-500">{byteCount(local)} bytes</p>
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }

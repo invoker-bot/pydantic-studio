@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { BoolNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -37,6 +37,7 @@ export function BoolField({ node, path }: { node: BoolNode; path: string }) {
       <div className="pt-1">
         <Switch
           id={`field-${path}`}
+        {...fieldErrorControlProps(error, path)}
           name={node.name}
           checked={local}
           onCheckedChange={(checked: boolean) => {
@@ -49,7 +50,7 @@ export function BoolField({ node, path }: { node: BoolNode; path: string }) {
           }}
         />
       </div>
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }

@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { DecimalNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { NumericConstraintChips } from "@/components/form/chrome/NumericConstraintChips";
@@ -42,6 +42,7 @@ export function DecimalField({ node, path }: { node: DecimalNode; path: string }
       {node.description && <Description>{node.description}</Description>}
       <Input
         id={`field-${path}`}
+        {...fieldErrorControlProps(error, path)}
         name={node.name}
         type="text"
         inputMode="decimal"
@@ -59,7 +60,7 @@ export function DecimalField({ node, path }: { node: DecimalNode; path: string }
           );
         }}
       />
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }

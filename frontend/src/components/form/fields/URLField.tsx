@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { URLNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -39,6 +39,7 @@ export function URLField({ node, path }: { node: URLNode; path: string }) {
       {node.description && <Description>{node.description}</Description>}
       <Input
         id={`field-${path}`}
+        {...fieldErrorControlProps(error, path)}
         name={node.name}
         type="url"
         placeholder="https://example.com"
@@ -52,7 +53,7 @@ export function URLField({ node, path }: { node: URLNode; path: string }) {
           );
         }}
       />
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }

@@ -5,7 +5,7 @@ import { useApplyMutation } from "@/api/mutations";
 import type { SecretNodeSchema } from "@/api/schemas";
 import { Chip } from "@/components/form/chrome/Chip";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -41,6 +41,7 @@ export function SecretField({ node, path }: { node: SecretNodeT; path: string })
       <div className="flex gap-2">
         <Input
           id={`field-${path}`}
+        {...fieldErrorControlProps(error, path)}
           name={node.name}
           type={revealed ? "text" : "password"}
           autoComplete="new-password"
@@ -68,7 +69,7 @@ export function SecretField({ node, path }: { node: SecretNodeT; path: string })
           {revealed ? "hide" : "show"}
         </Button>
       </div>
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }

@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { useApplyMutation } from "@/api/mutations";
 import type { TimeNodeSchema } from "@/api/schemas";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import { FieldError, fieldErrorControlProps } from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -50,6 +50,7 @@ export function TimeField({ node, path }: { node: TimeNodeT; path: string }) {
       {node.description && <Description>{node.description}</Description>}
       <Input
         id={`field-${path}`}
+        {...fieldErrorControlProps(error, path)}
         name={node.name}
         type="time"
         step="1"
@@ -64,7 +65,7 @@ export function TimeField({ node, path }: { node: TimeNodeT; path: string }) {
           );
         }}
       />
-      <FieldError message={error} />
+      <FieldError message={error} path={path} />
     </FieldRow>
   );
 }
