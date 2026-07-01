@@ -372,6 +372,7 @@ class DecimalNode(FormNode):
     le: Decimal | None = None
     gt: Decimal | None = None
     lt: Decimal | None = None
+    allow_inf_nan: bool = False
 
     def validate_value(self, value: Any) -> tuple[str, ...]:
         if value is None:
@@ -391,14 +392,17 @@ class DecimalNode(FormNode):
                 return (f"cannot convert {value!r} to Decimal",)
         else:
             return (f"expected Decimal, got {type(value).__name__}",)
+        if not self.allow_inf_nan and not decimal_value.is_finite():
+            return ("must be finite",)
         errors: list[str] = []
-        if self.ge is not None and decimal_value < self.ge:
+        value_is_nan = decimal_value.is_nan()
+        if self.ge is not None and (value_is_nan or decimal_value < self.ge):
             errors.append(f"must be >= {self.ge}")
-        if self.le is not None and decimal_value > self.le:
+        if self.le is not None and (value_is_nan or decimal_value > self.le):
             errors.append(f"must be <= {self.le}")
-        if self.gt is not None and decimal_value <= self.gt:
+        if self.gt is not None and (value_is_nan or decimal_value <= self.gt):
             errors.append(f"must be > {self.gt}")
-        if self.lt is not None and decimal_value >= self.lt:
+        if self.lt is not None and (value_is_nan or decimal_value >= self.lt):
             errors.append(f"must be < {self.lt}")
         if self.max_digits is not None:
             try:

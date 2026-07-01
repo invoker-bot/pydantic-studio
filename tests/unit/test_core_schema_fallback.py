@@ -523,6 +523,26 @@ class Money:
         return value if isinstance(value, cls) else cls(Decimal(value))
 
 
+class FiniteMoney:
+    """Wraps ``Decimal`` with allow_inf_nan disabled in core schema."""
+
+    def __init__(self, value: Decimal) -> None:
+        self.value = value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _src: Any, _h: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.decimal_schema(allow_inf_nan=False),
+        )
+
+    @classmethod
+    def _validate(cls, value: Any) -> FiniteMoney:
+        return value if isinstance(value, cls) else cls(Decimal(value))
+
+
 def test_timestamp_resolves_to_date_node():
     class M(BaseModel):
         when: Timestamp
@@ -584,6 +604,16 @@ def test_money_propagates_decimal_constraints():
     assert amount_node.max_digits == 10
     assert amount_node.decimal_places == 2
     assert amount_node.ge == 0
+
+
+def test_core_schema_decimal_propagates_allow_inf_nan_constraint():
+    class M(BaseModel):
+        amount: FiniteMoney
+
+    tree = build_form_tree(M)
+    amount_node = next(c for c in tree.root.fields if c.name == "amount")
+    assert isinstance(amount_node, DecimalNode)
+    assert amount_node.allow_inf_nan is False
 
 
 def test_custom_type_instance_as_default_strips_to_none():

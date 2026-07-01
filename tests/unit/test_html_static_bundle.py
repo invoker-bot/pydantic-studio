@@ -184,6 +184,24 @@ def test_frontend_float_schema_accepts_non_finite_wire_strings() -> None:
     assert 'value: trimmed' in float_field
 
 
+def test_frontend_decimal_schema_tracks_non_finite_constraint_flag() -> None:
+    schema = (ROOT / "frontend" / "src" / "api" / "schemas.ts").read_text(
+        encoding="utf-8"
+    )
+    decimal_field = (
+        ROOT / "frontend" / "src" / "components" / "form" / "fields" / "DecimalField.tsx"
+    ).read_text(encoding="utf-8")
+    decimal_schema = re.search(
+        r"export const DecimalNodeSchema = NodeBase\.extend\(\{(?P<body>.*?)\}\);",
+        schema,
+        re.S,
+    )
+
+    assert decimal_schema is not None
+    assert "allow_inf_nan: z.boolean()" in decimal_schema.group("body")
+    assert "!node.allow_inf_nan" in decimal_field
+
+
 def test_frontend_mutation_response_schema_validates_full_envelope() -> None:
     mutations = (ROOT / "frontend" / "src" / "api" / "mutations.ts").read_text(
         encoding="utf-8"

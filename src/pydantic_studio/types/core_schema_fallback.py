@@ -299,7 +299,7 @@ def _extract_metadata_from_schema(schema: Any) -> list[Any]:
             v = schema.get(key)
             if v is not None:
                 captured[key] = v
-        if kind == "float":
+        if kind in {"float", "decimal"}:
             v = schema.get("allow_inf_nan")
             if v is not None:
                 captured["allow_inf_nan"] = v

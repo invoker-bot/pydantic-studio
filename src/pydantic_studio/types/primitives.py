@@ -139,4 +139,5 @@ class DecimalBuilder:
             le=c.get("le"),
             gt=c.get("gt"),
             lt=c.get("lt"),
+            allow_inf_nan=c.get("allow_inf_nan", False),
         )

@@ -46,6 +46,14 @@ class ConstrainedDecimalSchema(BaseModel):
     cents: Decimal = Field(default=Decimal("1.00"), decimal_places=2)
 
 
+class PlainDecimalSchema(BaseModel):
+    price: Decimal = Decimal("1.00")
+
+
+class FiniteDecimalSchema(BaseModel):
+    price: Decimal = Field(default=Decimal("1.00"), allow_inf_nan=False)
+
+
 class ConstrainedStringSchema(BaseModel):
     at_least: str = Field(default="good", min_length=3)
     at_most: str = Field(default="good", max_length=5)
@@ -222,6 +230,42 @@ def test_set_decimal_value_rejects_constraint_violations_without_mutating(
     assert result.errors == (message,)
     assert node.value == Decimal("1.00")
     assert node.error == message
+
+
+def test_decimal_field_propagates_allow_inf_nan_constraint() -> None:
+    tree = build_form_tree(FiniteDecimalSchema)
+    node = tree.root.find("price")
+
+    assert node is not None
+    assert node.allow_inf_nan is False
+
+
+def test_decimal_field_defaults_to_rejecting_non_finite_values() -> None:
+    tree = build_form_tree(PlainDecimalSchema)
+    node = tree.root.find("price")
+
+    assert node is not None
+    assert node.allow_inf_nan is False
+
+
+@pytest.mark.parametrize(
+    "value",
+    [Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity")],
+)
+def test_set_decimal_value_rejects_non_finite_when_disallowed_without_mutating(
+    value: Decimal,
+) -> None:
+    tree = build_form_tree(FiniteDecimalSchema)
+    node = tree.root.find("price")
+    assert node is not None
+    assert node.value == Decimal("1.00")
+
+    result = tree.set_value("price", value)
+
+    assert result.ok is False
+    assert result.errors == ("must be finite",)
+    assert node.value == Decimal("1.00")
+    assert node.error == "must be finite"
 
 
 @pytest.mark.parametrize(

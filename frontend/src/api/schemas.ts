@@ -102,6 +102,7 @@ export const DecimalNodeSchema = NodeBase.extend({
   le: z.string().nullable(),
   gt: z.string().nullable(),
   lt: z.string().nullable(),
+  allow_inf_nan: z.boolean(),
 });
 
 export const DatetimeNodeSchema = NodeBase.extend({
