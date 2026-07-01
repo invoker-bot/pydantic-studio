@@ -4,7 +4,11 @@ import type { MappingNodeData, FormNodeData } from "@/api/schemas";
 import { useApplyMutation } from "@/api/mutations";
 import { ContainerConstraintChips } from "@/components/form/chrome/ContainerConstraintChips";
 import { Description } from "@/components/form/chrome/Description";
-import { FieldError } from "@/components/form/chrome/FieldError";
+import {
+  FieldError,
+  clearFieldError,
+  fieldErrorControlProps,
+} from "@/components/form/chrome/FieldError";
 import { FieldHeader } from "@/components/form/chrome/FieldHeader";
 import { FieldRow } from "@/components/form/chrome/FieldRow";
 import { RequiredBadge } from "@/components/form/chrome/RequiredBadge";
@@ -70,8 +74,6 @@ export function MappingField({
   };
   const onRemove = (index: number) =>
     mutation.mutate({ op: "remove_entry", path, index });
-  const onRenameKey = (index: number, new_key: string) =>
-    mutation.mutate({ op: "rename_key", path, index, new_key });
 
   return (
     <FieldRow>
@@ -91,8 +93,9 @@ export function MappingField({
             key={index}
             entryKey={entryKey(k_node)}
             valueNode={v_node}
+            mappingPath={path}
+            entryIndex={index}
             valuePath={childPath(path, index)}
-            onRenameKey={(new_key) => onRenameKey(index, new_key)}
             onRemove={() => onRemove(index)}
             removeDisabled={structureDisabled || atMinLength}
             keyDisabled={structureDisabled}
@@ -118,34 +121,61 @@ export function MappingField({
 function MappingEntry({
   entryKey,
   valueNode,
+  mappingPath,
+  entryIndex,
   valuePath,
-  onRenameKey,
   onRemove,
   removeDisabled,
   keyDisabled,
 }: {
   entryKey: string;
   valueNode: FormNodeData;
+  mappingPath: string;
+  entryIndex: number;
   valuePath: string;
-  onRenameKey: (new_key: string) => void;
   onRemove: () => void;
   removeDisabled: boolean;
   keyDisabled: boolean;
 }) {
+  const mutation = useApplyMutation();
   const [keyLocal, setKeyLocal] = useState(entryKey);
-  useEffect(() => setKeyLocal(entryKey), [entryKey]);
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const keyErrorPath = `${valuePath}.key`;
+
+  useEffect(() => {
+    setKeyLocal(entryKey);
+    setKeyError(null);
+  }, [entryKey]);
 
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50/50">
       <div className="flex items-center gap-2 px-3 py-1.5">
         <Input
           value={keyLocal}
-          onChange={(e) => setKeyLocal(e.target.value)}
+          onChange={(e) => {
+            setKeyLocal(e.target.value);
+            clearFieldError(keyError, setKeyError);
+          }}
           onBlur={() => {
-            if (keyLocal !== entryKey) onRenameKey(keyLocal);
+            if (keyLocal !== entryKey) {
+              mutation.mutate(
+                {
+                  op: "rename_key",
+                  path: mappingPath,
+                  index: entryIndex,
+                  new_key: keyLocal,
+                },
+                {
+                  onSuccess: () => setKeyError(null),
+                  onError: (e) =>
+                    setKeyError(e instanceof Error ? e.message : String(e)),
+                },
+              );
+            }
           }}
           className="h-7 text-xs font-mono"
           aria-label="entry key"
+          {...fieldErrorControlProps(keyError, keyErrorPath)}
           disabled={keyDisabled}
         />
         <Button
@@ -159,6 +189,11 @@ function MappingEntry({
           x
         </Button>
       </div>
+      {keyError && (
+        <div className="px-3 pb-2">
+          <FieldError message={keyError} path={keyErrorPath} />
+        </div>
+      )}
       <div className="border-t border-zinc-200 bg-white p-3">
         <FormField node={valueNode} path={valuePath} />
       </div>

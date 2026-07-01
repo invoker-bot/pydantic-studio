@@ -101,6 +101,41 @@ def test_add_entry_rename_key(page: Page, fastapi_url: str) -> None:
     expect(preview).to_contain_text("TZ:", timeout=5000)
 
 
+def test_duplicate_mapping_key_rename_announces_field_error(
+    page: Page, fastapi_url: str
+) -> None:
+    page.goto(f"{fastapi_url}/")
+    expect(page.get_by_label("name", exact=True)).to_be_visible(timeout=5000)
+
+    add_button = page.get_by_role("button", name="add env entry")
+    add_button.click()
+    add_button.click()
+
+    key_inputs = page.locator('input[aria-label="entry key"]')
+    first_key = key_inputs.nth(0)
+    second_key = key_inputs.nth(1)
+    expect(first_key).to_have_value("key0", timeout=5000)
+    expect(second_key).to_have_value("key1", timeout=5000)
+
+    second_key.fill("key0")
+    second_key.blur()
+
+    expect(second_key).to_have_attribute("aria-invalid", "true", timeout=5000)
+    describedby = second_key.get_attribute("aria-describedby")
+    assert describedby is not None
+    alert = page.locator(f'[id="{describedby}"]')
+    expect(alert).to_have_attribute("role", "alert")
+    expect(alert).to_contain_text("duplicate key 'key0'")
+
+    second_key.fill("SECOND")
+    expect(second_key).not_to_have_attribute("aria-invalid", "true")
+    assert second_key.get_attribute("aria-describedby") is None
+    second_key.blur()
+    expect(page.get_by_role("button", name="remove entry SECOND")).to_be_visible(
+        timeout=5000
+    )
+
+
 def test_add_entry_uses_typed_default_key_for_int_mapping(page: Page) -> None:
     tree = build_form_tree(_IntMappingSchema)
 
