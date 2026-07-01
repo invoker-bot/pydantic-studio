@@ -1490,8 +1490,6 @@ def _validate_transforming_python_value_against_node(
     node: Any,
     python_value: Any,
 ) -> list[str]:
-    if python_value is None and (getattr(node, "nullable", False) or not node.required):
-        return []
     field_info = getattr(node, "validation_field_info", None)
     if field_info is None:
         return []
@@ -2173,6 +2171,10 @@ class FormTree(BaseModel):
                 if target.required:
                     target.error = "value is required"
                     return ValidationResult.fail([target.error])
+                errors = _validate_transforming_python_value_against_node(target, None)
+                if errors:
+                    target.error = errors[0]
+                    return ValidationResult.fail(errors)
                 if target.omitted:
                     return ValidationResult.ok()
 
@@ -2207,6 +2209,10 @@ class FormTree(BaseModel):
         write_target = target
         if isinstance(target, UnionNode):
             if value is None and target.nullable:
+                errors = _validate_transforming_python_value_against_node(target, None)
+                if errors:
+                    target.error = errors[0]
+                    return ValidationResult.fail(errors)
                 if target.selected is None and target.emit_null:
                     return ValidationResult.ok()
 
@@ -2264,6 +2270,14 @@ class FormTree(BaseModel):
                     write_target.error = "value is required"
                     target.error = write_target.error
                     return ValidationResult.fail([write_target.error])
+                errors = _validate_transforming_python_value_against_node(
+                    write_target,
+                    None,
+                )
+                if errors:
+                    write_target.error = errors[0]
+                    target.error = errors[0]
+                    return ValidationResult.fail(errors)
                 if write_target.omitted:
                     return ValidationResult.ok()
 
@@ -2310,6 +2324,14 @@ class FormTree(BaseModel):
 
         if isinstance(write_target, SequenceNode):
             if value is None and write_target.nullable:
+                errors = _validate_transforming_python_value_against_node(
+                    write_target,
+                    None,
+                )
+                if errors:
+                    write_target.error = errors[0]
+                    target.error = errors[0]
+                    return ValidationResult.fail(errors)
                 if write_target.omitted and write_target.emit_null:
                     return ValidationResult.ok()
 
@@ -2366,6 +2388,14 @@ class FormTree(BaseModel):
 
         if isinstance(write_target, MappingNode):
             if value is None and write_target.nullable:
+                errors = _validate_transforming_python_value_against_node(
+                    write_target,
+                    None,
+                )
+                if errors:
+                    write_target.error = errors[0]
+                    target.error = errors[0]
+                    return ValidationResult.fail(errors)
                 if write_target.omitted and write_target.emit_null:
                     return ValidationResult.ok()
 

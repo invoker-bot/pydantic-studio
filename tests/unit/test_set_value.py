@@ -72,6 +72,16 @@ class PlainValidatorStringSchema(BaseModel):
     token: Annotated[str, PlainValidator(_reject_bad_string)] = "ok"
 
 
+def _reject_null_value(value: Any) -> Any:
+    if value is None:
+        raise ValueError("null blocked")
+    return value
+
+
+class NullRejectingOptionalStringSchema(BaseModel):
+    value: Annotated[str | None, PlainValidator(_reject_null_value)] = "ok"
+
+
 class NestedProfile(BaseModel):
     host: str = "localhost"
     port: int = Field(default=5432, ge=1)
@@ -88,10 +98,23 @@ def _reject_bad_profile(value: Any) -> NestedProfile:
     return profile
 
 
+def _reject_null_profile(value: Any) -> NestedProfile:
+    if value is None:
+        raise ValueError("null blocked")
+    return value if isinstance(value, NestedProfile) else NestedProfile.model_validate(value)
+
+
 class PlainValidatorNestedProfileSchema(BaseModel):
     profile: Annotated[
         NestedProfile,
         PlainValidator(_reject_bad_profile),
+    ] = Field(default_factory=NestedProfile)
+
+
+class NullRejectingOptionalProfileSchema(BaseModel):
+    profile: Annotated[
+        NestedProfile | None,
+        PlainValidator(_reject_null_profile),
     ] = Field(default_factory=NestedProfile)
 
 
@@ -348,6 +371,19 @@ def test_set_value_rejects_plain_validator_errors_without_mutating() -> None:
     assert tree.snapshots == []
 
 
+def test_set_value_rejects_null_with_field_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(NullRejectingOptionalStringSchema)
+    node = tree.root.find("value")
+    assert node is not None
+
+    result = tree.set_value("value", None)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, null blocked",)
+    assert node.value == "ok"
+    assert tree.snapshots == []
+
+
 def test_set_value_replaces_nested_group_fields_and_undoes() -> None:
     tree = build_form_tree(
         NestedProfileSchema,
@@ -372,6 +408,20 @@ def test_set_value_rejects_invalid_nested_group_field_without_mutating() -> None
 
     assert result.ok is False
     assert result.errors == ("port: must be >= 1",)
+    assert tree.to_instance().profile == NestedProfile(host="old.local", port=5432)
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_null_nested_group_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(
+        NullRejectingOptionalProfileSchema,
+        existing={"profile": {"host": "old.local", "port": 5432}},
+    )
+
+    result = tree.set_value("profile", None)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, null blocked",)
     assert tree.to_instance().profile == NestedProfile(host="old.local", port=5432)
     assert tree.snapshots == []
 

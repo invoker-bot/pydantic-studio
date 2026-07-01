@@ -89,6 +89,19 @@ class _RequiredPlainValidatorUnionHolder(BaseModel):
     ]
 
 
+def _reject_null_union_value(value: Any) -> Any:
+    if value is None:
+        raise ValueError("null union blocked")
+    return value
+
+
+class _NullRejectingOptionalUnionHolder(BaseModel):
+    value: Annotated[
+        int | str | None,
+        PlainValidator(_reject_null_union_value),
+    ] = 1
+
+
 def _reject_blocked_payload(value: Any) -> str | _SeededListPayload:
     candidate = (
         _SeededListPayload.model_validate(value)
@@ -490,6 +503,26 @@ def test_select_variant_rejects_explicit_none_seed_without_mutating() -> None:
     assert val.selected_index == 1
     assert isinstance(val.selected, StringNode)
     assert val.selected.value == "keep-me"
+    assert tree.snapshots == []
+
+
+def test_set_value_rejects_null_union_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_NullRejectingOptionalUnionHolder)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 1
+
+    result = tree.set_value("value", None)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, null union blocked",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, IntNode)
+    assert val.selected.value == 1
     assert tree.snapshots == []
 
 

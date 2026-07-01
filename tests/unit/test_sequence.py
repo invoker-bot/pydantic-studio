@@ -35,6 +35,18 @@ class PlainValidatorListHost(BaseModel):
     values: Annotated[list[int], PlainValidator(_reject_empty_sequence)] = [1]
 
 
+def _reject_null_sequence(value: Any) -> Any:
+    if value is None:
+        raise ValueError("null sequence blocked")
+    return value
+
+
+class NullRejectingOptionalListHost(BaseModel):
+    values: Annotated[list[int] | None, PlainValidator(_reject_null_sequence)] = Field(
+        default_factory=lambda: [1]
+    )
+
+
 def test_sequence_node_construct() -> None:
     node = SequenceNode(
         name="tags",
@@ -165,6 +177,19 @@ def test_set_value_can_clear_optional_list_to_null() -> None:
     assert result.ok is True
     assert tree.to_python()["tags"] is None
     assert tree.to_instance().tags is None
+
+
+def test_set_value_rejects_null_sequence_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(NullRejectingOptionalListHost)
+    values = tree.root.find("values")
+    assert isinstance(values, SequenceNode)
+
+    result = tree.set_value("values", None)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, null sequence blocked",)
+    assert values.to_python() == [1]
+    assert tree.snapshots == []
 
 
 def test_add_item_after_clearing_optional_list_does_not_restore_old_items() -> None:

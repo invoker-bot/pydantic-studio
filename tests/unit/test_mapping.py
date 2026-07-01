@@ -49,6 +49,19 @@ class PlainValidatorDictHost(BaseModel):
     values: Annotated[dict[str, int], PlainValidator(_reject_empty_mapping)] = {"a": 1}
 
 
+def _reject_null_mapping(value: Any) -> Any:
+    if value is None:
+        raise ValueError("null mapping blocked")
+    return value
+
+
+class NullRejectingOptionalDictHost(BaseModel):
+    values: Annotated[
+        dict[str, int] | None,
+        PlainValidator(_reject_null_mapping),
+    ] = Field(default_factory=lambda: {"a": 1})
+
+
 def test_dict_builder_constructs_mapping_node() -> None:
     tree = build_form_tree(WithDict)
     settings = tree.root.find("settings")
@@ -112,6 +125,19 @@ def test_set_value_can_clear_optional_dict_to_null() -> None:
     assert result.ok is True
     assert tree.to_python()["labels"] is None
     assert tree.to_instance().labels is None
+
+
+def test_set_value_rejects_null_mapping_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(NullRejectingOptionalDictHost)
+    values = tree.root.find("values")
+    assert isinstance(values, MappingNode)
+
+    result = tree.set_value("values", None)
+
+    assert result.ok is False
+    assert result.errors == ("Value error, null mapping blocked",)
+    assert values.to_python() == {"a": 1}
+    assert tree.snapshots == []
 
 
 def test_add_entry_after_clearing_optional_dict_does_not_restore_old_entries() -> None:
