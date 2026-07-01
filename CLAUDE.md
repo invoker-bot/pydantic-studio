@@ -11,8 +11,8 @@ immediately.
   YAML / TOML / JSON config files against a strongly-typed schema.
 - **Status**: v0.4.0 alpha — all 9 implementation phases, the
   task-oriented overhaul, TUI form mode, the React-backed web app, and
-  root model variants are merged on master. Current local gate: 1302
-  tests: 1250 default tests plus 52 explicit Playwright browser e2e tests, ruff
+  root model variants are merged on master. Current local gate: 1303
+  tests: 1251 default tests plus 52 explicit Playwright browser e2e tests, ruff
   clean, pyright clean for production code, `mkdocs build --strict`
   clean, frontend bundle build clean, `uv build` clean, `twine check`
   clean, and wheel/sdist install smoke clean. CI runs the default suite
@@ -250,7 +250,7 @@ ruff knows the rule and won't complain.
 
 ## Test patterns
 
-- **`uv run pytest -q`** runs the default suite (1250 tests currently).
+- **`uv run pytest -q`** runs the default suite (1251 tests currently).
   This intentionally skips `tests/e2e/` and disables the pytest-playwright
   plugin because plugin registration interferes with Textual
   `App.run_test()` under `asyncio_mode="auto"`.
@@ -318,7 +318,7 @@ ruff knows the rule and won't complain.
 - `model_dump(mode="python")` leaves Enum/Decimal/UUID/datetime as
   Python instances. ruamel.yaml can't serialize Python-only types.
   **Use `mode="json"`** when feeding output to a YAML/TOML writer.
-  The PreviewPane and `save_yaml` both do this.
+  The YAML preview and regular config writers both do this.
 - `EmailStr` is a plain class in Pydantic v2 (not `Annotated[str, ...]`),
   so detection looks at `type_.__name__ == "EmailStr"` directly without
   `strip_annotated`.
@@ -418,7 +418,7 @@ These are still deliberate non-goals unless the user asks for them:
 | Pilot DOM query returns None | `await pilot.pause()`, then use `app.screen.query_one` |
 | Widget id collision | Check `_sanitize_id(path)` for pre-escaped underscores |
 | Web field does not update | Check `/api/mutations`, `mutation_result`, and Query cache |
-| save_yaml raises ValidationFailedError | Unset required fields need `save_draft_yaml` |
+| save_config reports validation errors | Unset required fields need `save_draft_yaml` |
 | pyright reports many renderer errors | Check `[tool.pyright] exclude` is intact |
 | Test asserting `node.value` is None | Default-seeding was removed; seed with `tree.set_value` |
 

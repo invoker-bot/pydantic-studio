@@ -116,6 +116,14 @@ def test_release_gate_docs_use_current_test_counts() -> None:
             assert snippet in normalized_text, f"{doc} should mention {snippet!r}"
 
 
+def test_agent_guide_uses_format_dispatch_save_guidance() -> None:
+    text = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+
+    assert "### 5. `save_config` requires a valid tree" in text
+    assert "The PreviewPane and `save_yaml` both do this." not in text
+    assert "| save_yaml raises ValidationFailedError |" not in text
+
+
 def test_release_guide_names_console_script_entry_point_verification() -> None:
     guide = (ROOT / "docs" / "site" / "release.md").read_text(encoding="utf-8")
 
