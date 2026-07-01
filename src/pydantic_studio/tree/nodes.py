@@ -1747,6 +1747,7 @@ def _validate_seed_against_node(
             if expected_length is not None and len(values) != expected_length:
                 errors.append(f"length must be exactly {expected_length}")
         registry = default_registry()
+        items: list[Any] = []
         for index, value in enumerate(values):
             item_type = _sequence_item_annotation(node, index)
             if item_type is None:
@@ -1769,7 +1770,11 @@ def _validate_seed_against_node(
                 none_is_absent=False,
             ):
                 errors.append(f"[{index}]: {message}")
-        return errors
+            child.name = str(index)
+            items.append(child)
+        if errors:
+            return errors
+        return _validate_sequence_items_against_node(node, items)
     if isinstance(node, MappingNode):
         if not isinstance(seed, dict):
             return [f"expected dict for mapping value, got {type(seed).__name__}"]
@@ -1789,6 +1794,7 @@ def _validate_seed_against_node(
         value_builder = registry.find(value_type)
         key_field = field_info_from_annotation(key_type)
         value_field = field_info_from_annotation(value_type)
+        entries: list[tuple[Any, Any]] = []
         for raw_key, raw_value in seed.items():
             try:
                 key_node = key_builder.build(key_type, key_field, raw_key)
@@ -1816,7 +1822,12 @@ def _validate_seed_against_node(
                 none_is_absent=False,
             ):
                 errors.append(f"[{raw_key!r}]: {message}")
-        return errors
+            key_node.name = "key"
+            value_node.name = "value"
+            entries.append((key_node, value_node))
+        if errors:
+            return errors
+        return _validate_mapping_entries_against_node(node, entries)
     if isinstance(node, UnionNode) and node.selected is not None:
         return _validate_seed_against_node(
             node.selected,

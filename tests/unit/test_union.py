@@ -146,6 +146,32 @@ class _PlainValidatorMappingUnionHolder(BaseModel):
     ] = "start"
 
 
+def _reject_empty_variant_sequence(value: Any) -> Any:
+    if value == []:
+        raise ValueError("variant sequence blocked")
+    return value
+
+
+class _PlainValidatorSequenceVariantUnionHolder(BaseModel):
+    value: str | Annotated[
+        list[int],
+        PlainValidator(_reject_empty_variant_sequence),
+    ] = "start"
+
+
+def _reject_empty_variant_mapping(value: Any) -> Any:
+    if value == {}:
+        raise ValueError("variant mapping blocked")
+    return value
+
+
+class _PlainValidatorMappingVariantUnionHolder(BaseModel):
+    value: str | Annotated[
+        dict[str, int],
+        PlainValidator(_reject_empty_variant_mapping),
+    ] = "start"
+
+
 class _OptionalAnnotatedHolder(BaseModel):
     maybe_count: Annotated[int, Field(gt=0)] | None = None
     maybe_name: Annotated[str, Field(min_length=2)] | None = None
@@ -462,6 +488,31 @@ def test_set_value_rejects_selected_mapping_union_plain_validator_without_mutati
     assert len(tree.snapshots) == 1
 
 
+def test_set_value_rejects_sequence_variant_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_PlainValidatorSequenceVariantUnionHolder)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "start"
+
+    result = tree.set_value("value", [])
+
+    assert result.ok is False
+    assert result.errors == (
+        "no union variant accepted value: "
+        "variant 0 (builtins.str): expected str, got list; "
+        'variant 1 (typing.List["builtins.int"]): '
+        "Value error, variant sequence blocked",
+    )
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "start"
+    assert tree.snapshots == []
+
+
 def test_select_variant_rejects_invalid_seed_without_mutating() -> None:
     tree = build_form_tree(WithUnion, existing={"value": "keep-me"})
 
@@ -543,6 +594,26 @@ def test_select_variant_rejects_union_field_plain_validator_without_mutating() -
     assert val.selected_index == 0
     assert isinstance(val.selected, IntNode)
     assert val.selected.value == 1
+    assert tree.snapshots == []
+
+
+def test_select_variant_rejects_mapping_variant_plain_validator_without_mutating() -> None:
+    tree = build_form_tree(_PlainValidatorMappingVariantUnionHolder)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "start"
+
+    result = tree.select_variant("value", 1, seed={})
+
+    assert result.ok is False
+    assert result.errors == ("Value error, variant mapping blocked",)
+    val = tree.root.find("value")
+    assert isinstance(val, UnionNode)
+    assert val.selected_index == 0
+    assert isinstance(val.selected, StringNode)
+    assert val.selected.value == "start"
     assert tree.snapshots == []
 
 
