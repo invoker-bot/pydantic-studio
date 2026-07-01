@@ -130,6 +130,24 @@ def test_edit_console_failure_reports_clean_error(monkeypatch) -> None:
     assert "disk full" in result.output
 
 
+def test_edit_console_validation_failure_reports_validation_error(monkeypatch) -> None:
+    from pydantic_studio.exceptions import ValidationFailedError
+
+    def fake_run(tree, save_path=None) -> None:
+        raise ValidationFailedError(["name: value is required"], paths=["name"])
+
+    import pydantic_studio.renderers.console as console_module
+
+    monkeypatch.setattr(console_module, "run_console_app", fake_run)
+
+    result = runner.invoke(app, ["edit", "tests.fixtures.schemas:Server"])
+
+    assert result.exit_code == 1
+    assert "validation failed" in result.output.lower()
+    assert "edit failed" not in result.output.lower()
+    assert "name: value is required" in result.output
+
+
 def test_edit_console_cancel_exits_without_failure_message(monkeypatch) -> None:
     from pydantic_studio.exceptions import CancelledByUser
 

@@ -458,6 +458,9 @@ def edit(
         _exit_if_cancelled_outcome(outcome)
     except CancelledByUser as e:
         raise typer.Exit(code=1) from e
-    except (OSError, ValueError, ValidationFailedError) as e:
+    except ValidationFailedError as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+    except (OSError, ValueError) as e:
         typer.secho(f"edit failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from e
