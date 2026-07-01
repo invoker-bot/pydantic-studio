@@ -89,7 +89,16 @@ export default function App() {
   }, [submitErrors]);
 
   if (isLoading) {
-    return <div className="p-8 text-zinc-500">Loading tree...</div>;
+    return (
+      <div
+        role="status"
+        aria-busy="true"
+        aria-live="polite"
+        className="p-8 text-zinc-500"
+      >
+        Loading tree...
+      </div>
+    );
   }
   if (error || !data) {
     return (

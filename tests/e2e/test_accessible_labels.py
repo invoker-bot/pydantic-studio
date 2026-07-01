@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import socket
 import threading
 import time as _time
@@ -23,6 +24,10 @@ class _BrokenLoadSchema(BaseModel):
     name: str = "demo-service"
 
 
+class _DelayedLoadSchema(BaseModel):
+    name: str = "demo-service"
+
+
 def _find_free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -30,20 +35,8 @@ def _find_free_port() -> int:
 
 
 @contextmanager
-def _serve_broken_tree_load() -> Iterator[str]:
+def _serve_server(server: StudioServer) -> Iterator[str]:
     port = _find_free_port()
-    tree = build_form_tree(_BrokenLoadSchema)
-    server = StudioServer(tree=tree, save_path=None)
-
-    @server.app.middleware("http")
-    async def fail_tree_load(request, call_next):
-        if request.url.path == "/api/tree":
-            return JSONResponse(
-                status_code=500,
-                content={"detail": "tree unavailable"},
-            )
-        return await call_next(request)
-
     config = uvicorn.Config(
         server.app,
         host="127.0.0.1",
@@ -70,6 +63,39 @@ def _serve_broken_tree_load() -> Iterator[str]:
     finally:
         uvi.should_exit = True
         thread.join(timeout=2.0)
+
+
+@contextmanager
+def _serve_broken_tree_load() -> Iterator[str]:
+    tree = build_form_tree(_BrokenLoadSchema)
+    server = StudioServer(tree=tree, save_path=None)
+
+    @server.app.middleware("http")
+    async def fail_tree_load(request, call_next):
+        if request.url.path == "/api/tree":
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "tree unavailable"},
+            )
+        return await call_next(request)
+
+    with _serve_server(server) as base_url:
+        yield base_url
+
+
+@contextmanager
+def _serve_delayed_tree_load(delay_seconds: float = 3.0) -> Iterator[str]:
+    tree = build_form_tree(_DelayedLoadSchema)
+    server = StudioServer(tree=tree, save_path=None)
+
+    @server.app.middleware("http")
+    async def delay_tree_load(request, call_next):
+        if request.url.path == "/api/tree":
+            await asyncio.sleep(delay_seconds)
+        return await call_next(request)
+
+    with _serve_server(server) as base_url:
+        yield base_url
 
 
 def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> None:
@@ -102,6 +128,16 @@ def test_labels_reference_labelable_controls(page: Page, fastapi_url: str) -> No
     )
 
     assert broken == []
+
+
+def test_tree_loading_state_is_announced(page: Page) -> None:
+    with _serve_delayed_tree_load() as base_url:
+        page.goto(f"{base_url}/")
+
+        expect(page.get_by_text("Loading tree...")).to_be_visible(timeout=1000)
+        status = page.get_by_role("status")
+        expect(status).to_contain_text("Loading tree...", timeout=1000)
+        expect(status).to_have_attribute("aria-busy", "true")
 
 
 def test_tree_load_failure_is_announced(page: Page) -> None:
