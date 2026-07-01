@@ -66,7 +66,7 @@ class EditSession:
 
     def submit(self) -> SubmitResult:
         """Validate and optionally persist the current tree."""
-        from pydantic_studio import save_yaml
+        from pydantic_studio import save_config
 
         if self.submitted:
             return SubmitResult(ok=True, outcome=self.outcome)
@@ -80,7 +80,7 @@ class EditSession:
         try:
             if self.save_path is not None:
                 try:
-                    save_yaml(self.tree, self.save_path)
+                    save_config(self.tree, self.save_path)
                 except (OSError, ValueError) as exc:
                     return SubmitResult(
                         ok=False,

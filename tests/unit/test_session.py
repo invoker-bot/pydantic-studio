@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from pydantic_studio import build_form_tree, load_yaml
+from pydantic_studio import build_form_tree, load_config, load_yaml
 from pydantic_studio.outcome import EditOutcome
 from pydantic_studio.session import EditSession, SubmitResult
 
@@ -49,6 +49,19 @@ def test_submit_with_save_path_writes_yaml(tmp_path: Path) -> None:
     assert result.ok is True
     assert out.exists()
     assert load_yaml(out, _ValidSchema).to_instance().name == "alpha"
+
+
+@pytest.mark.parametrize("suffix", [".toml", ".json"])
+def test_submit_with_save_path_uses_extension_dispatch(tmp_path: Path, suffix: str) -> None:
+    out = tmp_path / f"config{suffix}"
+    tree = build_form_tree(_ValidSchema)
+    session = EditSession(tree=tree, save_path=out)
+
+    result = session.submit()
+
+    assert result.ok is True
+    assert out.exists()
+    assert load_config(out, _ValidSchema).to_instance().name == "alpha"
 
 
 def test_submit_success_resets_dirty_baseline() -> None:
